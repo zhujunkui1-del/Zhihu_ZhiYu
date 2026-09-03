@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="知遇 · 设置 —— 管理你的知乎授权与人格数据源、别人能否派 Agent 来认识你，以及数据与隐私偏好。">
+  <title>知遇 · 设置</title>
+  <style>
+    :root {
+      --bg:      #eef3fc;
+      --surface: #ffffff;
+      --fg:      #16263f;
+      --muted:   #5d6c88;
+      --border:  #d7e1f1;
+      --accent:  #0d64fd;
+      --accent-soft: color-mix(in oklch, var(--accent) 13%, transparent);
+      --accent-faint: color-mix(in oklch, var(--accent) 5%, transparent);
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --fg-softer: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      --radius: 10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    h1, h2 { font-family: var(--font-display); }
+    h1 { font-size: clamp(28px, 3vw, 38px); line-height: 1.25; margin: 0; letter-spacing: 0.01em; }
+    h2 { font-size: clamp(20px, 2vw, 26px); line-height: 1.32; margin: 0; }
+    h3 { font-size: 16px; margin: 0; }
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+    .meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.05s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 84%, black); border-color: color-mix(in oklch, var(--accent) 84%, black); }
+    .btn-primary[disabled], .btn-secondary[disabled] { opacity: 0.62; cursor: default; }
+    .btn-secondary { background: var(--surface); color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--accent-faint); }
+    .btn-ghost { background: transparent; color: var(--fg); padding-inline: 6px; }
+    .btn-ghost:hover { color: var(--accent); }
+    .btn-arrow::after { content: '→'; transition: transform 0.15s ease; }
+    .btn-arrow:hover::after { transform: translateX(3px); }
+
+    /* ─── 应用壳 ─────────────────────────────────────────────── */
+    .app-shell { display: flex; min-height: 100vh; }
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0;
+      width: 248px; z-index: 20;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 18px 14px 16px;
+    }
+    .side-brand { display: block; padding: 2px 6px 0; }
+    .brand-row { display: inline-flex; align-items: center; gap: 11px; }
+    .brand-plate {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      box-shadow: 0 8px 20px color-mix(in oklch, var(--fg) 8%, transparent);
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .brand-plate img { width: 37px; height: auto; }
+    .brand-word { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
+    .brand-tag { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; }
+    .side-nav { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%;
+      min-height: 46px;
+      padding: 9px 12px;
+      border: 0; border-radius: 12px;
+      background: transparent;
+      color: var(--fg);
+      font-size: 14.5px;
+      font-weight: 500;
+      text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--muted); transition: color 0.15s ease; }
+    .nav-item:hover { background: var(--fg-soft); }
+    .nav-item.active { background: var(--accent); color: var(--surface); }
+    .nav-item.active svg { color: var(--surface); }
+    .side-foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .zh-avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-family: var(--font-display);
+      font-size: 17px;
+      border: 1px solid var(--border);
+    }
+    .side-foot .nav-item { flex: 1; min-height: 42px; }
+
+    .main { flex: 1; margin-left: 248px; min-width: 0; padding: 34px clamp(22px, 4vw, 54px) 72px; }
+    .main-inner { max-width: 1180px; margin-inline: auto; }
+
+    /* ─── 页头与页签 ─────────────────────────────────────────── */
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
+    .page-head h1 { max-width: 20ch; }
+    .page-head .sub { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; max-width: 68ch; line-height: 1.75; }
+    .head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+    .cov-chip {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in oklch, var(--surface) 78%, transparent);
+      color: var(--muted);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .cov-chip b { color: var(--fg); font-weight: 600; }
+    .cov-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+    .head-hint { max-width: 30ch; font-size: 12px; color: var(--muted); line-height: 1.7; text-align: right; }
+
+    .seg {
+      display: inline-flex; gap: 4px;
+      padding: 4px;
+      background: color-mix(in oklch, var(--surface) 70%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .seg button {
+      min-height: 42px;
+      padding: 8px 20px;
+      border: 0; border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .seg button:hover { color: var(--fg); }
+    .seg button.active { background: var(--fg); color: var(--surface); }
+    .seg .seg-count { font-family: var(--font-mono); font-size: 11px; margin-left: 6px; opacity: 0.75; }
+
+    .tab-panel[hidden] { display: none; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px;
+    }
+    .panel-eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px; }
+    .demo-note {
+      margin: 18px 0 0;
+      padding: 11px 14px;
+      background: var(--accent-faint);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.75;
+    }
+    .demo-note b { color: var(--fg); font-weight: 600; }
+
+    .sec-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+    .sec-top h2 { max-width: 22ch; }
+    .sec-top .s-sub { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; max-width: 62ch; line-height: 1.75; }
+
+    /* ─── 对话双方头像 ───────────────────────────────────────── */
+    .ava {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      flex: 0 0 auto;
+      display: grid; place-items: center;
+      background: var(--fg-soft);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .ava.me { background: var(--accent-faint); border-color: color-mix(in oklch, var(--accent) 34%, var(--border)); color: var(--accent); }
+    .duo { display: inline-flex; align-items: center; flex: 0 0 auto; }
+    .duo .ava + .ava { margin-left: -11px; box-shadow: 0 0 0 3px var(--surface); }
+
+    /* ─── 认识中列表 ─────────────────────────────────────────── */
+    .list { display: grid; gap: 16px; }
+    .mcard {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .mcard:hover { border-color: color-mix(in oklch, var(--accent) 36%, var(--border)); box-shadow: 0 12px 30px color-mix(in oklch, var(--fg) 7%, transparent); }
+    .m-top { display: flex; align-items: flex-start; gap: 14px; }
+    .m-who { min-width: 0; }
+    .m-title { font-size: 15.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .m-title .who-me { font-weight: 400; color: var(--muted); font-size: 13px; }
+    .m-sub { margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; }
+    .m-sub .tag {
+      border: 1px solid var(--border);
+      background: var(--fg-softer);
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .m-side { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .pill.todo { background: var(--fg-soft); color: var(--muted); }
+    .pill.todo .dot { background: color-mix(in oklch, var(--muted) 55%, transparent); }
+    .pill.done { background: var(--accent-faint); color: var(--accent); }
+    .pill.done .dot { background: var(--accent); }
+    .pill.run { background: var(--accent-soft); color: var(--accent); }
+    .pill.run .dot { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+    .m-round { font-size: 12px; color: var(--muted); }
+    .m-round b { color: var(--fg); font-weight: 600; }
+
+    .m-quote {
+      margin: 0;
+      padding: 12px 14px;
+      background: var(--fg-softer);
+      border-radius: 12px;
+      color: var(--fg);
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+    .m-quote .q-src { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-bottom: 3px; }
+    .m-quote .q-src.silent { color: var(--muted); font-family: var(--font-body); font-size: 13px; }
+
+    .rounds { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .rseg {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 24px; padding: 0 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .rseg .n { font-family: var(--font-mono); font-size: 10px; }
+    .rseg.done { background: var(--fg-soft); border-color: transparent; color: var(--muted); }
+    .rseg.doing { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+    .rseg.todo { opacity: 0.72; }
+    .rseg.silent { opacity: 0.85; }
+
+    .m-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .m-foot .meta { font-size: 11.5px; }
+    .m-foot .btn { margin-left: auto; min-height: 40px; padding: 7px 14px; font-size: 13.5px; }
+
+    .empty-state {
+      border: 1px dashed color-mix(in oklch, var(--fg) 22%, transparent);
+      border-radius: 16px;
+      background: var(--fg-softer);
+      padding: 40px 26px;
+      text-align: center;
+    }
+    .empty-state .big { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+    .empty-state p { margin: 10px auto 0; color: var(--muted); font-size: 13.5px; max-width: 52ch; line-height: 1.8; }
+    .empty-state .btn { margin-top: 20px; }
+
+    /* ─── 匹配报告列表 ───────────────────────────────────────── */
+    .rep-row { flex-direction: row; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .rep-main { flex: 1; min-width: 280px; }
+    .rep-score {
+      display: flex; align-items: center; gap: 12px;
+      flex: 0 0 auto;
+    }
+    .rep-score .num { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+    .rep-score .lbl { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+    .rep-quote { margin: 8px 0 0; color: var(--fg); font-size: 13.5px; line-height: 1.7; }
+    .rep-quote::before { content: '“'; color: var(--accent); font-family: var(--font-display); font-size: 16px; }
+    .rep-quote::after { content: '”'; color: var(--accent); font-family: var(--font-display); font-size: 16px; }
+    .dim-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .dchip {
+      display: inline-flex; align-items: baseline; gap: 5px;
+      padding: 2px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .dchip b { color: var(--fg); font-family: var(--font-mono); font-weight: 600; }
+    .rep-actions { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; align-items: stretch; }
+    .rep-actions .btn { min-height: 40px; padding: 7px 14px; font-size: 13.5px; white-space: nowrap; }
+    .sent-note { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--muted); min-height: 40px; }
+    .sent-note svg { width: 14px; height: 14px; color: var(--accent); }
+
+    /* ─── 报告详情弹窗 ───────────────────────────────────────── */
+    .modal-xl .modal-dialog { width: min(96vw, 920px); }
+    .modal-wide .modal-dialog { width: min(94vw, 680px); }
+    .rep-head { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+    .rep-head .duo .ava { width: 46px; height: 46px; font-size: 14px; }
+    .rep-head .m-sub { margin-top: 4px; }
+    .score-badge { display: flex; align-items: center; gap: 12px; }
+    .score-badge .num { font-size: 42px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; color: var(--fg); }
+    .score-badge .lbl { font-size: 11.5px; color: var(--muted); font-family: var(--font-mono); }
+    .rep-head .score-badge { margin-left: auto; }
+    .rep-top { display: grid; grid-template-columns: 1.05fr 1fr; gap: 22px; margin-top: 18px; }
+    .radar-wrap { display: flex; align-items: center; justify-content: center; }
+    .radar-wrap svg { width: min(100%, 300px); height: auto; }
+    .why-block {
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 12px;
+      padding: 18px 20px;
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    .why-block .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
+    .why-block .headline { font-family: var(--font-display); font-size: 20px; font-weight: 600; line-height: 1.4; }
+    .why-block p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.85; }
+    .rep-dims { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 18px; }
+    .rep-dims > h3 { font-size: 15px; margin-bottom: 14px; }
+    .dim-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+    .dim-item .dtop { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 5px; }
+    .dim-item .dn { font-size: 13px; font-weight: 600; }
+    .dim-item .dv { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+    .dim-item .dr { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .track { height: 7px; border-radius: 999px; background: var(--fg-soft); overflow: hidden; }
+    .track i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+
+    .hl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .hl-list li { padding: 12px 14px; border-radius: 12px; background: var(--fg-softer); }
+    .hl-list .who { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+    .hl-list .who .mini {
+      width: 18px; height: 18px; border-radius: 6px;
+      display: grid; place-items: center;
+      font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+      background: var(--fg-soft); color: var(--fg);
+    }
+    .hl-list .who.me .mini { background: var(--accent-soft); color: var(--accent); }
+    .hl-list .who span.n { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+    .hl-list p { margin: 0; font-size: 13px; line-height: 1.7; }
+
+    /* ─── 对话过程弹窗 ───────────────────────────────────────── */
+    .chat-head { display: flex; align-items: center; gap: 13px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .chat-meta { min-width: 0; }
+    .chat-meta .ct { font-size: 15px; font-weight: 600; }
+    .chat-meta .cs { margin-top: 2px; font-size: 12px; color: var(--muted); }
+    .chat-feed {
+      margin-top: 16px;
+      display: flex; flex-direction: column; gap: 16px;
+      max-height: 46vh; min-height: 220px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .round-gap { align-self: center; }
+    .round-gap span {
+      display: inline-flex; align-items: center;
+      padding: 2px 11px; border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-family: var(--font-mono); font-size: 10.5px;
+      color: var(--muted); letter-spacing: 0.05em;
+    }
+    .msg { display: flex; flex-direction: column; max-width: 86%; }
+    .msg.me { align-self: flex-start; }
+    .msg.ta { align-self: flex-end; align-items: flex-end; }
+    .msg .who { display: flex; align-items: center; gap: 6px; margin: 0 2px 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+    .msg .who .wdot { width: 16px; height: 16px; border-radius: 6px; display: grid; place-items: center; font-size: 9px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+    .msg.ta .who { flex-direction: row-reverse; }
+    .msg.ta .who .wdot { background: var(--fg-soft); color: var(--fg); }
+    .msg .bubble { padding: 10px 14px; font-size: 13.5px; line-height: 1.75; }
+    .msg.me .bubble { background: var(--accent-soft); border: 1px solid color-mix(in oklch, var(--accent) 18%, var(--border)); border-top-left-radius: 5px; border-radius: 15px; }
+    .msg.ta .bubble { background: var(--fg-softer); border: 1px solid var(--border); border-top-right-radius: 5px; border-radius: 15px; }
+    .typing { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--fg-softer); border: 1px solid var(--border); border-radius: 15px; border-top-right-radius: 5px; }
+    .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: blink 1.3s infinite; }
+    .typing i:nth-child(2) { animation-delay: 0.2s; }
+    .typing i:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+    .chat-feed .sys-note {
+      align-self: center;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.75;
+      max-width: 46ch;
+    }
+    .chat-feed .sys-note b { color: var(--accent); font-weight: 600; }
+
+    /* ─── 弹窗与提示 ─────────────────────────────────────────── */
+    .modal {
+      position: fixed; inset: 0; z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 22px;
+    }
+    .modal.open { display: grid; }
+    .modal-backdrop { position: absolute; inset: 0; background: color-mix(in oklch, var(--fg) 48%, transparent); backdrop-filter: blur(3px); }
+    .modal-dialog {
+      position: relative;
+      width: min(100%, 580px);
+      max-height: min(88vh, 780px);
+      overflow: auto;
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 26px;
+      box-shadow: 0 36px 110px color-mix(in oklch, var(--fg) 40%, transparent);
+    }
+    .modal-close {
+      position: absolute; top: 14px; right: 14px;
+      width: 40px; height: 40px;
+      border: 0; border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      display: grid; place-items: center;
+      z-index: 1;
+    }
+    .modal-close:hover { background: var(--fg-soft); color: var(--fg); }
+    .modal-close svg { width: 18px; height: 18px; }
+    .modal h3 { font-size: 19px; font-family: var(--font-display); }
+    .modal-body { margin-top: 14px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+    .modal-actions .btn { flex: 1; min-width: 150px; }
+
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 26px;
+      transform: translate(-50%, 12px);
+      z-index: 70;
+      background: var(--fg);
+      color: var(--surface);
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      box-shadow: 0 16px 44px color-mix(in oklch, var(--fg) 30%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: min(86vw, 560px);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1120px) {
+      .rep-top { grid-template-columns: 1fr; }
+      .head-side { align-items: flex-start; }
+    }
+    @media (max-width: 920px) {
+      .app-shell { flex-direction: column; }
+      .sidebar {
+        position: static;
+        width: 100%; height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+      }
+      .side-nav { flex-direction: row; flex-wrap: wrap; margin-top: 12px; gap: 6px; flex: none; }
+      .nav-item { width: auto; min-height: 42px; padding: 8px 12px; font-size: 13.5px; }
+      .side-foot { margin-top: 10px; border-top: 0; padding-top: 0; }
+      .main { margin-left: 0; padding: 26px 18px 60px; }
+      .panel { padding: 18px; }
+      .rep-row { flex-direction: column; align-items: stretch; }
+      .rep-actions { flex-direction: row; }
+      .rep-actions .btn { flex: 1; }
+      .msg { max-width: 94%; }
+    }
+    /* ─── 通知页覆盖层 ───────────────────────────────────────── */
+    .head-side { gap: 8px; }
+    .head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .head-actions .btn { min-height: 40px; padding: 7px 15px; font-size: 13px; }
+    .head-actions .btn[hidden] { display: none; }
+    .head-hint { max-width: 34ch; }
+
+    .n-list { display: grid; gap: 14px; }
+    .n-card {
+      display: flex; gap: 16px; align-items: flex-start;
+      width: 100%;
+      padding: 18px 20px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    .n-card:hover { border-color: color-mix(in oklch, var(--accent) 36%, var(--border)); box-shadow: 0 12px 30px color-mix(in oklch, var(--fg) 7%, transparent); }
+    .n-card.unread { background: color-mix(in oklch, var(--accent) 3.5%, var(--surface)); }
+    .n-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 18px; }
+    .n-ico {
+      width: 44px; height: 44px; border-radius: 14px;
+      flex: 0 0 auto;
+      display: grid; place-items: center;
+      background: var(--fg-soft);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .n-ico svg { width: 21px; height: 21px; }
+    .n-card.k-report .n-ico { background: var(--accent-faint); border-color: color-mix(in oklch, var(--accent) 34%, var(--border)); color: var(--accent); }
+    .n-body { min-width: 0; flex: 1; }
+    .n-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .n-kind { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+    .n-kind .kdot { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in oklch, var(--muted) 55%, transparent); flex: 0 0 auto; }
+    .n-card.k-done .n-kind .kdot { background: var(--accent); }
+    .n-time { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 16%, transparent); }
+    .n-title { margin: 8px 0 0; font-size: 15.5px; font-weight: 600; }
+    .n-desc { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.75; max-width: 74ch; }
+    .n-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 13px; }
+    .n-open { min-height: 34px; padding: 4px 12px; font-size: 12.5px; font-weight: 500; color: var(--accent); }
+    .n-open:hover { color: var(--accent); background: var(--accent-faint); }
+    .n-open svg { width: 13px; height: 13px; margin-left: 3px; }
+
+    .n-notice {
+      margin-top: 20px; padding: 13px 16px;
+      border: 1px solid color-mix(in oklch, var(--accent) 26%, var(--border));
+      border-radius: 14px;
+      background: var(--accent-faint);
+      color: var(--muted); font-size: 12.5px; line-height: 1.8;
+    }
+    .n-notice b { color: var(--accent); }
+
+    @media (max-width: 560px) {
+      .n-card { gap: 12px; }
+      .n-ico { width: 40px; height: 40px; }
+      .n-time { margin-left: 0; }
+    }
+      /* ─── 设置页（追加）────────────────────────────────────── */
+    :root { --danger: oklch(0.54 0.18 27); }
+    .set-list { display: grid; gap: 22px; }
+    .s-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 26px 26px 10px;
+    }
+    .s-head { margin: 0 2px 6px; }
+    .s-head h2 { font-size: clamp(19px, 2vw, 24px); }
+    .s-head .s-sub { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; max-width: 78ch; line-height: 1.75; }
+    .s-rows { border-top: 1px solid var(--border); }
+    .s-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 22px; row-gap: 10px;
+      align-items: center;
+      padding: 18px 2px;
+    }
+    .s-row + .s-row { border-top: 1px solid var(--border); }
+    .s-row.lead {
+      display: flex; align-items: center; gap: 14px;
+      padding-bottom: 2px;
+    }
+    .s-body { min-width: 0; }
+    .s-body h3 {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.5;
+    }
+    .s-body h3 .pill { font-weight: 500; flex: 0 0 auto; }
+    .s-body p { margin: 7px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.8; max-width: 76ch; }
+    .s-ctl { display: flex; align-items: center; justify-content: flex-end; gap: 12px; grid-column: 2; }
+    .btn.sm { min-height: 44px; padding: 8px 16px; font-size: 13.5px; }
+    .sw-t { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .switch-wrap { display: inline-flex; align-items: center; min-height: 44px; }
+    .switch { position: relative; width: 46px; height: 26px; flex: 0 0 auto; }
+    .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+    .switch i {
+      position: absolute; inset: 0;
+      background: color-mix(in oklch, var(--muted) 34%, var(--border));
+      border-radius: 999px;
+      transition: background 0.18s ease;
+      pointer-events: none;
+    }
+    .switch i::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--surface);
+      box-shadow: 0 1px 3px color-mix(in oklch, var(--fg) 26%, transparent);
+      transition: transform 0.18s ease;
+    }
+    .switch input:checked + i { background: var(--accent); }
+    .switch input:checked + i::after { transform: translateX(20px); }
+    .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      border-color: color-mix(in oklch, var(--danger) 42%, var(--border));
+    }
+    .btn-danger:hover {
+      background: color-mix(in oklch, var(--danger) 8%, var(--surface));
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .btn-solid-danger { background: var(--danger); color: var(--surface); border-color: var(--danger); }
+    .btn-solid-danger:hover {
+      background: color-mix(in oklch, var(--danger) 84%, black);
+      border-color: color-mix(in oklch, var(--danger) 84%, black);
+    }
+
+    .auth-lead { margin: 0 0 2px; color: var(--fg); font-size: 14px; line-height: 1.7; }
+    .muted-p { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+    .auth-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+    .auth-list li { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; line-height: 1.6; }
+    .auth-list li .a-chk { font-family: var(--font-mono); color: var(--accent); font-weight: 700; flex: 0 0 auto; }
+    .auth-list li .a-dim { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .auth-note {
+      margin: 16px 0 0; padding: 11px 14px;
+      background: var(--fg-soft);
+      border-radius: 12px;
+      color: var(--muted); font-size: 12.5px; line-height: 1.75;
+    }
+    .auth-note b { color: var(--fg); font-weight: 600; }
+    .auth-note.danger-note {
+      background: color-mix(in oklch, var(--danger) 7%, var(--surface));
+      border: 1px solid color-mix(in oklch, var(--danger) 24%, var(--border));
+    }
+    .auth-note.danger-note b { color: var(--danger); }
+
+    @media (max-width: 760px) {
+      .s-row { grid-template-columns: 1fr; align-items: start; }
+      .s-ctl { grid-column: 1; justify-content: flex-start; margin-top: 2px; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" data-od-id="sidebar">
+      <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
+        <span class="brand-row">
+          <span class="brand-plate"><img src="data:image/webp;base64,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" width="260" height="204" alt="知遇 Logo"></span>
+          <span>
+            <span class="brand-word">知遇</span>
+            <span class="brand-tag meta">先认识，再相遇</span>
+          </span>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="主导航" data-od-id="side-nav">
+        <button class="nav-item" type="button" data-nav="首页" data-href="zhiyu-home.html" data-od-id="nav-home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3z"></path></svg>
+          <span>首页</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="发现" data-href="zhiyu-find.html" data-od-id="nav-find">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.8 8.2-2.6 5.2-5.2 2.6 2.6-5.2z"></path></svg>
+          <span>发现</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="我的人格" data-href="zhiyu-persona.html" data-od-id="nav-persona">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
+          <span>我的人格</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="Agent 匹配" data-href="zhiyu-agent-match.html" data-od-id="nav-match">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+          <span>Agent 匹配</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          <span>通知</span>
+        </button>
+      </nav>
+
+      <div class="side-foot" data-od-id="sidebar-account">
+        <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
+        <button class="nav-item active" type="button" data-nav="设置" data-od-id="nav-settings" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main" data-od-id="settings-main">
+      <div class="main-inner">
+        <header class="page-head">
+          <div>
+            <p class="meta" style="margin: 0 0 10px;">知遇 · 设置</p>
+            <h1>谁可以认识我，由你决定。</h1>
+            <p class="sub">身份与数据源、Agent 沟通偏好、数据与隐私——在这里管理别人「怎么看到你、能不能派 Agent 来认识你」。所有开关与状态均为演示，改动只记在本地。</p>
+          </div>
+          <div class="head-side">
+            <span class="cov-chip" data-od-id="head-demo-chip"><span class="dot"></span>演示原型 · 未接入后端</span>
+            <p class="head-hint">真实接入后，这些开关会写入你的账号设置，并同步到发现与 Agent 匹配流程。</p>
+          </div>
+        </header>
+
+        <div class="set-list" data-od-id="settings-sections">
+
+          <!-- ① 身份与数据源 -->
+          <section class="s-card" aria-labelledby="h-identity" data-od-id="sec-identity">
+            <header class="s-head">
+              <p class="panel-eyebrow">01 · 身份与数据源</p>
+              <h2 id="h-identity">你以什么身份出现</h2>
+              <p class="s-sub">人格来自你授权的数据源：六个来源各自独立、只标记“已注入 / 未注入”，融合成统一 Persona。状态口径与「我的人格」页保持一致。</p>
+            </header>
+            <div class="s-rows">
+              <div class="s-row" data-od-id="row-zhihu">
+                <div class="s-body">
+                  <h3>知乎账号<span class="pill done" id="zh-pill"><span class="dot"></span><span id="zh-pill-t">已授权（演示）</span></span></h3>
+                  <p>匹配与 Agent 只使用你授权的知乎公开内容作为人格输入之一，原始内容不用于其他用途。撤回授权后，知乎数据停止参与后续人格更新（已生成的人格不会被删除）。</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" id="btn-auth" data-od-id="btn-zhihu-manage">管理授权</button>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-wechat">
+                <div class="s-body">
+                  <h3>微信数据源<span class="pill todo" id="wx-pill"><span class="dot"></span><span id="wx-pill-t">未注入</span></span></h3>
+                  <p>用微信聊天记录补充私域生活特征。处理走 WeFlow：先在本地完成聚合与人格蒸馏，只把需要的 Persona 结果上传，原始聊天记录不会离开你的设备。（演示：本页暂不提供接入，可去「我的人格」页体验流程。）</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-wechat">去接入</button>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-qq">
+                <div class="s-body">
+                  <h3>QQ 数据源<span class="pill todo"><span class="dot"></span><span>未注入</span></span></h3>
+                  <p>用 QQ 群聊与常聊好友记录补充另一侧的私域生活特征。先在本地用 qq-chat-exporter 导出会话、完成说话人分离，只把需要的 Persona 结果上传。（演示：本页暂不提供接入，可去「我的人格」页体验流程。）</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-qq">去接入</button>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-feishu">
+                <div class="s-body">
+                  <h3>飞书工作数据<span class="pill todo"><span class="dot"></span><span>未注入</span></span></h3>
+                  <p>通过飞书官方 API 读取你在工作沟通、文档与多维表格里的表达，作为职场画像输入。（演示：本页暂不提供接入，可去「我的人格」页体验授权流程。）</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-feishu">去接入</button>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-dingtalk">
+                <div class="s-body">
+                  <h3>钉钉工作数据<span class="pill todo"><span class="dot"></span><span>未注入</span></span></h3>
+                  <p>文档与多维表格走官方 API，聊天消息以本地导出上传，共同构成职场画像输入。（演示：本页暂不提供接入，可去「我的人格」页体验导入流程。）</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-dingtalk">去接入</button>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-sbti">
+                <div class="s-body">
+                  <h3>SBTI 人格测试<span class="pill todo" id="sbti-pill"><span class="dot"></span><span id="sbti-pill-t">未注入</span></span></h3>
+                  <p>一份显性自报测试，补上「自我认知」这一维，与其它来源的行为证据一起融合进 Persona。六个来源各就各位后，快速匹配可用的特征才会最完整。</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-sbti">去测试</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ② Agent 沟通偏好 -->
+          <section class="s-card" aria-labelledby="h-agent" data-od-id="sec-agent">
+            <header class="s-head">
+              <p class="panel-eyebrow">02 · Agent 沟通偏好</p>
+              <h2 id="h-agent">别人如何与你相遇</h2>
+              <p class="s-sub">决定你在「发现」里的可见方式：对方能否派 Agent 与你进一步认识、能否在快速匹配里看到相似度，以及匹配结果如何通知你。</p>
+            </header>
+            <div class="s-rows">
+              <div class="s-row" data-od-id="row-allow-agent">
+                <div class="s-body">
+                  <h3>允许他人派 Agent 与我对话</h3>
+                  <p>对方看到你的人格卡后，可发起一轮 Agent 认识：他的 Agent 会与你的人格侧 Agent 做 5～8 轮对话并生成匹配报告。关闭后，对方只能看到人格卡与相似度，不能发起 Agent 对话。</p>
+                </div>
+                <div class="s-ctl">
+                  <span class="sw-t" id="sw-agent-t">已开启</span>
+                  <label class="switch-wrap">
+                    <span class="switch"><input type="checkbox" id="sw-agent" aria-label="允许他人派 Agent 与我对话" checked=""><i aria-hidden="true"></i></span>
+                  </label>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-allow-quick">
+                <div class="s-body">
+                  <h3>允许在「快速匹配」中展示相似度</h3>
+                  <p>当你的人格数据可用时，你的 Persona 会进入快速匹配候选池，对方可以看到与你的人格相似度。关闭后，你不会被推荐给陌生人。</p>
+                </div>
+                <div class="s-ctl">
+                  <span class="sw-t" id="sw-quick-t">已开启</span>
+                  <label class="switch-wrap">
+                    <span class="switch"><input type="checkbox" id="sw-quick" aria-label="允许在快速匹配中展示相似度" checked=""><i aria-hidden="true"></i></span>
+                  </label>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-report-notify">
+                <div class="s-body">
+                  <h3>对方发来匹配报告时提醒我</h3>
+                  <p>当对方把「与你的人格匹配报告」发过来时，在通知中心提醒你；历史报告可随时回看。</p>
+                </div>
+                <div class="s-ctl">
+                  <span class="sw-t" id="sw-notify-t">已开启</span>
+                  <label class="switch-wrap">
+                    <span class="switch"><input type="checkbox" id="sw-notify" aria-label="对方发来匹配报告时提醒我" checked=""><i aria-hidden="true"></i></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ③ 数据与隐私 -->
+          <section class="s-card" aria-labelledby="h-privacy" data-od-id="sec-privacy">
+            <header class="s-head">
+              <p class="panel-eyebrow">03 · 数据与隐私</p>
+              <h2 id="h-privacy">只带走「必要的人格」</h2>
+              <p class="s-sub">知遇以人格数据为基础，因此隐私优先。以下是本项目固定遵守的原则，在演示原型中同样适用。</p>
+            </header>
+            <div class="s-rows">
+              <div class="s-row" data-od-id="row-minimal">
+                <div class="s-body">
+                  <h3>原始数据最小化</h3>
+                  <p>微信聊天记录等原始内容先在本地聚合与蒸馏，只有匹配所需的人格结果会上传；服务器不保存原始聊天数据。</p>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-typed">
+                <div class="s-body">
+                  <h3>真人与 AI 严格区分</h3>
+                  <p>每个 Persona 都带类型标注：真人使用 type = human，AI 演示人格使用 type = synthetic 并在界面中如实标明，不会冒充真人。</p>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-explain">
+                <div class="s-body">
+                  <h3>结论可解释</h3>
+                  <p>相似度与匹配报告都会给出来源证据和「为什么值得认识」的解释，而不只是一个分数。</p>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-persona">
+                <div class="s-body">
+                  <h3>我的人格</h3>
+                  <p>查看各来源的注入状态与融合后的人格卡；数据更新后，建议重新蒸馏你的 Agent。</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-secondary sm" type="button" data-go-persona="card" data-od-id="btn-persona">查看人格卡</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ④ 账号与退出 -->
+          <section class="s-card" aria-labelledby="h-account" data-od-id="sec-account">
+            <header class="s-head">
+              <p class="panel-eyebrow">04 · 账号与退出</p>
+              <h2 id="h-account">账号与退出</h2>
+              <p class="s-sub">本页为黑客松演示原型，不涉及真实账号体系。</p>
+            </header>
+            <div class="s-rows">
+              <div class="s-row" data-od-id="row-about">
+                <div class="s-body">
+                  <h3>知遇 · 演示原型<span class="pill todo">v0.5 · 前端演示</span></h3>
+                  <p>知乎黑客松「灵魂匹配局」赛道作品：AI 驱动的人格匹配与 Agent 社交。授权、推送、Agent 运行与后端服务均未接入。</p>
+                </div>
+              </div>
+              <div class="s-row" data-od-id="row-logout">
+                <div class="s-body">
+                  <h3>退出登录</h3>
+                  <p>退出后回到登录页。演示模式下，本地的人格与匹配演示状态不会删除，重新进入仍可继续体验。</p>
+                </div>
+                <div class="s-ctl">
+                  <button class="btn btn-danger sm" type="button" id="btn-logout" data-od-id="btn-logout">退出登录</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <p class="demo-note set-demo" id="set-demo">演示说明：本页所有授权状态、数据源状态与开关均为演示数据。开关改动仅保存在本地浏览器，用于演示设置页的交互与状态记忆；真实版本中，这些设置会由 profile API 写入你的账号。</p>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- 知乎授权管理弹窗 -->
+  <div class="modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-od-id="auth-modal">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭授权管理">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <h3 id="auth-title">知乎授权管理</h3>
+      <div class="modal-body">
+        <div id="auth-panel-ok">
+          <p class="auth-lead">以下是你授权「知遇」使用的知乎数据范围（演示）：</p>
+          <ul class="auth-list" data-od-id="auth-scope-list">
+            <li><span class="a-chk">✓</span><span>主页公开信息<span class="a-dim">用于展示你的身份，不包含私密资料。</span></span></li>
+            <li><span class="a-chk">✓</span><span>已发布的公开内容<span class="a-dim">用于推断表达习惯、兴趣与思考方式。</span></span></li>
+            <li><span class="a-chk">✓</span><span>关注与互动聚合<span class="a-dim">仅读取公开聚合，不含私信与未公开互动。</span></span></li>
+          </ul>
+          <p class="auth-note">数据经知乎官方授权接口获取，只读取授权范围内内容；原始内容不会用于人格匹配以外的用途。<b>撤回授权</b>后可随时重新授权。</p>
+        </div>
+        <div id="auth-panel-no" hidden="">
+          <p class="auth-lead">已撤回知乎数据授权。</p>
+          <p class="muted-p">后续人格更新不再包含知乎数据；已生成的人格数据不会被自动删除。</p>
+          <p class="auth-note danger-note"><b>提示</b>：重新授权后，需要到「我的人格」页再次同步知乎数据，人格特征才会更新。</p>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" id="btn-auth-close-ok" data-close="">完成</button>
+        <button class="btn btn-danger" type="button" id="btn-auth-revoke" data-od-id="btn-auth-revoke">撤回授权</button>
+        <button class="btn btn-secondary" type="button" id="btn-auth-close-no" data-close="" hidden="">关闭</button>
+        <button class="btn btn-primary" type="button" id="btn-auth-reauth" data-od-id="btn-auth-reauth" hidden="">重新授权（演示）</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 退出登录确认弹窗 -->
+  <div class="modal" id="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logout-title" data-od-id="logout-modal">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭退出确认">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <h3 id="logout-title">退出登录？</h3>
+      <div class="modal-body">
+        <p class="auth-lead">退出后将回到登录页。</p>
+        <p class="muted-p">演示模式下，本地的人格注入、Agent 状态与通知已读等演示数据都不会被删除，方便你随时回来继续体验。</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">取消</button>
+        <button class="btn btn-solid-danger" type="button" id="btn-confirm-logout" data-od-id="btn-confirm-logout">退出登录</button>
+      </div>
+    </section>
+  </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+      (function () {
+        var $ = function (id) { return document.getElementById(id); };
+
+        var toastEl = $('toast');
+        var toastTimer = null;
+        function showToast(msg) {
+          if (!toastEl) return;
+          toastEl.textContent = msg;
+          toastEl.classList.add('show');
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 3200);
+        }
+
+        function lsGet(key, dflt) {
+          try {
+            var v = localStorage.getItem(key);
+            return v == null ? dflt : v;
+          } catch (e) { return dflt; }
+        }
+        function lsSet(key, val) {
+          try { localStorage.setItem(key, val); } catch (e) {}
+        }
+
+        /* ── 弹窗通用 ── */
+        function openModal(id) {
+          var m = $(id);
+          if (!m) return;
+          m.classList.add('open');
+          var f = m.querySelector('[autofocus], button:not([data-close=""])');
+          if (f && f.focus) f.focus();
+        }
+        function closeModal(el) {
+          if (!el) return;
+          el.classList.remove('open');
+        }
+        document.querySelectorAll('.modal').forEach(function (m) {
+          m.addEventListener('mousedown', function (ev) {
+            var dlg = m.querySelector('.modal-dialog');
+            if (dlg && !dlg.contains(ev.target)) closeModal(m);
+          });
+        });
+        document.querySelectorAll('.modal [data-close]').forEach(function (el) {
+          el.addEventListener('click', function () {
+            closeModal(el.closest('.modal'));
+          });
+        });
+        document.addEventListener('keydown', function (ev) {
+          if (ev.key !== 'Escape') return;
+          var open = document.querySelector('.modal.open');
+          if (open) closeModal(open);
+        });
+
+        /* ── 知乎授权状态 ── */
+        var zhihuKey = 'zhiyu-settings-zhihu';
+        var zhihuState = lsGet(zhihuKey, 'ok');
+        if (zhihuState !== 'ok' && zhihuState !== 'revoked') zhihuState = 'ok';
+        var zhPill = $('zh-pill');
+        var zhPillT = $('zh-pill-t');
+        var btnAuth = $('btn-auth');
+        var panelOk = $('auth-panel-ok');
+        var panelNo = $('auth-panel-no');
+        var closeOk = $('btn-auth-close-ok');
+        var revokeBtn = $('btn-auth-revoke');
+        var closeNo = $('btn-auth-close-no');
+        var reauthBtn = $('btn-auth-reauth');
+
+        function paintZhihu() {
+          var ok = zhihuState === 'ok';
+          zhPill.className = 'pill ' + (ok ? 'done' : 'todo');
+          zhPillT.textContent = ok ? '已授权（演示）' : '未授权（演示）';
+          btnAuth.textContent = ok ? '管理授权' : '重新授权';
+          panelOk.hidden = !ok;
+          panelNo.hidden = ok;
+          closeOk.hidden = !ok;
+          revokeBtn.hidden = !ok;
+          closeNo.hidden = ok;
+          reauthBtn.hidden = ok;
+        }
+        paintZhihu();
+
+        function setZhihu(next) {
+          zhihuState = next;
+          lsSet(zhihuKey, next);
+          paintZhihu();
+        }
+        btnAuth.addEventListener('click', function () { openModal('auth-modal'); });
+        revokeBtn.addEventListener('click', function () {
+          setZhihu('revoked');
+          closeModal($('auth-modal'));
+          showToast('已撤回知乎授权（演示）。知乎数据将不再参与人格更新。');
+        });
+        reauthBtn.addEventListener('click', function () {
+          setZhihu('ok');
+          closeModal($('auth-modal'));
+          showToast('已重新授权知乎数据（演示）。可去「我的人格」页同步最新内容。');
+        });
+
+        /* ── Agent 沟通开关 ── */
+        var swDef = { agent: true, quick: true, notify: true };
+        var sw = {};
+        Object.keys(swDef).forEach(function (k) { sw[k] = swDef[k]; });
+        try {
+          var swRaw = localStorage.getItem('zhiyu-settings-sw');
+          if (swRaw) {
+            var swParsed = JSON.parse(swRaw);
+            Object.keys(swDef).forEach(function (k) {
+              if (typeof swParsed[k] === 'boolean') sw[k] = swParsed[k];
+            });
+          }
+        } catch (e) {}
+        function saveSw() {
+          try { localStorage.setItem('zhiyu-settings-sw', JSON.stringify(sw)); } catch (e) {}
+        }
+        var swCopy = {
+          agent: {
+            on: '已开启：他人可以派 Agent 来认识你（演示）。',
+            off: '已关闭：他人将无法派 Agent 与你对话（演示）。'
+          },
+          quick: {
+            on: '已开启：你的人格可进入「快速匹配」候选池（演示）。',
+            off: '已关闭：你不会被推荐给陌生人（演示）。'
+          },
+          notify: {
+            on: '已开启：对方发来匹配报告时会提醒你（演示）。',
+            off: '已关闭：收到报告将不再提醒（演示）。'
+          }
+        };
+        [
+          ['sw-agent', 'agent', 'sw-agent-t'],
+          ['sw-quick', 'quick', 'sw-quick-t'],
+          ['sw-notify', 'notify', 'sw-notify-t']
+        ].forEach(function (pair) {
+          var input = $(pair[0]);
+          var key = pair[1];
+          var txt = $(pair[2]);
+          if (!input) return;
+          input.checked = !!sw[key];
+          txt.textContent = sw[key] ? '已开启' : '已关闭';
+          input.addEventListener('change', function () {
+            sw[key] = input.checked;
+            saveSw();
+            txt.textContent = sw[key] ? '已开启' : '已关闭';
+            showToast(sw[key] ? swCopy[key].on : swCopy[key].off);
+          });
+        });
+
+        /* ── 退出登录 ── */
+        $('btn-logout').addEventListener('click', function () { openModal('logout-modal'); });
+        $('btn-confirm-logout').addEventListener('click', function () {
+          window.location.href = 'zhiyu-login.html';
+        });
+
+        /* ── 跳转「我的人格」并预选页签 ── */
+        document.querySelectorAll('[data-go-persona]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var tab = btn.getAttribute('data-go-persona');
+            if (tab === 'card' || tab === 'sources' || tab === 'distill') {
+              try { localStorage.setItem('zhiyu-persona-tab', tab); } catch (e) {}
+            }
+            window.location.href = 'zhiyu-persona.html';
+          });
+        });
+
+        /* ── 侧边栏 ── */
+        document.querySelectorAll('[data-nav]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            if (btn.classList.contains('active')) return;
+            var href = btn.getAttribute('data-href');
+            if (href) { window.location.href = href; return; }
+            showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
+          });
+        });
+      })();
+  </script>
+
+
+</body></html>

@@ -479,23 +479,23 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.8 8.2-2.6 5.2-5.2 2.6 2.6-5.2z"></path></svg>
           <span>发现</span>
         </button>
-        <button class="nav-item" type="button" data-nav="我的人格" data-od-id="nav-persona">
+        <button class="nav-item" type="button" data-nav="我的人格" data-href="zhiyu-persona.html" data-od-id="nav-persona">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
           <span>我的人格</span>
         </button>
-        <button class="nav-item" type="button" data-nav="Agent 匹配" data-od-id="nav-match">
+        <button class="nav-item" type="button" data-nav="Agent 匹配" data-href="zhiyu-agent-match.html" data-od-id="nav-match">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
           <span>Agent 匹配</span>
         </button>
-        <button class="nav-item" type="button" data-nav="通知" data-od-id="nav-notify">
+        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
           <span>通知</span>
         </button>
       </nav>
 
       <div class="side-foot" data-od-id="sidebar-account">
-        <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
-        <button class="nav-item" type="button" data-nav="设置" data-od-id="nav-settings">
+        <span class="zh-avatar" title="你的知乎头像">知</span>
+        <button class="nav-item" type="button" data-nav="设置" data-href="zhiyu-settings.html" data-od-id="nav-settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
           <span>设置</span>
         </button>
@@ -508,7 +508,6 @@
           <div>
             <p class="meta" style="margin: 0 0 10px;">知遇 · 发现</p>
             <h1>今天，要和谁相遇？</h1>
-            <p class="sub">搜索你感兴趣的知乎用户、让系统随机推荐，或直接用你的人格做快速匹配——遇到想进一步了解的人，再让 Agent 先聊聊。</p>
           </div>
           
         </header>
@@ -562,7 +561,7 @@
             </div>
 
             <div class="result-meta">
-              <span id="result-count">共 6 位演示结果</span>
+              <span id="result-count">共 6 位结果</span>
               <button class="reset-btn" type="button" id="reset-filters" data-od-id="search-reset">重置筛选</button>
             </div>
             <div class="cand-grid" id="search-results" data-od-id="search-results"></div>
@@ -575,10 +574,6 @@
           <div class="panel">
             <p class="panel-eyebrow">随机推荐 · 随机抓取一位</p>
             <div class="random-head">
-              <div>
-                <h2>不知道想找谁？让系统替你抓一位。</h2>
-                <p>随机展示一位知乎用户；觉得不合适就换一批，直到遇到想深入了解的人。</p>
-              </div>
               <button class="btn btn-secondary" type="button" id="reroll-btn" data-od-id="random-reroll">换一批 · 随机人格</button>
             </div>
             <div class="cand-grid" id="random-results" data-od-id="random-results"></div>
@@ -592,7 +587,6 @@
             <p class="panel-eyebrow">快速匹配 · 直接用人格找人</p>
             <div class="quick-intro">
               <h2>用你的人格，直接找到最可能同频的人。</h2>
-              <p>快速匹配根据 SBTI 测试结果与人格蒸馏数据计算候选人的相似度；如果你对某位候选人感兴趣，可以再进入 Agent 对话做进一步判断。</p>
             </div>
             <div class="req-chips">
               <span class="req-chip">SBTI 测试结果：<b>未完成</b></span>
@@ -604,8 +598,7 @@
               
             </div>
             <div class="quick-result" id="quick-result" data-od-id="quick-result" hidden="">
-              <h3>匹配结果（示例相似度）</h3>
-              <span class="meta" style="display: block;">按相似度从高到低排列 · 相似度基于演示人格计算</span>
+              <h3>匹配结果</h3>
               <div class="cand-grid" id="quick-results" style="margin-top: 16px;" data-od-id="quick-results"></div>
             </div>
           </div>
@@ -629,8 +622,8 @@
         </div>
       </div>
       <div class="profile-section">
-        <h3>人格画像（演示）</h3>
-        <p id="modal-desc">在接入知乎 API 后，这里会展示 TA 基于公开内容生成的人格卡。</p>
+        <h3>人格画像</h3>
+        <p id="modal-desc"></p>
       </div>
       <div class="profile-section">
         <h3>数据与沟通设置</h3>
@@ -674,7 +667,7 @@
       function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
       function cardHtml(p, withSim) {
-        var sim = withSim ? '<div class="sim-block"><div class="sim-top"><span>与你的相似度 · 示例</span><span class="num">' + p.sim + '%</span></div><div class="track"><i style="width:' + p.sim + '%;"></i></div></div>' : '';
+        var sim = withSim ? '<div class="sim-block"><div class="sim-top"><span>与你的相似度</span><span class="num">' + p.sim + '%</span></div><div class="track"><i style="width:' + p.sim + '%;"></i></div></div>' : '';
         return '<article class="persona-card" data-id="' + esc(p.id) + '" data-city="' + esc(p.city) + '" data-type="' + esc(p.type) + '" data-agent="' + (p.agent ? '1' : '0') + '" data-od-id="persona-card-' + esc(p.id) + '">' +
           '<div class="p-head"><span class="p-avatar">' + esc(p.code) + '</span><div><div class="p-title">' + esc(p.title) + '</div><span class="p-pill">AI 演示人格</span></div></div>' +
           '<ul class="p-meta">' +
@@ -742,7 +735,7 @@
           return ok;
         });
         renderList('search-results', list, false);
-        document.getElementById('result-count').textContent = '共 ' + list.length + ' 位演示结果';
+        document.getElementById('result-count').textContent = '共 ' + list.length + ' 位结果';
       }
       document.getElementById('search-form').addEventListener('submit', applySearch);
       ['filter-city', 'filter-persona', 'filter-agent'].forEach(function (id) {
@@ -776,9 +769,9 @@
           var ranked = all().slice().sort(function (a, b) { return b.sim - a.sim; }).slice(0, 3);
           renderList('quick-results', ranked, true);
           document.getElementById('quick-result').hidden = false;
-          quickRun.textContent = '重新匹配（演示）';
+          quickRun.textContent = '重新匹配';
           quickRun.disabled = false;
-          showToast('匹配完成：已按示例相似度为你排序三位候选人。');
+          showToast('匹配完成：已按相似度为你排序三位候选人。');
         }, 1000);
       });
 
@@ -833,12 +826,25 @@
           if (btn.classList.contains('active')) return;
           var href = btn.getAttribute('data-href');
           if (href) { window.location.href = href; return; }
-          showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
+          showToast('「' + btn.getAttribute('data-nav') + '」页面暂未开放。');
         });
       });
 
       applySearch();
       renderRandom();
+
+      /* 首页“快速匹配预览”→ ?tab=quick 直达：切到快速匹配页签并自动跑一次 */
+      (function () {
+        var m = /[?&]tab=([^&]+)/.exec(window.location.search || '');
+        var tabName = m ? decodeURIComponent(m[1]) : null;
+        if (tabName && panels[tabName]) {
+          switchTab(tabName);
+          if (tabName === 'quick') {
+            var runBtn = document.getElementById('quick-run');
+            if (runBtn) runBtn.click();
+          }
+        }
+      })();
     })();
   </script>
 

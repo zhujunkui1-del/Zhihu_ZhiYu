@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="知遇 · 首页 —— 让 Agent 先替你认识一个人。">
+  <title>知遇 · 首页</title>
+  <style>
+    /* ─── tokens（与登录页同一套设计变量） ───────────────────────── */
+    :root {
+      --bg:      #eef3fc;
+      --surface: #ffffff;
+      --fg:      #16263f;
+      --muted:   #5d6c88;
+      --border:  #d7e1f1;
+      --accent:  #0d64fd;
+      --accent-soft: color-mix(in oklch, var(--accent) 13%, transparent);
+      --accent-faint: color-mix(in oklch, var(--accent) 5%, transparent);
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --fg-softer: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      --fs-h1: clamp(28px, 3vw, 38px);
+      --fs-h2: clamp(22px, 2.4vw, 30px);
+      --fs-body: 15px;
+      --fs-meta: 12.5px;
+      --gap-xs: 8px;
+      --gap-sm: 12px;
+      --gap-md: 20px;
+      --gap-lg: 28px;
+      --gap-xl: 40px;
+      --radius: 10px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: var(--fs-body);
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 8px;
+    }
+    .btn:focus-visible { box-shadow: 0 0 0 4px var(--accent-faint); }
+
+    h1, h2 { font-family: var(--font-display); }
+    h1 { font-size: var(--fs-h1); line-height: 1.25; letter-spacing: 0.01em; margin: 0; }
+    h2 { font-size: var(--fs-h2); line-height: 1.3; margin: 0; }
+    h3 { font-size: 17px; line-height: 1.35; margin: 0; }
+    .meta { font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--muted); }
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.05s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 84%, black); border-color: color-mix(in oklch, var(--accent) 84%, black); }
+    .btn-secondary { background: var(--surface); color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--accent-faint); }
+    .btn-ghost { background: transparent; color: var(--fg); padding-inline: 8px; }
+    .btn-ghost:hover { color: var(--accent); }
+    .btn-arrow::after { content: '→'; transition: transform 0.15s ease; }
+    .btn-arrow:hover::after { transform: translateX(3px); }
+
+    /* ─── 应用壳：侧边栏 + 主区 ─────────────────────────────────── */
+    .app-shell { display: flex; min-height: 100vh; }
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0;
+      width: 248px;
+      z-index: 20;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 18px 14px 16px;
+    }
+    .side-brand { display: block; padding: 2px 6px 0; }
+    .side-brand .brand-row { display: inline-flex; align-items: center; gap: 11px; }
+    .brand-plate {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      box-shadow: 0 8px 20px color-mix(in oklch, var(--fg) 8%, transparent);
+      overflow: hidden;
+    }
+    .brand-plate img { width: 37px; height: auto; }
+    .brand-word { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
+    .brand-tag { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; }
+
+    .side-nav { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%;
+      min-height: 46px;
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--fg);
+      font-size: 14.5px;
+      font-weight: 500;
+      text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--muted); transition: color 0.15s ease; }
+    .nav-item:hover { background: var(--fg-soft); }
+    .nav-item:hover svg { color: var(--fg); }
+    .nav-item.active { background: var(--accent); color: var(--surface); }
+    .nav-item.active svg { color: var(--surface); }
+
+    .side-foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .zh-avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-family: var(--font-display);
+      font-size: 17px;
+      border: 1px solid var(--border);
+    }
+    .side-foot .nav-item { flex: 1; min-height: 42px; }
+
+    .main {
+      flex: 1;
+      margin-left: 248px;
+      min-width: 0;
+      padding: 34px clamp(22px, 4vw, 54px) 64px;
+    }
+    .main-inner { max-width: 1180px; margin-inline: auto; }
+
+    /* ─── 顶部问候 ──────────────────────────────────────────────── */
+    .main-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: var(--gap-lg);
+      margin-bottom: 34px;
+      flex-wrap: wrap;
+    }
+    .main-head h1 { max-width: 18ch; }
+    .main-head .sub { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; max-width: 60ch; }
+    .auth-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 13px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in oklch, var(--surface) 78%, transparent);
+      color: var(--muted);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .auth-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--fg); opacity: 0.45; }
+
+    /* ─── 状态卡 ───────────────────────────────────────────────── */
+    .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .sheet-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 22px 20px;
+      display: flex; flex-direction: column;
+    }
+    .card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .card-mark {
+      width: 38px; height: 38px;
+      border-radius: 11px;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      flex: 0 0 auto;
+    }
+    .card-mark svg { width: 19px; height: 19px; }
+    .card-head h3 { font-size: 16px; }
+    .card-state { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+    .sheet-card > p { margin: 0 0 16px; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+
+    .source-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+    .source-list li {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 0 0;
+      font-size: 13.5px;
+    }
+    .source-list li + li { padding-top: 8px; }
+    .source-list svg { width: 15px; height: 15px; flex: 0 0 auto; }
+    .source-list .src-name { flex: 1; }
+    .source-list .src-note { color: var(--muted); font-size: 12.5px; }
+    .source-list .done svg { color: var(--fg); }
+    .source-list .todo { color: var(--muted); }
+    .source-list.cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px 18px; }
+    .source-list.cols li { padding-top: 0; }
+    .source-list.cols li + li { padding-top: 0; }
+
+    .card-actions { margin-top: auto; padding-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .card-actions .btn { min-height: 42px; padding: 9px 16px; font-size: 13.5px; }
+    .card-actions .text-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 13.5px; color: var(--muted); }
+    .card-actions .text-link:hover { color: var(--accent); }
+
+    .step-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .step-list li { display: flex; align-items: baseline; gap: 9px; font-size: 13.5px; color: var(--muted); }
+    .step-list .num { color: var(--fg); font-size: 12px; }
+
+    /* ─── 主内容双栏 ───────────────────────────────────────────── */
+    .work-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; margin-top: 18px; align-items: stretch; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px;
+    }
+    .panel-eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px; }
+    .discover-panel h2 { max-width: 22ch; }
+    .discover-panel > p { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 52ch; line-height: 1.8; }
+    .flow-mini { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .flow-mini .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 11px;
+      background: var(--fg-soft);
+      color: var(--fg);
+      border-radius: 999px;
+      font-size: 12.5px;
+    }
+    .flow-mini svg { width: 13px; height: 13px; color: var(--muted); }
+    .src-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+    .src-chips .chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 11px; border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 12.5px; color: var(--muted);
+    }
+    .src-chips .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-soft); flex: 0 0 auto; }
+    .src-chips .chip b { color: var(--fg); font-weight: 600; }
+    .src-chips .chip small { font-size: 11px; }
+    .src-chips .chip.ok { color: var(--fg); border-color: color-mix(in oklch, var(--accent) 42%, var(--border)); }
+    .src-chips .chip.ok .dot { background: var(--accent); }
+    .panel-note { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.75; }
+
+    .side-stack { display: grid; gap: 18px; }
+    .mini-panel .panel-eyebrow { margin-bottom: 8px; }
+    .mini-icon {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      background: var(--fg-soft);
+      display: grid; place-items: center;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .mini-icon svg { width: 20px; height: 20px; }
+    .mini-panel p { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+    .mini-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 8px; padding: 0 4px; font-size: 13.5px; color: var(--fg); }
+    .mini-link:hover { color: var(--accent); }
+    .mini-link svg { width: 15px; height: 15px; }
+
+    .foot-note { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+
+    /* ─── 提示条 ───────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      transform: translate(-50%, 12px);
+      z-index: 60;
+      background: var(--fg);
+      color: var(--surface);
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      box-shadow: 0 16px 44px color-mix(in oklch, var(--fg) 30%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: min(86vw, 480px);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1120px) {
+      .status-grid { grid-template-columns: 1fr; }
+      .work-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 920px) {
+      .app-shell { flex-direction: column; }
+      .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+      }
+      .side-nav { flex-direction: row; flex-wrap: wrap; margin-top: 12px; gap: 6px; flex: none; }
+      .nav-item { width: auto; min-height: 42px; padding: 8px 12px; font-size: 13.5px; }
+      .side-foot { margin-top: 10px; border-top: 0; padding-top: 0; }
+      .main { margin-left: 0; padding: 26px 18px 56px; }
+      .main-head { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" data-od-id="sidebar">
+      <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
+        <span class="brand-row">
+          <span class="brand-plate"><img src="data:image/webp;base64,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" width="260" height="204" alt="知遇 Logo"></span>
+          <span>
+            <span class="brand-word">知遇</span>
+            <span class="brand-tag meta">先认识，再相遇</span>
+          </span>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="主导航" data-od-id="side-nav">
+        <button class="nav-item active" type="button" data-nav="首页" data-od-id="nav-home" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3z"></path></svg>
+          <span>首页</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="发现" data-href="zhiyu-find.html" data-od-id="nav-find">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.8 8.2-2.6 5.2-5.2 2.6 2.6-5.2z"></path></svg>
+          <span>发现</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="我的人格" data-href="zhiyu-persona.html" data-od-id="nav-persona">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
+          <span>我的人格</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="Agent 匹配" data-href="zhiyu-agent-match.html" data-od-id="nav-match">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+          <span>Agent 匹配</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          <span>通知</span>
+        </button>
+      </nav>
+
+      <div class="side-foot" data-od-id="sidebar-account">
+        <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
+        <button class="nav-item" type="button" data-nav="设置" data-href="zhiyu-settings.html" data-od-id="nav-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main" id="home" data-od-id="home-main">
+      <div class="main-inner">
+        <header class="main-head">
+          <div>
+            <p class="meta" style="margin: 0 0 10px;">知遇 · 首页</p>
+            <h1>欢迎回到知遇</h1>
+            <p class="sub">你的 Agent 先从知乎公开内容认识你；补入更多来源、完成一次蒸馏后，它就能替你遇见真正值得认识的人。</p>
+          </div>
+          
+        </header>
+
+        <!-- 三步状态 -->
+        <section class="status-grid" data-od-id="home-status" aria-label="产品状态概览">
+          <article class="sheet-card" data-od-id="home-card-persona">
+            <div class="card-head">
+              <span class="card-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
+              </span>
+              <h3>我的人格</h3>
+              <span class="card-state">待蒸馏</span>
+            </div>
+            <p>六个来源分别回答“不同场景里的你”：微信与 QQ 是私域生活，飞书与钉钉是职场，知乎是公共表达，SBTI 是你眼中的自己。</p>
+            <ul class="source-list cols">
+              <li class="done">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span class="src-name">知乎数据</span><span class="src-note">已注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">微信聊天</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">QQ 聊天</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">飞书工作</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">钉钉工作</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">SBTI 自评</span><span class="src-note">未注入</span>
+              </li>
+            </ul>
+            <div class="card-actions">
+              <button class="btn btn-primary" type="button" data-goto="我的人格" data-od-id="cta-home-persona">去管理人格数据源</button>
+            </div>
+          </article>
+
+          <article class="sheet-card" data-od-id="home-card-agent">
+            <div class="card-head">
+              <span class="card-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="3"></rect><path d="M9 7V5a3 3 0 0 1 6 0v2"></path><circle cx="9.5" cy="12.5" r="0.8" fill="currentColor"></circle><circle cx="14.5" cy="12.5" r="0.8" fill="currentColor"></circle><path d="M9 15.5h6"></path></svg>
+              </span>
+              <h3>我的 Agent</h3>
+              <span class="card-state">待生成</span>
+            </div>
+            <p>把人格蒸馏成真正能代表你的 Agent：知道你为什么喜欢、怎么思考、和谁聊得来。</p>
+            <ul class="step-list">
+              <li><span class="num">01</span>人格数据 → Persona 蒸馏</li>
+              <li><span class="num">02</span>Persona → Agent 训练</li>
+              <li><span class="num">03</span>Agent 替你去认识 TA</li>
+            </ul>
+            <div class="card-actions">
+              <button class="btn btn-secondary" type="button" data-goto="我的人格" data-od-id="cta-home-train">开始训练 Agent</button>
+            </div>
+          </article>
+
+          <article class="sheet-card" data-od-id="home-card-match">
+            <div class="card-head">
+              <span class="card-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+              </span>
+              <h3>Agent 匹配</h3>
+              <span class="card-state">未开始</span>
+            </div>
+            <p>两个 Agent 会先围绕兴趣、价值观与思维聊一聊，聊完再决定你们要不要认识。</p>
+            <ul class="step-list">
+              <li><span class="num">01</span>快速匹配或指定对象</li>
+              <li><span class="num">02</span>让 Agent 先去聊</li>
+              <li><span class="num">03</span>收到可解释的匹配报告</li>
+            </ul>
+            <div class="card-actions">
+              <a class="text-link" href="#discover" data-od-id="home-link-discover">生成 Agent 后，从这里开始遇见 ↓</a>
+            </div>
+          </article>
+        </section>
+
+        <!-- 发现引导 + 动态 -->
+        <section class="work-grid" data-od-id="home-work">
+          <div class="panel discover-panel" id="discover" data-od-id="home-discover">
+            <p class="panel-eyebrow">发现 · 入口预告</p>
+            <h2>先让你的 Agent 认识 TA，再由你们认识彼此。</h2>
+            <p>当人格数据更完整，Agent 会更有把握：它不再只比较“你们有多像”，而是判断兴趣、思维、价值观与沟通方式是否适配。</p>
+            <div class="flow-mini" aria-label="匹配流程示意">
+              <span class="tag">搜索 / 随机用户</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">快速匹配</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">Agent 对话</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">匹配报告</span>
+            </div>
+            <div class="src-state" style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; font-size: 13px;">
+                <span style="color: var(--muted);">人格数据源 · 注入状态</span>
+                <span style="font-weight: 600; font-size: 12.5px;">知乎已注入 · 等待蒸馏</span>
+              </div>
+              <ul class="src-chips" aria-label="六个数据源的注入状态">
+                <li class="chip ok"><span class="dot"></span>知乎 <b>已注入</b></li>
+                <li class="chip"><span class="dot"></span>微信 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>QQ <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>飞书 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>钉钉 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>SBTI <small>未注入</small></li>
+              </ul>
+              <p class="panel-note">六个来源彼此独立、二元标记：只标记“已注入 / 未注入”，不折算成百分比。Agent 蒸馏只需要至少一个已注入的来源；每补入一个来源并重新蒸馏，匹配就会多一个侧面可依据。</p>
+            </div>
+          </div>
+
+          <div class="side-stack">
+            <div class="panel mini-panel" data-od-id="home-recent-match">
+              <p class="panel-eyebrow">Agent 匹配 · 动态</p>
+              <span class="mini-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+              </span>
+              <h3>最近的匹配</h3>
+              <p>还没有进行中的 Agent 对话。完成人格与 Agent 训练后，这里会出现对方的匹配报告。</p>
+              <a class="mini-link" href="#home-status" data-od-id="home-link-status">先完成上方的三步 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+            </div>
+            <div class="panel mini-panel" data-od-id="home-notify">
+              <p class="panel-eyebrow">通知中心</p>
+              <span class="mini-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+              </span>
+              <h3>暂无新通知</h3>
+              <p>当 Agent 对话完成、或对方把匹配报告发给你时，提醒会出现在这里。</p>
+            </div>
+          </div>
+        </section>
+
+        <footer class="foot-note">
+          <span>© 2026 知遇 · 知乎黑客松「灵魂匹配局」赛道作品</span>
+          
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+      var toast = document.getElementById('toast');
+      var timer = null;
+
+      function showToast(text) {
+        if (!toast) return;
+        toast.textContent = text;
+        toast.classList.add('show');
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { toast.classList.remove('show'); }, 2600);
+      }
+
+      var navItems = document.querySelectorAll('[data-nav]');
+      Array.prototype.forEach.call(navItems, function (btn) {
+        btn.addEventListener('click', function () {
+          var name = btn.getAttribute('data-nav');
+          if (btn.classList.contains('active')) return;
+          var href = btn.getAttribute('data-href');
+          if (href) { window.location.href = href; return; }
+          showToast('「' + name + '」页面将在后续页面原型中开放，当前展示的是首页。');
+        });
+      });
+
+      var gotoBtns = document.querySelectorAll('[data-goto]');
+      Array.prototype.forEach.call(gotoBtns, function (btn) {
+        btn.addEventListener('click', function () {
+          showToast('「' + btn.getAttribute('data-goto') + '」页面将在后续页面原型中开放。');
+        });
+      });
+    })();
+  </script>
+
+
+</body></html>

@@ -2,8 +2,8 @@
 <html lang="zh-CN"><head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="知遇 · 设置 —— 管理你的知乎授权与人格数据源、别人能否派 Agent 来认识你，以及数据与隐私偏好。">
-  <title>知遇 · 设置</title>
+  <meta name="description" content="知遇 · 通知 —— Agent 对话完成、对方发来的匹配报告，认识进程里的关键消息都会在这里等你。">
+  <title>知遇 · 通知</title>
   <style>
     :root {
       --bg:      #eef3fc;
@@ -565,102 +565,6 @@
       .n-ico { width: 40px; height: 40px; }
       .n-time { margin-left: 0; }
     }
-      /* ─── 设置页（追加）────────────────────────────────────── */
-    :root { --danger: oklch(0.54 0.18 27); }
-    .set-list { display: grid; gap: 22px; }
-    .s-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 26px 26px 10px;
-    }
-    .s-head { margin: 0 2px 6px; }
-    .s-head h2 { font-size: clamp(19px, 2vw, 24px); }
-    .s-head .s-sub { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; max-width: 78ch; line-height: 1.75; }
-    .s-rows { border-top: 1px solid var(--border); }
-    .s-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      column-gap: 22px; row-gap: 10px;
-      align-items: center;
-      padding: 18px 2px;
-    }
-    .s-row + .s-row { border-top: 1px solid var(--border); }
-    .s-row.lead {
-      display: flex; align-items: center; gap: 14px;
-      padding-bottom: 2px;
-    }
-    .s-body { min-width: 0; }
-    .s-body h3 {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.5;
-    }
-    .s-body h3 .pill { font-weight: 500; flex: 0 0 auto; }
-    .s-body p { margin: 7px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.8; max-width: 76ch; }
-    .s-ctl { display: flex; align-items: center; justify-content: flex-end; gap: 12px; grid-column: 2; }
-    .btn.sm { min-height: 44px; padding: 8px 16px; font-size: 13.5px; }
-    .sw-t { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .switch-wrap { display: inline-flex; align-items: center; min-height: 44px; }
-    .switch { position: relative; width: 46px; height: 26px; flex: 0 0 auto; }
-    .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-    .switch i {
-      position: absolute; inset: 0;
-      background: color-mix(in oklch, var(--muted) 34%, var(--border));
-      border-radius: 999px;
-      transition: background 0.18s ease;
-      pointer-events: none;
-    }
-    .switch i::after {
-      content: ''; position: absolute; top: 3px; left: 3px;
-      width: 20px; height: 20px; border-radius: 50%;
-      background: var(--surface);
-      box-shadow: 0 1px 3px color-mix(in oklch, var(--fg) 26%, transparent);
-      transition: transform 0.18s ease;
-    }
-    .switch input:checked + i { background: var(--accent); }
-    .switch input:checked + i::after { transform: translateX(20px); }
-    .switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    .btn-danger {
-      background: transparent;
-      color: var(--danger);
-      border-color: color-mix(in oklch, var(--danger) 42%, var(--border));
-    }
-    .btn-danger:hover {
-      background: color-mix(in oklch, var(--danger) 8%, var(--surface));
-      border-color: var(--danger);
-      color: var(--danger);
-    }
-    .btn-solid-danger { background: var(--danger); color: var(--surface); border-color: var(--danger); }
-    .btn-solid-danger:hover {
-      background: color-mix(in oklch, var(--danger) 84%, black);
-      border-color: color-mix(in oklch, var(--danger) 84%, black);
-    }
-
-    .auth-lead { margin: 0 0 2px; color: var(--fg); font-size: 14px; line-height: 1.7; }
-    .muted-p { margin: 10px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
-    .auth-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
-    .auth-list li { display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; line-height: 1.6; }
-    .auth-list li .a-chk { font-family: var(--font-mono); color: var(--accent); font-weight: 700; flex: 0 0 auto; }
-    .auth-list li .a-dim { display: block; color: var(--muted); font-size: 12px; line-height: 1.6; }
-    .auth-note {
-      margin: 16px 0 0; padding: 11px 14px;
-      background: var(--fg-soft);
-      border-radius: 12px;
-      color: var(--muted); font-size: 12.5px; line-height: 1.75;
-    }
-    .auth-note b { color: var(--fg); font-weight: 600; }
-    .auth-note.danger-note {
-      background: color-mix(in oklch, var(--danger) 7%, var(--surface));
-      border: 1px solid color-mix(in oklch, var(--danger) 24%, var(--border));
-    }
-    .auth-note.danger-note b { color: var(--danger); }
-
-    @media (max-width: 760px) {
-      .s-row { grid-template-columns: 1fr; align-items: start; }
-      .s-ctl { grid-column: 1; justify-content: flex-start; margin-top: 2px; }
-    }
-
   </style>
 </head>
 <body>
@@ -694,7 +598,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
           <span>Agent 匹配</span>
         </button>
-        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
+        <button class="nav-item active" type="button" data-nav="通知" data-od-id="nav-notify" aria-current="page">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
           <span>通知</span>
         </button>
@@ -702,7 +606,7 @@
 
       <div class="side-foot" data-od-id="sidebar-account">
         <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
-        <button class="nav-item active" type="button" data-nav="设置" data-od-id="nav-settings" aria-current="page">
+        <button class="nav-item" type="button" data-nav="设置" data-href="zhiyu-settings.html" data-od-id="nav-settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
           <span>设置</span>
         </button>
@@ -710,406 +614,566 @@
     </aside>
 
     <!-- 主内容 -->
-    <main class="main" data-od-id="settings-main">
+    <main class="main" data-od-id="notify-main">
       <div class="main-inner">
         <header class="page-head">
           <div>
-            <p class="meta" style="margin: 0 0 10px;">知遇 · 设置</p>
-            <h1>谁可以认识我，由你决定。</h1>
-            <p class="sub">身份与数据源、Agent 沟通偏好、数据与隐私——在这里管理别人「怎么看到你、能不能派 Agent 来认识你」。所有开关与状态均为演示，改动只记在本地。</p>
+            <p class="meta" style="margin: 0 0 10px;">知遇 · 通知</p>
+            <h1>该你看到的消息，会在这里等你。</h1>
+            <p class="sub">后台的 Agent 认识完成了、对方把与你的匹配报告发了过来——通知中心只放与「认识一个人」有关的进展。看过的报告，随时回到 Agent 匹配页再翻。</p>
           </div>
           <div class="head-side">
-            <span class="cov-chip" data-od-id="head-demo-chip"><span class="dot"></span>演示原型 · 未接入后端</span>
-            <p class="head-hint">真实接入后，这些开关会写入你的账号设置，并同步到发现与 Agent 匹配流程。</p>
+            <div class="head-actions">
+              <span class="cov-chip" data-od-id="head-unread"><span class="dot"></span><span id="head-unread-t">…</span></span>
+              <button class="btn btn-secondary" type="button" id="mark-all" data-od-id="mark-all-btn">全部标为已读</button>
+            </div>
+            <p class="head-hint">已读状态记在本地：再次打开时，新消息会放在最上面。</p>
           </div>
         </header>
 
-        <div class="set-list" data-od-id="settings-sections">
-
-          <!-- ① 身份与数据源 -->
-          <section class="s-card" aria-labelledby="h-identity" data-od-id="sec-identity">
-            <header class="s-head">
-              <p class="panel-eyebrow">01 · 身份与数据源</p>
-              <h2 id="h-identity">你以什么身份出现</h2>
-              <p class="s-sub">人格来自你授权的数据源，融合成统一 Persona。状态口径与「我的人格」页保持一致。</p>
-            </header>
-            <div class="s-rows">
-              <div class="s-row" data-od-id="row-zhihu">
-                <div class="s-body">
-                  <h3>知乎账号<span class="pill done" id="zh-pill"><span class="dot"></span><span id="zh-pill-t">已授权（演示）</span></span></h3>
-                  <p>匹配与 Agent 只使用你授权的知乎公开内容作为人格输入之一，原始内容不用于其他用途。撤回授权后，知乎数据停止参与后续人格更新（已生成的人格不会被删除）。</p>
-                </div>
-                <div class="s-ctl">
-                  <button class="btn btn-secondary sm" type="button" id="btn-auth" data-od-id="btn-zhihu-manage">管理授权</button>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-wechat">
-                <div class="s-body">
-                  <h3>微信数据源<span class="pill todo" id="wx-pill"><span class="dot"></span><span id="wx-pill-t">未接入</span></span></h3>
-                  <p>用微信聊天记录补充私域表达特征。处理走 WeFlow：先在本地完成聚合与人格蒸馏，只把需要的 Persona 结果上传，原始聊天记录不会离开你的设备。（演示：本页暂不提供接入，可去「我的人格」页体验流程。）</p>
-                </div>
-                <div class="s-ctl">
-                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-wechat">去接入</button>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-sbti">
-                <div class="s-body">
-                  <h3>SBTI 人格测试<span class="pill todo" id="sbti-pill"><span class="dot"></span><span id="sbti-pill-t">未完成</span></span></h3>
-                  <p>一份显性自报测试，补全「自我认知」这一维，与知乎、微信数据一起融合进 Persona。完成后，快速匹配才有更完整的人格特征可用。</p>
-                </div>
-                <div class="s-ctl">
-                  <button class="btn btn-secondary sm" type="button" data-go-persona="sources" data-od-id="btn-sbti">去测试</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ② Agent 沟通偏好 -->
-          <section class="s-card" aria-labelledby="h-agent" data-od-id="sec-agent">
-            <header class="s-head">
-              <p class="panel-eyebrow">02 · Agent 沟通偏好</p>
-              <h2 id="h-agent">别人如何与你相遇</h2>
-              <p class="s-sub">决定你在「发现」里的可见方式：对方能否派 Agent 与你进一步认识、能否在快速匹配里看到相似度，以及匹配结果如何通知你。</p>
-            </header>
-            <div class="s-rows">
-              <div class="s-row" data-od-id="row-allow-agent">
-                <div class="s-body">
-                  <h3>允许他人派 Agent 与我对话</h3>
-                  <p>对方看到你的人格卡后，可发起一轮 Agent 认识：他的 Agent 会与你的人格侧 Agent 做 5～8 轮对话并生成匹配报告。关闭后，对方只能看到人格卡与相似度，不能发起 Agent 对话。</p>
-                </div>
-                <div class="s-ctl">
-                  <span class="sw-t" id="sw-agent-t">已开启</span>
-                  <label class="switch-wrap">
-                    <span class="switch"><input type="checkbox" id="sw-agent" aria-label="允许他人派 Agent 与我对话" checked=""><i aria-hidden="true"></i></span>
-                  </label>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-allow-quick">
-                <div class="s-body">
-                  <h3>允许在「快速匹配」中展示相似度</h3>
-                  <p>当你的人格数据可用时，你的 Persona 会进入快速匹配候选池，对方可以看到与你的人格相似度。关闭后，你不会被推荐给陌生人。</p>
-                </div>
-                <div class="s-ctl">
-                  <span class="sw-t" id="sw-quick-t">已开启</span>
-                  <label class="switch-wrap">
-                    <span class="switch"><input type="checkbox" id="sw-quick" aria-label="允许在快速匹配中展示相似度" checked=""><i aria-hidden="true"></i></span>
-                  </label>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-report-notify">
-                <div class="s-body">
-                  <h3>对方发来匹配报告时提醒我</h3>
-                  <p>当对方把「与你的人格匹配报告」发过来时，在通知中心提醒你；历史报告可随时回看。</p>
-                </div>
-                <div class="s-ctl">
-                  <span class="sw-t" id="sw-notify-t">已开启</span>
-                  <label class="switch-wrap">
-                    <span class="switch"><input type="checkbox" id="sw-notify" aria-label="对方发来匹配报告时提醒我" checked=""><i aria-hidden="true"></i></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ③ 数据与隐私 -->
-          <section class="s-card" aria-labelledby="h-privacy" data-od-id="sec-privacy">
-            <header class="s-head">
-              <p class="panel-eyebrow">03 · 数据与隐私</p>
-              <h2 id="h-privacy">只带走「必要的人格」</h2>
-              <p class="s-sub">知遇以人格数据为基础，因此隐私优先。以下是本项目固定遵守的原则，在演示原型中同样适用。</p>
-            </header>
-            <div class="s-rows">
-              <div class="s-row" data-od-id="row-minimal">
-                <div class="s-body">
-                  <h3>原始数据最小化</h3>
-                  <p>微信聊天记录等原始内容先在本地聚合与蒸馏，只有匹配所需的人格结果会上传；服务器不保存原始聊天数据。</p>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-typed">
-                <div class="s-body">
-                  <h3>真人与 AI 严格区分</h3>
-                  <p>每个 Persona 都带类型标注：真人使用 type = human，AI 演示人格使用 type = synthetic 并在界面中如实标明，不会冒充真人。</p>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-explain">
-                <div class="s-body">
-                  <h3>结论可解释</h3>
-                  <p>相似度与匹配报告都会给出来源证据和「为什么值得认识」的解释，而不只是一个分数。</p>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-persona">
-                <div class="s-body">
-                  <h3>我的人格</h3>
-                  <p>查看融合后的人格卡与数据覆盖度；数据更新后，建议重新蒸馏你的 Agent。</p>
-                </div>
-                <div class="s-ctl">
-                  <button class="btn btn-secondary sm" type="button" data-go-persona="card" data-od-id="btn-persona">查看人格卡</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ④ 账号与退出 -->
-          <section class="s-card" aria-labelledby="h-account" data-od-id="sec-account">
-            <header class="s-head">
-              <p class="panel-eyebrow">04 · 账号与退出</p>
-              <h2 id="h-account">账号与退出</h2>
-              <p class="s-sub">本页为黑客松演示原型，不涉及真实账号体系。</p>
-            </header>
-            <div class="s-rows">
-              <div class="s-row" data-od-id="row-about">
-                <div class="s-body">
-                  <h3>知遇 · 演示原型<span class="pill todo">v0.5 · 前端演示</span></h3>
-                  <p>知乎黑客松「灵魂匹配局」赛道作品：AI 驱动的人格匹配与 Agent 社交。授权、推送、Agent 运行与后端服务均未接入。</p>
-                </div>
-              </div>
-              <div class="s-row" data-od-id="row-logout">
-                <div class="s-body">
-                  <h3>退出登录</h3>
-                  <p>退出后回到登录页。演示模式下，本地的人格与匹配演示状态不会删除，重新进入仍可继续体验。</p>
-                </div>
-                <div class="s-ctl">
-                  <button class="btn btn-danger sm" type="button" id="btn-logout" data-od-id="btn-logout">退出登录</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <p class="demo-note set-demo" id="set-demo">演示说明：本页所有授权状态、数据源状态与开关均为演示数据。开关改动仅保存在本地浏览器，用于演示设置页的交互与状态记忆；真实版本中，这些设置会由 profile API 写入你的账号。</p>
+        <div class="seg" role="tablist" aria-label="按消息类型筛选" data-od-id="notify-tabs">
+          <button class="active" type="button" role="tab" aria-selected="true" data-tab="all" data-od-id="ntab-all">全部<span class="seg-count" id="cnt-all"></span></button>
+          <button type="button" role="tab" aria-selected="false" data-tab="done" data-od-id="ntab-done">对话完成<span class="seg-count" id="cnt-done"></span></button>
+          <button type="button" role="tab" aria-selected="false" data-tab="report" data-od-id="ntab-report">发来的报告<span class="seg-count" id="cnt-report"></span></button>
         </div>
+
+        <section class="tab-panel" data-od-id="notify-panel">
+          <div class="panel">
+            <div class="sec-top">
+              <div>
+                <p class="panel-eyebrow">消息流 · 按时间倒序</p>
+                <p class="s-sub">点开一条查看详情，读完会自动标为已读。这里只汇总与你认识进程有关的提醒——发起 Agent 认识后，对话完成的提醒会第一时间送达。</p>
+              </div>
+            </div>
+            <div class="n-list" id="n-list" data-od-id="notify-list"></div>
+            <div class="empty-state" id="n-empty" hidden="">
+              <div class="big">这个分组下暂时没有消息。</div>
+              <p id="n-empty-p">新的进展会自动出现在这里——例如在发现页发起「让 Agent 先聊聊」后，对话完成的提醒会先落到通知里。</p>
+              <button class="btn btn-secondary" type="button" id="n-empty-all" data-od-id="empty-back">返回「全部」</button>
+            </div>
+            <p class="demo-note" id="demo-note"></p>
+          </div>
+        </section>
       </div>
     </main>
 
   </div>
 
-  <!-- 知乎授权管理弹窗 -->
-  <div class="modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-od-id="auth-modal">
+  <!-- 通知详情弹窗 -->
+  <div class="modal modal-wide" id="done-modal" role="dialog" aria-modal="true" aria-labelledby="done-title" data-od-id="done-modal">
     <div class="modal-backdrop" data-close=""></div>
     <section class="modal-dialog">
-      <button class="modal-close" type="button" data-close="" aria-label="关闭授权管理">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭通知">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
       </button>
-      <h3 id="auth-title">知乎授权管理</h3>
-      <div class="modal-body">
-        <div id="auth-panel-ok">
-          <p class="auth-lead">以下是你授权「知遇」使用的知乎数据范围（演示）：</p>
-          <ul class="auth-list" data-od-id="auth-scope-list">
-            <li><span class="a-chk">✓</span><span>主页公开信息<span class="a-dim">用于展示你的身份，不包含私密资料。</span></span></li>
-            <li><span class="a-chk">✓</span><span>已发布的公开内容<span class="a-dim">用于推断表达习惯、兴趣与思考方式。</span></span></li>
-            <li><span class="a-chk">✓</span><span>关注与互动聚合<span class="a-dim">仅读取公开聚合，不含私信与未公开互动。</span></span></li>
-          </ul>
-          <p class="auth-note">数据经知乎官方授权接口获取，只读取授权范围内内容；原始内容不会用于人格匹配以外的用途。<b>撤回授权</b>后可随时重新授权。</p>
+      <p class="panel-eyebrow">通知 · Agent 对话完成</p>
+      <div class="rep-head">
+        <div class="duo" id="done-duo"></div>
+        <div class="m-who">
+          <div class="m-title" id="done-title"></div>
+          <div class="m-sub" id="done-sub"></div>
         </div>
-        <div id="auth-panel-no" hidden="">
-          <p class="auth-lead">已撤回知乎数据授权。</p>
-          <p class="muted-p">后续人格更新不再包含知乎数据；已生成的人格数据不会被自动删除。</p>
-          <p class="auth-note danger-note"><b>提示</b>：重新授权后，需要到「我的人格」页再次同步知乎数据，人格特征才会更新。</p>
+        <div class="score-badge">
+          <span class="num" id="done-num"></span>
+          <span class="lbl">综合匹配度<br>演示数据</span>
         </div>
       </div>
+      <div class="why-block" style="margin-top:18px;">
+        <span class="k">报告里怎么说的？</span>
+        <div class="headline" id="done-why"></div>
+        <p id="done-why-p"></p>
+      </div>
+      <div class="rep-dims">
+        <h3>五维概览 · 每一条都能在对话里找到依据</h3>
+        <ul class="dim-list" id="done-dims"></ul>
+      </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" id="btn-auth-close-ok" data-close="">完成</button>
-        <button class="btn btn-danger" type="button" id="btn-auth-revoke" data-od-id="btn-auth-revoke">撤回授权</button>
-        <button class="btn btn-secondary" type="button" id="btn-auth-close-no" data-close="" hidden="">关闭</button>
-        <button class="btn btn-primary" type="button" id="btn-auth-reauth" data-od-id="btn-auth-reauth" hidden="">重新授权（演示）</button>
+        <button class="btn btn-secondary" type="button" data-close="">关闭</button>
+        <button class="btn btn-primary btn-arrow" type="button" id="go-match" data-od-id="go-match-btn">前往 Agent 匹配 · 看完整报告</button>
       </div>
     </section>
   </div>
 
-  <!-- 退出登录确认弹窗 -->
-  <div class="modal" id="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logout-title" data-od-id="logout-modal">
+  <div class="modal modal-xl" id="in-modal" role="dialog" aria-modal="true" aria-labelledby="in-title" data-od-id="in-modal">
     <div class="modal-backdrop" data-close=""></div>
     <section class="modal-dialog">
-      <button class="modal-close" type="button" data-close="" aria-label="关闭退出确认">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭报告">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
       </button>
-      <h3 id="logout-title">退出登录？</h3>
-      <div class="modal-body">
-        <p class="auth-lead">退出后将回到登录页。</p>
-        <p class="muted-p">演示模式下，本地的人格注入、Agent 状态与通知已读等演示数据都不会被删除，方便你随时回来继续体验。</p>
+      <p class="panel-eyebrow">对方发来的报告 · Judge Agent 分析</p>
+      <div class="rep-head">
+        <div class="duo" id="in-duo"></div>
+        <div class="m-who">
+          <div class="m-title" id="in-title"></div>
+          <div class="m-sub" id="in-sub"></div>
+        </div>
+        <div class="score-badge">
+          <span class="num" id="in-num"></span>
+          <span class="lbl">综合匹配度<br>演示数据</span>
+        </div>
       </div>
+      <div class="rep-top">
+        <div class="why-block">
+          <span class="k">在 TA 的 Agent 看来，为什么值得认识你？</span>
+          <div class="headline" id="in-why"></div>
+          <p id="in-why-p"></p>
+        </div>
+        <div class="radar-wrap" id="in-radar"></div>
+      </div>
+      <div class="rep-dims">
+        <h3>五维分析 · 结论都来自双方的表达</h3>
+        <ul class="dim-list" id="in-dims"></ul>
+      </div>
+      <div class="rep-dims">
+        <h3>对话摘录 · 你的 Agent 替你说的几句</h3>
+        <ul class="hl-list" id="in-hls"></ul>
+      </div>
+      <div class="n-notice" id="in-note"></div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" data-close="">取消</button>
-        <button class="btn btn-solid-danger" type="button" id="btn-confirm-logout" data-od-id="btn-confirm-logout">退出登录</button>
+        <button class="btn btn-secondary" type="button" data-close="">关闭</button>
+        <button class="btn btn-primary btn-arrow" type="button" id="in-go" data-od-id="in-go-btn">回访 TA · 打开发现页</button>
       </div>
     </section>
   </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
-      (function () {
-        var $ = function (id) { return document.getElementById(id); };
+    (function () {
+      'use strict';
 
-        var toastEl = $('toast');
-        var toastTimer = null;
-        function showToast(msg) {
-          if (!toastEl) return;
-          toastEl.textContent = msg;
-          toastEl.classList.add('show');
-          if (toastTimer) clearTimeout(toastTimer);
-          toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 3200);
-        }
+      var toast = document.getElementById('toast');
+      var toastTimer = null;
+      function showToast(text) {
+        if (!toast) return;
+        toast.textContent = text;
+        toast.classList.add('show');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 3400);
+      }
 
-        function lsGet(key, dflt) {
-          try {
-            var v = localStorage.getItem(key);
-            return v == null ? dflt : v;
-          } catch (e) { return dflt; }
-        }
-        function lsSet(key, val) {
-          try { localStorage.setItem(key, val); } catch (e) {}
-        }
-
-        /* ── 弹窗通用 ── */
-        function openModal(id) {
-          var m = $(id);
-          if (!m) return;
-          m.classList.add('open');
-          var f = m.querySelector('[autofocus], button:not([data-close=""])');
-          if (f && f.focus) f.focus();
-        }
-        function closeModal(el) {
-          if (!el) return;
-          el.classList.remove('open');
-        }
-        document.querySelectorAll('.modal').forEach(function (m) {
-          m.addEventListener('mousedown', function (ev) {
-            var dlg = m.querySelector('.modal-dialog');
-            if (dlg && !dlg.contains(ev.target)) closeModal(m);
-          });
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
         });
-        document.querySelectorAll('.modal [data-close]').forEach(function (el) {
-          el.addEventListener('click', function () {
-            closeModal(el.closest('.modal'));
-          });
-        });
-        document.addEventListener('keydown', function (ev) {
-          if (ev.key !== 'Escape') return;
-          var open = document.querySelector('.modal.open');
-          if (open) closeModal(open);
-        });
+      }
 
-        /* ── 知乎授权状态 ── */
-        var zhihuKey = 'zhiyu-settings-zhihu';
-        var zhihuState = lsGet(zhihuKey, 'ok');
-        if (zhihuState !== 'ok' && zhihuState !== 'revoked') zhihuState = 'ok';
-        var zhPill = $('zh-pill');
-        var zhPillT = $('zh-pill-t');
-        var btnAuth = $('btn-auth');
-        var panelOk = $('auth-panel-ok');
-        var panelNo = $('auth-panel-no');
-        var closeOk = $('btn-auth-close-ok');
-        var revokeBtn = $('btn-auth-revoke');
-        var closeNo = $('btn-auth-close-no');
-        var reauthBtn = $('btn-auth-reauth');
+      /* ── 元数据（与「发现」「Agent 匹配」页口径一致） ── */
+      var DIMMETA = [
+        { k: 'interest', label: '兴趣同频' },
+        { k: 'thinking', label: '思维共振' },
+        { k: 'value',    label: '价值观契合' },
+        { k: 'comm',     label: '沟通适配' },
+        { k: 'comp',     label: '互补程度' }
+      ];
+      var PERS = {
+        '01': { title: '演示人格 01', type: '深度思考型', city: '杭州' },
+        '02': { title: '演示人格 02', type: '好奇探索型', city: '北京' },
+        '04': { title: '演示人格 04', type: '理性辩手型', city: '深圳' },
+        '05': { title: '演示人格 05', type: '深度思考型', city: '北京' }
+      };
 
-        function paintZhihu() {
-          var ok = zhihuState === 'ok';
-          zhPill.className = 'pill ' + (ok ? 'done' : 'todo');
-          zhPillT.textContent = ok ? '已授权（演示）' : '未授权（演示）';
-          btnAuth.textContent = ok ? '管理授权' : '重新授权';
-          panelOk.hidden = !ok;
-          panelNo.hidden = ok;
-          closeOk.hidden = !ok;
-          revokeBtn.hidden = !ok;
-          closeNo.hidden = ok;
-          reauthBtn.hidden = ok;
+      var SEEDS = [
+        {
+          id: 'r-in-02', kind: 'report', code: '02', time: '今天 · 11:02', unread: true,
+          title: '「演示人格 02」发来了一份与你的匹配报告',
+          desc: 'TA 也让自己的 Agent 先认识了你：这轮由 TA 发起，你的 Agent 全程应答，Judge 给出结论后，TA 决定把这份报告递给你。',
+          overall: 81,
+          why: '在 TA 看来，你是少数能让 TA 的好奇心停下来的人。',
+          whyP: 'TA 的好奇心驱动很强，但更在意对方有没有自己的坐标系：你偏爱深度学习与创造，正好是 TA 愿意长期一起琢磨事情的人。沟通上 TA 偏发散、你偏收敛，结论是互补大于冲突——TA 建议从交换一个具体话题开始认识。',
+          dims: { interest: 90, thinking: 82, value: 78, comm: 74, comp: 84 },
+          whys: [
+            'TA 注意到你长期保持「输入 → 输出」的创作循环，认为这是它愿意长期追随的节奏。',
+            'TA 欣赏你“先理解、再判断”的顺序——它自己也常这么想。',
+            '你们在“真实高于体面”上高度一致，只是对效率的偏好略有分歧。',
+            'TA 偏发散、你偏收敛，TA 觉得慢下来反而聊得更深。',
+            '一个负责打开新话题，一个负责把话题讲透。'
+          ],
+          hl: [
+            { me: false, t: '如果只能保留一种“输入方式”（读、听、看、亲身体验），你会留下哪一个？' },
+            { me: true,  t: '大概是“读”。读能让我随时开始、随时停下，把想法慢慢沉淀成自己的。' },
+            { me: false, t: '朋友向你倾诉一件你并不认同的事，你会先说什么？' },
+            { me: true,  t: '先问他此刻更需要被理解，还是需要被点醒——再决定怎么接。' }
+          ],
+          note: '这份报告由 <b>TA 一侧发起</b>：TA 的 Agent 与你的 Agent 完成了一轮认识，TA 选择把结论发给你。看完可以回访 TA；想让两边继续聊深一层，随时在发现页发起「让 Agent 先聊聊」。（报告与理由为演示数据）'
+        },
+        {
+          id: 'dn-01', kind: 'done', code: '01', time: '今天 · 10:25', unread: true,
+          title: '与「演示人格 01」的 Agent 认识已完成',
+          desc: '你在发现页发起的认识有了结果：你的 Agent 与 TA 的 Agent 围绕兴趣、思维、价值观聊完 5 轮，Judge 已完成五维分析。',
+          overall: 87,
+          why: '你们不是最像的人，但可能是最适合认识的人。',
+          whyP: '你在「学习与创造」上的权重很高，而 TA 习惯把问题想清楚再开口、对技术背后的价值判断敏感——在深度话题上，你们对“聊得下去”的要求几乎一致。主要差异在沟通节奏：两人都慢热，建议先把这份报告发给 TA，再从一次具体的讨论开始。',
+          dims: { interest: 91, thinking: 84, value: 88, comm: 79, comp: 94 },
+          whys: [
+            '你俩都愿意为“把一件事做深”花时间，见面不缺话题。',
+            '一个偏归纳、一个偏推演，聊起来会互相补全。',
+            '都把真诚和长期主义放在比较靠前的位置。',
+            '都慢热，却都能接住深度话题——节奏接近。',
+            '你偏输出、TA 偏内省，恰好互补。'
+          ]
+        },
+        {
+          id: 'dn-04', kind: 'done', code: '04', time: '昨天 · 21:06', unread: false,
+          title: '与「演示人格 04」的 Agent 认识已完成',
+          desc: '这场认识同样在后台安静完成：5 轮聊完、报告已归档。你之前已经看过，需要的话随时能再翻。',
+          overall: 76,
+          why: '不是彼此的复制品，却是敢互相挑战的人。',
+          whyP: 'TA 讲究先立论再反驳，而你偏好能被认真挑战的讨论——思维层面相当合拍。真正的落差在价值观权重：你更看重“学习与创造”，TA 的判断更结果导向。这不适合急着定义关系，更适合先来几场诚实、过瘾的观点交锋。',
+          dims: { interest: 78, thinking: 85, value: 61, comm: 78, comp: 86 },
+          whys: [
+            '都有点“较真”，各自领域不同但都享受钻研的过程。',
+            '都习惯先立论、再找反例，思辨上很合拍。',
+            'TA 更结果导向、你更看重过程——这是主要差异。',
+            '都敢直接表达不同意见，沟通不绕弯子。',
+            '你想被认真挑战，TA 恰好擅长这件事。'
+          ]
+        },
+        {
+          id: 'r-in-05', kind: 'report', code: '05', time: '昨天 · 20:14', unread: false,
+          title: '「演示人格 05」发来了一份与你的匹配报告',
+          desc: 'TA 让 Agent 先认识了你，并把结论发给了你。这份报告你看过——是“同频但克制”的那一类。',
+          overall: 69,
+          why: '同频但克制，或许能安静地相处很久。',
+          whyP: 'TA 的低社交需求与你的专注并不冲突——你们都不喜欢被高频确认消耗。差异主要在价值观权重：TA 的判断更多来自阅历与直觉，而你倾向先建立稳定的方法论。结论是适合“低频、高质”的往来，从一篇共同感兴趣的文章聊起最自然。',
+          dims: { interest: 76, thinking: 79, value: 58, comm: 72, comp: 82 },
+          whys: [
+            '两个人都把阅读与写作放在生活重心附近。',
+            'TA 靠直觉先给判断、再回头找依据；你习惯反着来——正好互相补盲。',
+            '人生排序里，“被时刻理解”都不是你们的第一需求。',
+            '都不爱寒暄，但都能为一次深入的交谈留足时间。',
+            '一个发散联想、一个收敛归纳，恰好互补。'
+          ],
+          hl: [
+            { me: false, t: '如果只能推荐一本书给五年后的自己，你会选哪一本？' },
+            { me: true,  t: '会选一本当年“没读透”的书——留了遗憾的书，重读时最能看清自己变在哪里。' },
+            { me: false, t: '你怎么看“越长大越难交到朋友”这种说法？' },
+            { me: true,  t: '不是变难，是标准变具体了。能坐下来聊三小时不累的人，本来就少。' }
+          ],
+          note: '这份报告来自 <b>TA 一侧</b>：由演示人格 05 发起、TA 的 Agent 与你的 Agent 完成认识后把结论发给了你。（报告与理由为演示数据）'
         }
-        paintZhihu();
+      ];
 
-        function setZhihu(next) {
-          zhihuState = next;
-          lsSet(zhihuKey, next);
-          paintZhihu();
-        }
-        btnAuth.addEventListener('click', function () { openModal('auth-modal'); });
-        revokeBtn.addEventListener('click', function () {
-          setZhihu('revoked');
-          closeModal($('auth-modal'));
-          showToast('已撤回知乎授权（演示）。知乎数据将不再参与人格更新。');
-        });
-        reauthBtn.addEventListener('click', function () {
-          setZhihu('ok');
-          closeModal($('auth-modal'));
-          showToast('已重新授权知乎数据（演示）。可去「我的人格」页同步最新内容。');
-        });
+      /* ── 已读状态（存本地，id 维度） ── */
+      var readKey = 'zhiyu-notify-read';
+      var readSet = {};
+      try {
+        var savedRead = JSON.parse(localStorage.getItem(readKey) || '{}');
+        if (savedRead && typeof savedRead === 'object') readSet = savedRead;
+      } catch (e) {}
 
-        /* ── Agent 沟通开关 ── */
-        var swDef = { agent: true, quick: true, notify: true };
-        var sw = {};
-        Object.keys(swDef).forEach(function (k) { sw[k] = swDef[k]; });
-        try {
-          var swRaw = localStorage.getItem('zhiyu-settings-sw');
-          if (swRaw) {
-            var swParsed = JSON.parse(swRaw);
-            Object.keys(swDef).forEach(function (k) {
-              if (typeof swParsed[k] === 'boolean') sw[k] = swParsed[k];
-            });
-          }
-        } catch (e) {}
-        function saveSw() {
-          try { localStorage.setItem('zhiyu-settings-sw', JSON.stringify(sw)); } catch (e) {}
+      function isRead(it) { return !!readSet[it.id]; }
+      function persistRead() {
+        try { localStorage.setItem(readKey, JSON.stringify(readSet)); } catch (e) {}
+      }
+
+      var items = SEEDS.map(function (s) {
+        s.meName = '你的 Agent';
+        s.taName = PERS[s.code].title + ' · Agent';
+        return s;
+      });
+
+      /* ── 渲染 ── */
+      var currentTab = 'all';
+      var listEl = document.getElementById('n-list');
+      var emptyEl = document.getElementById('n-empty');
+      var noteEl = document.getElementById('demo-note');
+
+      function tabCounts() {
+        var c = { all: items.length, done: 0, report: 0 };
+        items.forEach(function (it) { if (it.kind) c[it.kind]++; });
+        return c;
+      }
+      function unreadCount() {
+        return items.reduce(function (n, it) { return n + (isRead(it) ? 0 : 1); }, 0);
+      }
+
+      function avatarHtml(p, me) {
+        return '<span class="ava' + (me ? ' me' : '') + '" aria-hidden="true">' + (me ? '我' : esc(p.code)) + '</span>';
+      }
+      function duoHtml(code) {
+        var p = PERS[code];
+        return '<span class="duo" aria-label="你的 Agent 与对方 Agent">' +
+          avatarHtml(p, true) + avatarHtml(p, false) + '</span>';
+      }
+
+      function kindMeta(it) {
+        if (it.kind === 'done') {
+          return {
+            lbl: 'Agent 对话完成',
+            ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="m8.5 10.6 2.5 2.5 4.5-4.7"></path></svg>'
+          };
         }
-        var swCopy = {
-          agent: {
-            on: '已开启：他人可以派 Agent 来认识你（演示）。',
-            off: '已关闭：他人将无法派 Agent 与你对话（演示）。'
-          },
-          quick: {
-            on: '已开启：你的人格可进入「快速匹配」候选池（演示）。',
-            off: '已关闭：你不会被推荐给陌生人（演示）。'
-          },
-          notify: {
-            on: '已开启：对方发来匹配报告时会提醒你（演示）。',
-            off: '已关闭：收到报告将不再提醒（演示）。'
-          }
+        return {
+          lbl: '对方发来的报告',
+          ico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path><path d="M14 2v5h5M12 10v7M8.6 13.5h6.8"></path></svg>'
         };
-        [
-          ['sw-agent', 'agent', 'sw-agent-t'],
-          ['sw-quick', 'quick', 'sw-quick-t'],
-          ['sw-notify', 'notify', 'sw-notify-t']
-        ].forEach(function (pair) {
-          var input = $(pair[0]);
-          var key = pair[1];
-          var txt = $(pair[2]);
-          if (!input) return;
-          input.checked = !!sw[key];
-          txt.textContent = sw[key] ? '已开启' : '已关闭';
-          input.addEventListener('change', function () {
-            sw[key] = input.checked;
-            saveSw();
-            txt.textContent = sw[key] ? '已开启' : '已关闭';
-            showToast(sw[key] ? swCopy[key].on : swCopy[key].off);
-          });
-        });
+      }
 
-        /* ── 退出登录 ── */
-        $('btn-logout').addEventListener('click', function () { openModal('logout-modal'); });
-        $('btn-confirm-logout').addEventListener('click', function () {
-          window.location.href = 'zhiyu-login.html';
-        });
+      function cardHtml(it) {
+        var km = kindMeta(it);
+        var un = !isRead(it);
+        return '<article class="n-card k-' + it.kind + (un ? ' unread' : '') + '" data-id="' + it.id + '" data-od-id="ncard-' + it.id + '">' +
+          '<span class="n-ico">' + km.ico + '</span>' +
+          '<div class="n-body">' +
+            '<div class="n-top">' +
+              '<span class="n-kind"><span class="kdot"></span>' + km.lbl + '</span>' +
+              '<span class="n-time">' + esc(it.time) + '</span>' +
+              (un ? '<span class="unread-dot" aria-hidden="true"></span>' : '') +
+            '</div>' +
+            '<h3 class="n-title">' + esc(it.title) + '</h3>' +
+            '<p class="n-desc">' + esc(it.desc) + '</p>' +
+            '<div class="n-foot">' +
+              '<span class="dchip">综合 <b>' + it.overall + '%</b></span>' +
+              '<button class="btn btn-ghost n-open" type="button" data-open="' + it.id + '" data-od-id="open-' + it.id + '">' + (un ? '查看' : '再看一次') + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>' +
+            '</div>' +
+          '</div>' +
+        '</article>';
+      }
 
-        /* ── 跳转「我的人格」并预选页签 ── */
-        document.querySelectorAll('[data-go-persona]').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            var tab = btn.getAttribute('data-go-persona');
-            if (tab === 'card' || tab === 'sources' || tab === 'distill') {
-              try { localStorage.setItem('zhiyu-persona-tab', tab); } catch (e) {}
-            }
-            window.location.href = 'zhiyu-persona.html';
-          });
+      function setTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('#notify-tabs [role="tab"]').forEach(function (b) {
+          var on = b.getAttribute('data-tab') === tab;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        try { localStorage.setItem('zhiyu-notify-tab', tab); } catch (e) {}
+        renderAll();
+      }
 
-        /* ── 侧边栏 ── */
-        document.querySelectorAll('[data-nav]').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            if (btn.classList.contains('active')) return;
-            var href = btn.getAttribute('data-href');
-            if (href) { window.location.href = href; return; }
-            showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
-          });
+      function renderAll() {
+        var counts = tabCounts();
+        document.getElementById('cnt-all').textContent = counts.all;
+        document.getElementById('cnt-done').textContent = counts.done;
+        document.getElementById('cnt-report').textContent = counts.report;
+
+        var uc = unreadCount();
+        document.getElementById('head-unread-t').textContent = uc ? uc + ' 条未读' : '已全部读完';
+        document.getElementById('mark-all').hidden = uc === 0;
+
+        var shown = items.filter(function (it) { return currentTab === 'all' || it.kind === currentTab; });
+        if (shown.length) {
+          listEl.innerHTML = shown.map(cardHtml).join('');
+          listEl.hidden = false;
+          emptyEl.hidden = true;
+        } else {
+          listEl.innerHTML = '';
+          listEl.hidden = true;
+          emptyEl.hidden = false;
+        }
+      }
+
+      function openItem(id) {
+        var it = null;
+        for (var i = 0; i < items.length; i++) if (items[i].id === id) it = items[i];
+        if (!it) return;
+        if (!isRead(it)) { readSet[it.id] = 1; persistRead(); renderAll(); }
+        if (it.kind === 'done') fillDone(it); else fillIn(it);
+      }
+
+      function fillModalCommon(modalId) {
+        var m = document.getElementById(modalId);
+        m.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        var x = m.querySelector('.modal-close');
+        if (x) x.focus();
+      }
+      function closeModal(modalId) {
+        var m = document.getElementById(modalId);
+        if (m) m.classList.remove('open');
+        if (!document.querySelector('.modal.open')) document.body.style.overflow = '';
+      }
+
+      function dimListHtml(it) {
+        return DIMMETA.map(function (d, i) {
+          var v = it.dims[d.k];
+          return '<li class="dim-item" data-od-id="dim-' + d.k + '">' +
+            '<div class="dtop"><span class="dn">' + d.label + '</span><span class="dv num">' + v + '%</span></div>' +
+            '<div class="track"><i style="width:' + v + '%"></i></div>' +
+            '<p class="dr">' + esc(it.whys[i]) + '</p>' +
+          '</li>';
+        }).join('');
+      }
+      function hlListHtml(it) {
+        return (it.hl || []).map(function (h) {
+          var mine = !!h.me;
+          return '<li data-od-id="hl-' + (mine ? 'me' : 'ta') + '">' +
+            '<div class="who' + (mine ? ' me' : '') + '"><span class="mini">' + (mine ? '我' : 'TA') + '</span><span class="n">' + esc(mine ? it.meName : it.taName) + '</span></div>' +
+            '<p>' + esc(h.t) + '</p>' +
+          '</li>';
+        }).join('');
+      }
+
+      function fillDone(it) {
+        var p = PERS[it.code];
+        document.getElementById('done-duo').innerHTML = duoHtml(it.code);
+        document.getElementById('done-title').textContent = '与「' + p.title + '」的 Agent 认识已完成';
+        document.getElementById('done-sub').textContent = '我的 Agent ↔ ' + p.title + ' · ' + p.city + ' · ' + p.type + ' · ' + it.time;
+        document.getElementById('done-num').textContent = it.overall + '%';
+        document.getElementById('done-why').textContent = it.why;
+        document.getElementById('done-why-p').textContent = it.whyP;
+        document.getElementById('done-dims').innerHTML = dimListHtml(it);
+        fillModalCommon('done-modal');
+      }
+
+      function radarHtml(vals) {
+        var cx = 110, cy = 100, R = 76;
+        function pt(frac, i) {
+          var a = (Math.PI / 180) * (-90 + i * 72);
+          return (cx + frac * R * Math.cos(a)).toFixed(1) + ',' + (cy + frac * R * Math.sin(a)).toFixed(1);
+        }
+        function poly(frac) {
+          var pts = [];
+          for (var i = 0; i < 5; i++) pts.push(pt(frac, i));
+          return pts.join(' ');
+        }
+        function dataPts() {
+          var keys = DIMMETA.map(function (d) { return d.k; });
+          var pts = [];
+          for (var i = 0; i < 5; i++) {
+            var a = (Math.PI / 180) * (-90 + i * 72);
+            var v = (vals[keys[i]] || 0) / 100;
+            pts.push((cx + v * R * Math.cos(a)).toFixed(1) + ',' + (cy + v * R * Math.sin(a)).toFixed(1));
+          }
+          return pts.join(' ');
+        }
+        var html = '<svg viewBox="0 0 220 200" role="img" aria-label="五维匹配度雷达图（演示数据）">';
+        [0.25, 0.5, 0.75, 1].forEach(function (f) {
+          html += '<polygon points="' + poly(f) + '" fill="none" stroke="var(--border)"' + (f === 1 ? '' : ' stroke-opacity="0.7"') + '></polygon>';
         });
-      })();
+        for (var i = 0; i < 5; i++) {
+          html += '<line x1="' + cx + '" y1="' + cy + '" x2="' + pt(1, i).split(',')[0] + '" y2="' + pt(1, i).split(',')[1] + '" stroke="var(--border)" stroke-opacity="0.7"></line>';
+        }
+        html += '<polygon points="' + dataPts() + '" fill="var(--accent)" fill-opacity="0.15" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"></polygon>';
+        var dpts = dataPts().split(' ');
+        dpts.forEach(function (p) {
+          html += '<circle cx="' + p.split(',')[0] + '" cy="' + p.split(',')[1] + '" r="3" fill="var(--accent)"></circle>';
+        });
+        html += '</svg>';
+        return html;
+      }
+
+      function fillIn(it) {
+        var p = PERS[it.code];
+        document.getElementById('in-duo').innerHTML = duoHtml(it.code);
+        document.getElementById('in-title').textContent = '「' + p.title + '」发起 · 与你的匹配报告';
+        document.getElementById('in-sub').textContent = 'TA 的 Agent ↔ 你的 Agent · ' + p.city + ' · ' + p.type + ' · ' + it.time;
+        document.getElementById('in-num').textContent = it.overall + '%';
+        document.getElementById('in-why').textContent = it.why;
+        document.getElementById('in-why-p').textContent = it.whyP;
+        document.getElementById('in-radar').innerHTML = radarHtml(it.dims);
+        document.getElementById('in-dims').innerHTML = dimListHtml(it);
+        document.getElementById('in-hls').innerHTML = hlListHtml(it);
+        document.getElementById('in-note').innerHTML = it.note;
+        fillModalCommon('in-modal');
+      }
+
+      /* ── 事件 ── */
+      document.getElementById('n-list').addEventListener('click', function (ev) {
+        var card = ev.target.closest('.n-card');
+        if (card) openItem(card.getAttribute('data-id'));
+      });
+      document.querySelectorAll('#notify-tabs [role="tab"]').forEach(function (b) {
+        b.addEventListener('click', function () { setTab(b.getAttribute('data-tab')); });
+      });
+      document.getElementById('n-empty-all').addEventListener('click', function () { setTab('all'); });
+
+      document.getElementById('mark-all').addEventListener('click', function () {
+        items.forEach(function (it) { readSet[it.id] = 1; });
+        persistRead();
+        renderAll();
+        showToast('已全部标为已读。');
+      });
+
+      document.getElementById('go-match').addEventListener('click', function () {
+        try { localStorage.setItem('zhiyu-match-tab', 'reports'); } catch (e) {}
+        window.location.href = 'zhiyu-agent-match.html';
+      });
+      document.getElementById('in-go').addEventListener('click', function () {
+        window.location.href = 'zhiyu-find.html';
+      });
+
+      document.querySelectorAll('[data-close]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var m = el.closest('.modal');
+          if (m) closeModal(m.id);
+        });
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') {
+          ['done-modal', 'in-modal'].forEach(closeModal);
+        }
+      });
+
+      /* ── 演示：后台对话完成 → 通知自动送达（两次） ── */
+      var LIVE = {
+        '05': {
+          overall: 78, dims: { interest: 80, thinking: 82, value: 66, comm: 70, comp: 85 },
+          why: '同频但克制，或许能安静地相处很久。',
+          whyP: '你们都不喜欢被高频确认消耗，对深度内容的偏好也接近——真正的差异在人生排序：TA 把自在放在效率之前，你则在“学习与创造”上权重更高。结论是适合低频、高质的往来。',
+          whys: [
+            '都把阅读与写作放在生活重心附近。',
+            '都习惯先给直觉判断、再回头找依据。',
+            '“被时刻理解”都不是你们的第一需求。',
+            '都不爱寒暄，但能为一次深谈留足时间。',
+            '一个发散联想、一个收敛归纳，恰好互补。'
+          ]
+        },
+        '02': {
+          overall: 84, dims: { interest: 92, thinking: 86, value: 74, comm: 80, comp: 88 },
+          why: '你负责把话题讲深，TA 负责把世界打开。',
+          whyP: 'TA 的跨学科好奇心与你的深度钻研并不冲突——TA 带来新角度，你负责把角度讲透。主要差异在价值观权重：TA 更看重体验密度，而你更在意长期积累，聊开后反而互相补全。',
+          whys: [
+            '都享受“从一个话题引向更多话题”的聊天。',
+            'TA 靠联想跳跃、你靠追问深入——配合很顺。',
+            '都认为真诚比迎合更重要，只是表达方式不同。',
+            'TA 更外放、你更沉得住，节奏互补。',
+            '一个负责打开新话题，一个负责把话题讲透。'
+          ]
+        }
+      };
+      var liveDone = 0;
+      function scheduleLive(delay, code, label) {
+        setTimeout(function () {
+          var d = LIVE[code];
+          items.unshift({
+            id: 'live-' + code.toLowerCase(),
+            kind: 'done', code: code, time: '刚刚', unread: true,
+            title: '与「' + PERS[code].title + '」的 Agent 认识已完成',
+            desc: '这场认识在后台完成：5 轮聊完、Judge 已出结论，报告已归档到 Agent 匹配页。',
+            overall: d.overall, why: d.why, whyP: d.whyP, dims: d.dims, whys: d.whys,
+            meName: '你的 Agent', taName: PERS[code].title + ' · Agent'
+          });
+          liveDone++;
+          renderAll();
+          if (liveDone === 1) {
+            noteEl.textContent = '演示说明：以上为演示数据——包括「Agent 对话完成」与「对方发来的匹配报告」两类消息。本条“刚刚”的消息，是与 Agent 匹配页同步完成的一轮后台认识：到达通知中心后会自动置顶并计入未读。接入真实后端后，这些消息将由 notifications API 推送，与 Agent 匹配页保持实时一致。';
+            showToast(label + ' 的 Agent 对话已在后台完成，通知已送达。');
+          }
+        }, delay);
+      }
+      scheduleLive(3600, '05', '「演示人格 05」');
+      scheduleLive(7800, '02', '「演示人格 02」');
+
+      /* ── 侧边栏 ── */
+      document.querySelectorAll('[data-nav]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (btn.classList.contains('active')) return;
+          var href = btn.getAttribute('data-href');
+          if (href) { window.location.href = href; return; }
+          showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
+        });
+      });
+
+      /* ── 初始化 ── */
+      noteEl.textContent = '演示说明：此页用于演示通知中心的两类消息——「Agent 对话完成」与「对方发来的匹配报告」，内容与报告均为演示数据。已读状态与页签选择记在本地；停留片刻，会看到两场与 Agent 匹配页同步的后台对话完成并自动送达。';
+      try {
+        var savedTab = localStorage.getItem('zhiyu-notify-tab');
+        if (savedTab && (savedTab === 'done' || savedTab === 'report' || savedTab === 'all')) currentTab = savedTab;
+      } catch (e) {}
+      setTab(currentTab);
+    })();
   </script>
 
 

@@ -216,6 +216,9 @@
     .source-list .src-note { color: var(--muted); font-size: 12.5px; }
     .source-list .done svg { color: var(--fg); }
     .source-list .todo { color: var(--muted); }
+    .source-list.cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px 18px; }
+    .source-list.cols li { padding-top: 0; }
+    .source-list.cols li + li { padding-top: 0; }
 
     .card-actions { margin-top: auto; padding-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .card-actions .btn { min-height: 42px; padding: 9px 16px; font-size: 13.5px; }
@@ -247,12 +250,19 @@
       font-size: 12.5px;
     }
     .flow-mini svg { width: 13px; height: 13px; color: var(--muted); }
-    .progress-block { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
-    .progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 9px; font-size: 13px; }
-    .progress-top .num { color: var(--fg); font-weight: 600; }
-    .progress-top span:first-child { color: var(--muted); }
-    .track { height: 8px; border-radius: 999px; background: var(--fg-soft); overflow: hidden; }
-    .track i { display: block; height: 100%; width: 0; border-radius: 999px; background: color-mix(in oklch, var(--fg) 64%, transparent); }
+    .src-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+    .src-chips .chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 11px; border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 12.5px; color: var(--muted);
+    }
+    .src-chips .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-soft); flex: 0 0 auto; }
+    .src-chips .chip b { color: var(--fg); font-weight: 600; }
+    .src-chips .chip small { font-size: 11px; }
+    .src-chips .chip.ok { color: var(--fg); border-color: color-mix(in oklch, var(--accent) 42%, var(--border)); }
+    .src-chips .chip.ok .dot { background: var(--accent); }
     .panel-note { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.75; }
 
     .side-stack { display: grid; gap: 18px; }
@@ -369,7 +379,7 @@
           <div>
             <p class="meta" style="margin: 0 0 10px;">知遇 · 首页</p>
             <h1>欢迎回到知遇</h1>
-            <p class="sub">你的 Agent 先从知乎公开内容认识你；补全人格数据后，它就能替你遇见真正值得认识的人。</p>
+            <p class="sub">你的 Agent 先从知乎公开内容认识你；补入更多来源、完成一次蒸馏后，它就能替你遇见真正值得认识的人。</p>
           </div>
           
         </header>
@@ -382,25 +392,37 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
               </span>
               <h3>我的人格</h3>
-              <span class="card-state num">1 / 3 数据源</span>
+              <span class="card-state">待蒸馏</span>
             </div>
-            <p>从三个来源认识你：聊出来的、表达出来的，以及你眼中的自己。</p>
-            <ul class="source-list">
+            <p>六个来源分别回答“不同场景里的你”：微信与 QQ 是私域生活，飞书与钉钉是职场，知乎是公共表达，SBTI 是你眼中的自己。</p>
+            <ul class="source-list cols">
               <li class="done">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
-                <span class="src-name">知乎数据</span><span class="src-note">已接入</span>
+                <span class="src-name">知乎数据</span><span class="src-note">已注入</span>
               </li>
               <li class="todo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
-                <span class="src-name">微信聊天</span><span class="src-note">未接入</span>
+                <span class="src-name">微信聊天</span><span class="src-note">未注入</span>
               </li>
               <li class="todo">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
-                <span class="src-name">SBTI 测试</span><span class="src-note">未完成</span>
+                <span class="src-name">QQ 聊天</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">飞书工作</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">钉钉工作</span><span class="src-note">未注入</span>
+              </li>
+              <li class="todo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5l3 2"></path></svg>
+                <span class="src-name">SBTI 自评</span><span class="src-note">未注入</span>
               </li>
             </ul>
             <div class="card-actions">
-              <button class="btn btn-primary" type="button" data-goto="我的人格" data-od-id="cta-home-persona">补充人格数据</button>
+              <button class="btn btn-primary" type="button" data-goto="我的人格" data-od-id="cta-home-persona">去管理人格数据源</button>
             </div>
           </article>
 
@@ -458,15 +480,20 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
               <span class="tag">匹配报告</span>
             </div>
-            <div class="progress-block">
-              <div class="progress-top">
-                <span>人格数据源接入进度</span>
-                <span class="num">33% · 1 / 3</span>
+            <div class="src-state" style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; font-size: 13px;">
+                <span style="color: var(--muted);">人格数据源 · 注入状态</span>
+                <span style="font-weight: 600; font-size: 12.5px;">知乎已注入 · 等待蒸馏</span>
               </div>
-              <div class="track" role="progressbar" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100" aria-label="人格数据源接入进度 33%">
-                <i style="width: 33%; background-color: rgb(13, 100, 253);"></i>
-              </div>
-              <p class="panel-note">已接入知乎公开资料；补充微信聊天或完成 SBTI 测试后，Agent 对你的理解会更完整。</p>
+              <ul class="src-chips" aria-label="六个数据源的注入状态">
+                <li class="chip ok"><span class="dot"></span>知乎 <b>已注入</b></li>
+                <li class="chip"><span class="dot"></span>微信 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>QQ <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>飞书 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>钉钉 <small>未注入</small></li>
+                <li class="chip"><span class="dot"></span>SBTI <small>未注入</small></li>
+              </ul>
+              <p class="panel-note">六个来源彼此独立、二元标记：只标记“已注入 / 未注入”，不折算成百分比。Agent 蒸馏只需要至少一个已注入的来源；每补入一个来源并重新蒸馏，匹配就会多一个侧面可依据。</p>
             </div>
           </div>
 

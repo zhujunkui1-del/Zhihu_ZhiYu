@@ -101,7 +101,7 @@
       overflow: hidden;
       flex: 0 0 auto;
     }
-    .brand-plate img { width: 36px; height: auto; }
+    .brand-plate img { width: 37px; height: auto; }
     .brand-word { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
     .brand-tag { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; }
     .side-nav { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; flex: 1; }
@@ -209,28 +209,8 @@
     .ov-lead { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 56ch; line-height: 1.8; }
     .ov-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
 
-    .dial-box {
-      background: var(--fg-softer);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 22px;
-      display: flex; flex-direction: column; align-items: center;
-      text-align: center;
-    }
-    .dial { position: relative; width: 150px; height: 150px; }
-    .dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .dial circle { fill: none; stroke-width: 11; }
-    .dial-track { stroke: var(--border); }
-    .dial-fill { stroke: var(--accent); stroke-linecap: round; }
-    .dial-num {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center; gap: 2px;
-      font-size: 34px;
-      font-weight: 600;
-      color: var(--fg);
-    }
-    .dial-num em { font-style: normal; font-size: 15px; color: var(--muted); margin-top: 10px; }
-    .dial-box > span { margin-top: 4px; font-size: 12.5px; color: var(--muted); letter-spacing: 0.05em; }
+    .cov-note { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .cov-list.list-flush { margin-top: 0; }
 
     .cov-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; width: 100%; }
     .cov-list li {
@@ -253,28 +233,22 @@
     .feat-block { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
     .feat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
     .feat-head .meta { font-size: 11.5px; }
-    .trait-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
-    .trait-row { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .trait-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; }
+    .trait-row { padding-bottom: 20px; border-bottom: 1px solid var(--border); }
     .trait-row:last-child { padding-bottom: 0; border-bottom: 0; }
-    .trait-top { display: flex; align-items: baseline; gap: 10px; }
-    .trait-name { font-size: 14.5px; font-weight: 600; }
-    .trait-val { margin-left: auto; font-size: 12px; color: var(--muted); }
-    .trait-desc { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
-    .trait-bottom { display: flex; align-items: baseline; gap: 14px; margin-top: 7px; }
-    .trait-bottom .trait-desc { flex: 1; min-width: 0; margin: 0; }
-    .trait-tag {
+    .trait-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .trait-name { font-size: 15px; font-weight: 600; }
+    .trait-origin {
       flex: 0 0 auto;
+      font-family: var(--font-mono);
       font-size: 11px;
       color: var(--muted);
       border: 1px solid var(--border);
       border-radius: 999px;
-      padding: 1px 8px;
-      font-family: var(--font-mono);
+      padding: 2px 10px;
       white-space: nowrap;
     }
-    .track { height: 7px; border-radius: 999px; background: var(--fg-soft); overflow: hidden; }
-    .track i { display: block; height: 100%; border-radius: 999px; background: color-mix(in oklch, var(--fg) 62%, transparent); }
-    .trait-val { float: right; font-size: 11.5px; }
+    .trait-desc { margin: 8px 0 0; color: var(--fg); font-size: 14px; line-height: 1.75; max-width: 74ch; }
     .feat-empty { padding: 6px 0 2px; }
     .feat-empty p { margin: 0; color: var(--muted); font-size: 13.5px; max-width: 62ch; line-height: 1.8; }
     .feat-dims { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -288,6 +262,32 @@
       color: var(--fg);
     }
     .fdim .dot { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in oklch, var(--fg) 30%, transparent); }
+
+    /* ─── 来源画像卡（人格卡页内） ─────────────────────────────── */
+    .sp-card.on .src-mark { background: var(--accent-soft); color: var(--accent); }
+    .sp-card .src-mark { color: var(--muted); }
+    .sp-card .sp-desc { margin: 14px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.8; }
+    .sp-card .sp-desc b { color: var(--fg); font-weight: 600; }
+    .sp-card .src-foot { margin-top: auto; padding-top: 14px; }
+    .sp-empty { font-size: 12.5px; color: var(--muted); }
+
+    .sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+    .sp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex; flex-direction: column;
+      min-height: 118px;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .sp-card:hover { box-shadow: 0 12px 30px color-mix(in oklch, var(--fg) 6%, transparent); }
+    .sp-card.on { border-color: color-mix(in oklch, var(--accent) 40%, var(--border)); }
+    .sp-card.off { opacity: 0.66; }
+    .sp-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .sp-name { font-size: 14.5px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+    .sp-name small { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+    .sp-pill { flex: 0 0 auto; }
 
     /* ─── 注入数据 ─────────────────────────────────────────────── */
     .sec-intro { max-width: 66ch; margin-bottom: 22px; }
@@ -513,7 +513,7 @@
     <aside class="sidebar" data-od-id="sidebar">
       <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
         <span class="brand-row">
-          <span class="brand-plate"><img src="logo1.png" alt="知遇" width="36" height="29"></span>
+          <span class="brand-plate"><img src="data:image/webp;base64,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" width="260" height="204" alt="知遇 Logo"></span>
           <span>
             <span class="brand-word">知遇</span>
             <span class="brand-tag meta">先认识，再相遇</span>
@@ -560,7 +560,7 @@
           <div>
             <p class="meta" style="margin: 0 0 10px;">知遇 · 我的人格</p>
             <h1>把完整的你，交给 Agent。</h1>
-            <p class="sub">人格不是标签，而是三份证据的融合：微信里的私域、知乎里的公开表达，和你眼中的 SBTI。数据就绪后再蒸馏，Agent 才有底气替你判断该和谁同频。</p>
+            <p class="sub">人格不是一张标签，而是多份数据各自蒸馏、再融合的结果——私域聊天里的你、职场协作里的你、公开表达里的你，和你眼中的自己。每一面都带得出处，Agent 才有底气替你判断该和谁同频。</p>
           </div>
           
         </header>
@@ -576,47 +576,62 @@
           <div class="panel">
             <div class="card-grid">
               <div>
-                <p class="panel-eyebrow">人格卡 · 结果</p>
-                <h2 id="ov-title">人格还差两份证据。</h2>
-                <p class="ov-lead" id="ov-lead">人格融合不会草率下结论。先补齐下面这份证据清单，蒸馏后的人格特征才会带上来源、可以解释——而不是几个拍脑袋的标签。</p>
+                <p class="panel-eyebrow">人格卡 · 综合画像</p>
+                <h2 id="ov-title">知乎数据已就位，等待一次蒸馏。</h2>
+                <p class="ov-lead" id="ov-lead">已注入的来源会先各自蒸馏成「来源画像」，再融合成一张综合画像。现在就可以用知乎开始蒸馏，也可以再补入其它来源，让融合更有依据。</p>
                 <div class="ov-actions" id="ov-actions"></div>
               </div>
 
               <aside class="card-side">
-                <div class="dial-box">
-                  <div class="dial">
-                    <svg viewBox="0 0 120 120" role="img" aria-label="人格完整度">
-                      <circle class="dial-track" cx="60" cy="60" r="52"></circle>
-                      <circle class="dial-fill" id="ringFill" cx="60" cy="60" r="52"></circle>
-                    </svg>
-                    <div class="dial-num num"><span id="ring-num">33</span><em>%</em></div>
-                  </div>
-                  <span>数据覆盖度 · 完整度不等同于真实度</span>
-                </div>
-                <ul class="cov-list" aria-label="数据源覆盖情况">
+                <p class="panel-eyebrow" style="margin: 0 0 12px;">六源注入状态</p>
+                <ul class="cov-list list-flush" aria-label="各来源注入状态">
                   <li data-cov="zhihu">
                     <span class="cov-mark on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
                     <span class="cov-name">知乎 · 公共表达<small>Observed · 公开内容推断</small></span>
-                    <span class="cov-state on">已接入</span>
+                    <span class="cov-state on">已注入</span>
                   </li>
                   <li data-cov="wechat">
                     <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
-                    <span class="cov-name">微信 · 私域表达<small>Observed · 本地聊天分析</small></span>
-                    <span class="cov-state">未接入</span>
+                    <span class="cov-name">微信 · 私域生活<small>Observed · 本地聊天分析</small></span>
+                    <span class="cov-state">未注入</span>
+                  </li>
+                  <li data-cov="qq">
+                    <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
+                    <span class="cov-name">QQ · 私域表达<small>Observed · 本地群聊分析</small></span>
+                    <span class="cov-state">未注入</span>
+                  </li>
+                  <li data-cov="feishu">
+                    <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
+                    <span class="cov-name">飞书 · 职场协作<small>Observed · 官方 API / 文档</small></span>
+                    <span class="cov-state">未注入</span>
+                  </li>
+                  <li data-cov="dingtalk">
+                    <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
+                    <span class="cov-name">钉钉 · 职场沟通<small>Observed · 文档 API / 消息上传</small></span>
+                    <span class="cov-state">未注入</span>
                   </li>
                   <li data-cov="sbti">
                     <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
                     <span class="cov-name">SBTI · 显性自评<small>Self-reported · 你眼中的自己</small></span>
-                    <span class="cov-state">未完成</span>
+                    <span class="cov-state">未注入</span>
                   </li>
                 </ul>
+                <p class="cov-note">每个来源是否已注入彼此独立；已注入的来源参与融合，未注入的来源可随时补入并重新蒸馏。</p>
               </aside>
+            </div>
+
+            <div class="feat-block">
+              <div class="feat-head">
+                <h3>来源人格卡 · 每一面都带出处</h3>
+                <span class="meta">各来源先独立蒸馏，融合后才可解释</span>
+              </div>
+              <div class="src-grid" id="sp-grid" data-od-id="persona-src-personas"></div>
             </div>
 
             <div class="feat-block" data-od-id="persona-features">
               <div class="feat-head">
-                <h3>人格特征 · 每条都带来源</h3>
-                <span class="meta">观察人格 vs 自评人格，可对照可解释</span>
+                <h3>综合画像 · 融合特征</h3>
+                <span class="meta">把六个来源合起来看，每条可追问来源</span>
               </div>
               <div id="feat-list"></div>
             </div>
@@ -628,8 +643,8 @@
           <div class="panel">
             <p class="panel-eyebrow">注入数据 · Multi-source Fusion</p>
             <div class="sec-intro">
-              <h2>从三个侧面认识你，而不是替你下定义。</h2>
-              <p>微信还原真实生活中的你，知乎理解你在公开表达里的关注与倾向，SBTI 记录你眼中的自己。三种证据融合成一个可检索、可解释的 Persona——所有来源都能被追问。</p>
+              <h2>六个来源，各留一面，再合成一个你。</h2>
+              <p>微信与 QQ 回答「生活里、熟人面前的你」，飞书与钉钉回答「职场里的你」，知乎回答「公开表达的你」，SBTI 记录「你自认为的你」。每个来源先独立蒸馏成来源画像，再融合成一份可检索、可解释的 Persona——任何结论都能被追问出处。</p>
             </div>
 
             <div class="src-grid">
@@ -642,19 +657,38 @@
                     <div class="src-title">微信聊天记录</div>
                     <span class="src-dim">私域人格 · 本地处理</span>
                   </div>
-                  <span class="pill todo src-badge" id="badge-wechat"><span class="dot"></span><span id="badge-wechat-t">未接入</span></span>
+                  <span class="pill todo src-badge" id="badge-wechat"><span class="dot"></span><span id="badge-wechat-t">未注入</span></span>
                 </div>
-                <p>通过 WeFlow 导出你与常聊对象的记录，系统只提取“你自己的发言”作为人格证据，还原日常表达、情绪反应与决策习惯。</p>
+                <p>通过 WeFlow 导出你与常聊对象的记录，系统只提取“你自己的发言”作为人格证据，还原私域生活里的表达、情绪反应与决策习惯。</p>
                 <ol class="src-steps">
-                  <li><span class="num">01</span>WeFlow 本地读取并导出聊天记录</li>
-                  <li><span class="num">02</span>本地完成说话人分离（self / other）</li>
-                  <li><span class="num">03</span>仅注入蒸馏后的结果，可多次更新</li>
+                  <li><span class="num">01</span>WeFlow 在本地读取并导出聊天记录</li>
+                  <li><span class="num">02</span>导出 JSON 后在本页上传，原文件不留服务器</li>
+                  <li><span class="num">03</span>系统分离 self / other，只注入“你自己的发言”</li>
                 </ol>
-                <ul class="src-stats" id="stats-wechat">
-                  <li><span>状态</span><span class="num">等待导入</span></li>
-                </ul>
                 <div class="src-foot">
                   <button class="btn btn-secondary" type="button" id="act-wechat" data-od-id="wechat-action">选择聊天文件</button>
+                </div>
+              </article>
+
+              <article class="src-card" data-od-id="src-card-qq">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">QQ 聊天记录</div>
+                    <span class="src-dim">私域人格 · 本地处理</span>
+                  </div>
+                  <span class="pill todo src-badge" id="badge-qq"><span class="dot"></span><span id="badge-qq-t">未注入</span></span>
+                </div>
+                <p>熟人群聊里更放得开的你，同样构成私域人格。用 qq-chat-exporter 在本地导出会话 JSON，再回到本页上传注入。</p>
+                <ol class="src-steps">
+                  <li><span class="num">01</span>本地运行 qq-chat-exporter，导出会话 JSON</li>
+                  <li><span class="num">02</span>上传 JSON，覆盖你与常聊好友 / 群的消息</li>
+                  <li><span class="num">03</span>只把“你自己”的表达蒸馏进私域画像</li>
+                </ol>
+                <div class="src-foot">
+                  <button class="btn btn-secondary" type="button" id="act-qq" data-od-id="qq-action">选择导出文件</button>
                 </div>
               </article>
 
@@ -665,17 +699,61 @@
                   </span>
                   <div>
                     <div class="src-title">知乎公开数据</div>
-                    <span class="src-dim">公共人格 · 已授权</span>
+                    <span class="src-dim">公共人格 · OAuth 已授权</span>
                   </div>
-                  <span class="pill done src-badge" id="badge-zhihu"><span class="dot"></span><span id="badge-zhihu-t">已接入</span></span>
+                  <span class="pill done src-badge" id="badge-zhihu"><span class="dot"></span><span id="badge-zhihu-t">已注入</span></span>
                 </div>
-                <p>分析你授权的公开回答、关注与想法，理解你在公共表达里关注什么、如何思考、知识结构长在哪里。</p>
+                <p>分析你授权的公开回答、关注与想法，理解你在公共表达里关注什么、如何思考、知识结构长在哪里。数据经知乎官方 OAuth 获取，只用于人格匹配。</p>
                 <ul class="src-stats">
-                  <li><span>回答 / 想法 / 关注话题</span><span class="num">87 / 302 / 41</span></li>
+                  <li><span>内容类型</span><span class="num">回答 · 想法 · 关注</span></li>
                   <li><span>最近同步</span><span class="num" id="zhihu-sync">今天 · 刚刚</span></li>
                 </ul>
                 <div class="src-foot">
                   <button class="btn btn-secondary" type="button" id="act-zhihu" data-od-id="zhihu-action">重新同步</button>
+                </div>
+              </article>
+
+              <article class="src-card" data-od-id="src-card-feishu">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4z"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">飞书工作数据</div>
+                    <span class="src-dim">职场人格 · 官方 API</span>
+                  </div>
+                  <span class="pill todo src-badge" id="badge-feishu"><span class="dot"></span><span id="badge-feishu-t">未注入</span></span>
+                </div>
+                <p>通过飞书开放平台官方 API 授权，读取你在工作沟通、文档与多维表格里的表达，回答“职场协作里的我是谁”。</p>
+                <ol class="src-steps">
+                  <li><span class="num">01</span>创建自建应用，开通 im:message 与文档 scope</li>
+                  <li><span class="num">02</span>走官方 OAuth 完成授权（演示为模拟）</li>
+                  <li><span class="num">03</span>拉取群聊消息与文档，清洗后注入职场画像</li>
+                </ol>
+                <div class="src-foot">
+                  <button class="btn btn-secondary" type="button" id="act-feishu" data-od-id="feishu-action">连接飞书（演示）</button>
+                </div>
+              </article>
+
+              <article class="src-card" data-od-id="src-card-dingtalk">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">钉钉工作数据</div>
+                    <span class="src-dim">职场人格 · 文档 API + 消息上传</span>
+                  </div>
+                  <span class="pill todo src-badge" id="badge-dingtalk"><span class="dot"></span><span id="badge-dingtalk-t">未注入</span></span>
+                </div>
+                <p>文档与多维表格可走官方 API 自动拉取；聊天消息因官方暂无历史接口，用本地工具导出 JSON 后上传（演示以导入模拟）。</p>
+                <ol class="src-steps">
+                  <li><span class="num">01</span>官方 API 拉取你创建的文档与表格</li>
+                  <li><span class="num">02</span>消息类内容在本地工具导出 JSON</li>
+                  <li><span class="num">03</span>合并上传，统一进入职场人格蒸馏</li>
+                </ol>
+                <div class="src-foot">
+                  <button class="btn btn-secondary" type="button" id="act-dingtalk" data-od-id="dingtalk-action">导入钉钉数据（演示）</button>
                 </div>
               </article>
 
@@ -685,20 +763,17 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M9 3.5h6M9.5 12l2 2 3-3.5"></path></svg>
                   </span>
                   <div>
-                    <div class="src-title">SBTI 测试</div>
-                    <span class="src-dim">显性人格 · 自评</span>
+                    <div class="src-title">SBTI 四维自评</div>
+                    <span class="src-dim">显性人格 · 产品内置</span>
                   </div>
-                  <span class="pill todo src-badge" id="badge-sbti"><span class="dot"></span><span id="badge-sbti-t">未完成</span></span>
+                  <span class="pill todo src-badge" id="badge-sbti"><span class="dot"></span><span id="badge-sbti-t">未注入</span></span>
                 </div>
-                <p>由你自评的显性人格，也是快速匹配的必要信号之一。完成后会与“从行为观察到的你”对照，判断哪些判断来自你，哪些来自数据。</p>
+                <p>产品内置的四维自评，记录“你认为自己是怎样的人”。它作为显性信号，与从行为中被观察到的证据形成对照，完成结果随即注入融合。</p>
                 <ol class="src-steps">
                   <li><span class="num">01</span>完成 SBTI 四维测试（约 12 分钟）</li>
                   <li><span class="num">02</span>结果作为 Self-reported 进入融合</li>
                   <li><span class="num">03</span>随时可重测，结果随之更新</li>
                 </ol>
-                <ul class="src-stats" id="stats-sbti">
-                  <li><span>状态</span><span class="num">尚未开始</span></li>
-                </ul>
                 <div class="src-foot">
                   <button class="btn btn-primary" type="button" id="act-sbti" data-od-id="sbti-action">去完成 SBTI</button>
                 </div>
@@ -715,7 +790,7 @@
             <p class="panel-eyebrow">Agent 蒸馏 · Persona 训练</p>
             <div class="sec-intro">
               <h2>把原始材料，训练成能代表你的 Agent。</h2>
-              <p>Persona 是长期保存、可向量化检索的人格数据；Agent 是它在需要替你交流时按需启动的运行实例。蒸馏把三份证据规整成这份可解释的底稿——数据更新后，随时可以重新蒸馏。</p>
+              <p>Persona 是长期保存、可向量化检索的人格数据；Agent 是它在需要替你交流时按需启动的运行实例。蒸馏会把已注入的来源各自蒸馏成画像、再融合成可解释的底稿——数据更新后，随时可以重新蒸馏。</p>
             </div>
 
             <div class="pipe" aria-label="蒸馏流程">
@@ -731,16 +806,19 @@
             <div class="run-grid">
               <div>
                 <div class="run-req">
-                  <span class="meta">数据源就绪情况</span>
-                  <span class="req-chip ok"><span class="dot"></span>知乎 <b>已接入</b></span>
-                  <span class="req-chip no" id="req-wechat"><span class="dot"></span>微信 <b id="req-wechat-t">未接入</b></span>
-                  <span class="req-chip no" id="req-sbti"><span class="dot"></span>SBTI <b id="req-sbti-t">未完成</b></span>
+                  <span class="meta">数据源注入情况</span>
+                  <span class="req-chip ok" id="req-zhihu"><span class="dot"></span>知乎 <b id="req-zhihu-t">已注入</b></span>
+                  <span class="req-chip no" id="req-wechat"><span class="dot"></span>微信 <b id="req-wechat-t">未注入</b></span>
+                  <span class="req-chip no" id="req-qq"><span class="dot"></span>QQ <b id="req-qq-t">未注入</b></span>
+                  <span class="req-chip no" id="req-feishu"><span class="dot"></span>飞书 <b id="req-feishu-t">未注入</b></span>
+                  <span class="req-chip no" id="req-dingtalk"><span class="dot"></span>钉钉 <b id="req-dingtalk-t">未注入</b></span>
+                  <span class="req-chip no" id="req-sbti"><span class="dot"></span>SBTI <b id="req-sbti-t">未注入</b></span>
                 </div>
 
                 <ol class="stage-list" id="stage-list" data-od-id="distill-stages">
                   <li class="todo" data-stage="0">
                     <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
-                    <span class="st-name">校验已接入的数据源</span>
+                    <span class="st-name">校验已注入的数据源</span>
                     <span class="st-note" data-note="0"></span>
                   </li>
                   <li class="todo" data-stage="1">
@@ -819,6 +897,78 @@
     </section>
   </div>
 
+  <!-- QQ 接入弹窗 -->
+  <div class="modal" id="modal-qq" role="dialog" aria-modal="true" aria-labelledby="qq-title" data-od-id="modal-qq">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <p class="panel-eyebrow">注入数据 · QQ</p>
+      <h3 id="qq-title">接入 QQ 聊天记录（本地导出）</h3>
+      <div class="modal-body">
+        <p>QQ 会话在本地用 qq-chat-exporter 导出为 JSON。你在本页上传前只保留“自己的发言”，群聊语境只作上下文参考，不进证据库。</p>
+        <ol class="modal-steps">
+          <li><span class="num">01</span><span><b>本地导出会话 JSON</b><small>运行 qq-chat-exporter，选择要分析的常聊好友或群。</small></span></li>
+          <li><span class="num">02</span><span><b>上传结构化文件</b><small>会话在本地完成说话人分离，原始文件不留服务器。</small></span></li>
+          <li><span class="num">03</span><span><b>可多次注入更新</b><small>新增会话后再导出一份，重新注入即可刷新私域人格。</small></span></li>
+        </ol>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">取消</button>
+        <button class="btn btn-primary" type="button" id="qq-confirm" data-od-id="qq-confirm">我已导出 · 选择文件</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 飞书接入弹窗 -->
+  <div class="modal" id="modal-feishu" role="dialog" aria-modal="true" aria-labelledby="feishu-title" data-od-id="modal-feishu">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <p class="panel-eyebrow">注入数据 · 飞书</p>
+      <h3 id="feishu-title">连接飞书（官方 API）</h3>
+      <div class="modal-body">
+        <p>通过飞书开放平台官方 OAuth 授权，只读取你在工作沟通、文档与多维表格里的公开表达。此页为演示流程：点击授权即模拟完成拉取。</p>
+        <ol class="modal-steps">
+          <li><span class="num">01</span><span><b>创建自建应用</b><small>在开放平台开通 im:message 与文档相关读取 scope。</small></span></li>
+          <li><span class="num">02</span><span><b>完成 OAuth 授权</b><small>跳转授权后仅读取你允许的会话与文档范围。</small></span></li>
+          <li><span class="num">03</span><span><b>清洗后注入职场画像</b><small>消息与文档内容只提炼表达特征，原始内容不长期保存。</small></span></li>
+        </ol>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">取消</button>
+        <button class="btn btn-primary" type="button" id="feishu-confirm" data-od-id="feishu-confirm">演示授权并拉取</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 钉钉接入弹窗 -->
+  <div class="modal" id="modal-dingtalk" role="dialog" aria-modal="true" aria-labelledby="dingtalk-title" data-od-id="modal-dingtalk">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <p class="panel-eyebrow">注入数据 · 钉钉</p>
+      <h3 id="dingtalk-title">导入钉钉工作数据</h3>
+      <div class="modal-body">
+        <p>文档与多维表格走官方 API 自动拉取；聊天消息因官方暂无历史接口，需要你先把本地导出的 JSON 交给我们（演示以导入模拟）。</p>
+        <ol class="modal-steps">
+          <li><span class="num">01</span><span><b>授权拉取文档与表格</b><small>官方 API 读取你创建的文档与多维表格，用于职场表达分析。</small></span></li>
+          <li><span class="num">02</span><span><b>上传本地导出的消息</b><small>会话 JSON 在本页上传，原始内容不留服务器。</small></span></li>
+          <li><span class="num">03</span><span><b>统一进入职场人格蒸馏</b><small>文档与消息两类证据合并，参与飞书同侧的职场画像。</small></span></li>
+        </ol>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">取消</button>
+        <button class="btn btn-primary" type="button" id="dingtalk-confirm" data-od-id="dingtalk-confirm">演示导入</button>
+      </div>
+    </section>
+  </div>
+
   <!-- SBTI 弹窗 -->
   <div class="modal" id="modal-sbti" role="dialog" aria-modal="true" aria-labelledby="sbti-title" data-od-id="modal-sbti">
     <div class="modal-backdrop" data-close=""></div>
@@ -832,7 +982,7 @@
         <p>SBTI 记录的是“你认为自己是怎样的人”，属于显性人格；它与你从行为中被观察到的特征形成对照。测试约 12 分钟，完成后可随时重测，重测结果会重新参与融合。</p>
         <ol class="modal-steps">
           <li><span class="num">01</span><span><b>四维倾向自评</b><small>围绕精力来源、信息偏好、决策方式与生活结构作答。</small></span></li>
-          <li><span class="num">02</span><span><b>结果进入融合</b><small>作为 Self-reported 信号，与知乎、微信的 Observed 证据合并。</small></span></li>
+          <li><span class="num">02</span><span><b>结果进入融合</b><small>作为 Self-reported 信号，与各数据源的 Observed 证据合并。</small></span></li>
           <li><span class="num">03</span><span><b>用于快速匹配</b><small>它是“快速匹配”的关键输入之一，帮助直接过滤出同频候选人。</small></span></li>
         </ol>
       </div>
@@ -858,77 +1008,71 @@
         timer = setTimeout(function () { toast.classList.remove('show'); }, 3000);
       }
 
-      /* ── 状态（与首页口径一致：知乎已接入，其余未完成） ── */
+      /* ── 六源定义（二元注入状态；口径与首页一致：知乎默认已注入） ── */
+      var SOURCES = [
+        { key: 'zhihu', name: '知乎', dim: '公共表达' },
+        { key: 'wechat', name: '微信', dim: '私域生活' },
+        { key: 'qq', name: 'QQ', dim: '私域群聊' },
+        { key: 'feishu', name: '飞书', dim: '职场协作' },
+        { key: 'dingtalk', name: '钉钉', dim: '职场沟通' },
+        { key: 'sbti', name: 'SBTI', dim: '显性自评' }
+      ];
+      var INJECTED = { zhihu: true, wechat: false, qq: false, feishu: false, dingtalk: false, sbti: false };
       var state = {
-        zhihu: true,
-        wechat: false,
-        sbti: false,
         ready: false,
         running: false,
         zhihuTime: '今天 · 刚刚',
         srcVersion: 0,
         distillVersion: -1
       };
-      var CIRC = 2 * Math.PI * 52;
-      var ring = document.getElementById('ringFill');
-
-      function doneCount() { return (state.zhihu ? 1 : 0) + (state.wechat ? 1 : 0) + (state.sbti ? 1 : 0); }
-      function pct() { return Math.round(doneCount() / 3 * 100); }
-      function missing() { return 3 - doneCount(); }
+      var SOURCE_NAMES = {};
+      SOURCES.forEach(function (s) { SOURCE_NAMES[s.key] = s.name; });
+      function isIn(k) { return !!INJECTED[k]; }
+      function injectedKeys() { return SOURCES.map(function (s) { return s.key; }).filter(function (k) { return INJECTED[k]; }); }
+      function anyInjected() { return injectedKeys().length > 0; }
+      function nameList() { return injectedKeys().map(function (k) { return SOURCE_NAMES[k]; }).join(' · '); }
       function dirty() { return state.ready && state.srcVersion !== state.distillVersion; }
 
-      /* ── 进度环 ── */
-      function paintRing() {
-        var p = pct();
-        var num = document.getElementById('ring-num');
-        var head = document.getElementById('head-cov');
-        num.textContent = p;
-        head.textContent = p;
-        ring.style.strokeDasharray = CIRC;
-        ring.style.strokeDashoffset = CIRC * (1 - p / 100);
-      }
-
-      /* ── 覆盖清单（人格卡右侧） ── */
+      /* ── 六源注入清单（人格卡右侧） ── */
       function paintCovList() {
-        var map = { zhihu: state.zhihu, wechat: state.wechat, sbti: state.sbti };
-        var label = { zhihu: ['已接入', '未接入'], wechat: ['已接入', '未接入'], sbti: ['已完成', '未完成'] };
         document.querySelectorAll('.cov-list li').forEach(function (li) {
           var k = li.getAttribute('data-cov');
-          var on = map[k];
+          var on = isIn(k);
           li.querySelector('.cov-mark').className = 'cov-mark ' + (on ? 'on' : 'off');
           li.querySelector('.cov-mark svg').outerHTML = on
             ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>'
             : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
           var st = li.querySelector('.cov-state');
-          st.textContent = on ? label[k][0] : label[k][1];
+          st.textContent = on ? '已注入' : '未注入';
           st.className = 'cov-state' + (on ? ' on' : '');
         });
       }
 
       /* ── 人格卡标题与引导区 ── */
       var FEATS = [
-        { name: '思维风格', v: 82, desc: '偏深度与系统化：习惯先搭框架再填细节，喜欢追问“为什么”，对技术背后的价值判断更敏感。', tag: '示例数据' },
-        { name: '沟通习惯', v: 70, desc: '表达克制但真诚、慢热；偏好有来有回、可以被认真挑战的讨论，不喜欢含糊其辞。', tag: '示例数据' },
-        { name: '兴趣结构', v: 76, desc: '技术 × 人文的交叉地带：关注产品、叙事与科普，跨领域话题往往最能打开话匣子。', tag: '示例数据' },
-        { name: '价值观权重', v: 88, desc: '更看重“学习与创造”，其次职业与社交；价值判断常先于情绪表达。', tag: '示例数据' },
-        { name: '社交风格', v: 64, desc: '主动性中等、内向度偏高：熟悉的场域话多，陌生场合更倾向先观察再开口。', tag: '示例数据' }
+        { name: '思维风格', desc: '偏深度与系统化：习惯先搭框架再填细节，喜欢追问“为什么”，对技术背后的价值判断更敏感。' },
+        { name: '沟通习惯', desc: '表达克制但真诚、慢热；偏好有来有回、可以被认真挑战的讨论，不喜欢含糊其辞。' },
+        { name: '兴趣结构', desc: '技术 × 人文的交叉地带：关注产品、叙事与科普，跨领域话题往往最能打开话匣子。' },
+        { name: '价值观权重', desc: '更看重“学习与创造”，其次职业与社交；价值判断常先于情绪表达。' },
+        { name: '社交风格', desc: '主动性中等、内向度偏高：熟悉的场域话多，陌生场合更倾向先观察再开口。' }
       ];
 
       function paintOverview() {
         var title = document.getElementById('ov-title');
         var lead = document.getElementById('ov-lead');
         var actions = document.getElementById('ov-actions');
-        if (!state.ready) {
-          if (missing() > 0) {
-            title.textContent = '人格还差' + missing() + '份证据。';
-            lead.textContent = '人格融合不会草率下结论。先补齐上面这份证据清单，蒸馏后的人格特征才会带上来源、可以解释——而不是几个拍脑袋的标签。';
-          } else {
-            title.textContent = '证据齐了，准备蒸馏。';
-            lead.textContent = '三份证据都已就绪。现在去「Agent 蒸馏」发起蒸馏，把原始材料训练成可解释的 Persona 与你的 Agent。';
-          }
-        } else {
+        if (state.ready) {
           title.textContent = '这是一份可解释的“我”。';
-          lead.textContent = '以下是基于已接入数据生成的示例人格特征，每条都保留来源、可以追问“为什么”。补入更多数据后，随时可以重新蒸馏刷新。';
+          lead.textContent = '已注入的来源先各自蒸馏成来源画像，再融合成上面的综合特征；每条都保留来源、可以追问出处。补入新来源后，随时可以重新蒸馏刷新。';
+        } else if (anyInjected()) {
+          var ks = injectedKeys();
+          title.textContent = ks.length === 1
+            ? SOURCE_NAMES[ks[0]] + '数据已就位，等待一次蒸馏。'
+            : '已有 ' + ks.length + ' 个来源就位，等待一次蒸馏。';
+          lead.textContent = '已注入的来源会先各自蒸馏成「来源画像」，再融合成一张综合画像。现在就可以用已注入的来源开始蒸馏，也可以再补入其它来源，让融合更有依据。';
+        } else {
+          title.textContent = '先用一个来源，留下你的第一面。';
+          lead.textContent = '六个来源彼此独立、各自回答“不同场景里的你”。先注入任意一个（微信、QQ、知乎、飞书、钉钉或 SBTI），蒸馏就从这一面开始。';
         }
         actions.innerHTML = buildOvActions();
       }
@@ -938,11 +1082,11 @@
           return '<a class="btn btn-primary btn-arrow" href="zhiyu-find.html" data-od-id="ov-find">带着 Agent 去发现页</a>' +
             '<button class="btn btn-ghost btn-arrow" type="button" data-cmd="sources">再补点数据</button>';
         }
-        if (missing() === 0) {
-          return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="distill" data-od-id="ov-distill">开始蒸馏</button>';
+        if (anyInjected()) {
+          return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="distill" data-od-id="ov-distill">去开始蒸馏</button>' +
+            '<button class="btn btn-ghost btn-arrow" type="button" data-cmd="sources">再补点数据</button>';
         }
-        var href = state.sbti ? 'distill' : 'sources';
-        return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="' + href + '" data-od-id="ov-next">' + (state.sbti ? '去开始蒸馏' : '去注入数据') + '</button>';
+        return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="sources" data-od-id="ov-next">去注入数据</button>';
       }
 
       /* ── 特征列表 ── */
@@ -960,61 +1104,87 @@
             '</div></div>';
           return;
         }
+        var fusedKeys = injectedKeys();
+        var origin = fusedKeys.length
+          ? fusedKeys.map(function (k) { return SOURCE_NAMES[k]; }).join(' + ')
+          : '暂无来源';
         box.innerHTML = '<ul class="trait-list">' + FEATS.map(function (f, i) {
           return '<li class="trait-row" data-od-id="feature-row-' + (i + 1) + '">' +
-            '<div class="trait-top"><span class="trait-name">' + f.name + '</span>' +
-            '<span class="num trait-val">' + f.v + '</span></div>' +
-            '<div class="track" role="progressbar" aria-valuenow="' + f.v + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + f.name + ' 示例值 ' + f.v + '"><i style="width:' + f.v + '%;"></i></div>' +
-            '<div class="trait-bottom"><p class="trait-desc">' + f.desc + '</p>' +
-            '<span class="trait-tag">' + f.tag + '</span></div>' +
+            '<div class="trait-head"><span class="trait-name">' + f.name + '</span>' +
+            '<span class="trait-origin">出处 · ' + origin + '</span></div>' +
+            '<p class="trait-desc">' + f.desc + '</p>' +
             '</li>';
         }).join('') + '</ul>' +
-          '<p class="demo-note" style="margin:16px 0 0;">演示说明：当前人格由示例数据生成，用于演示完整的人格卡界面。接入你的真实微信 / 知乎 / SBTI 数据后，此卡会基于你的内容重建，并标注每条特征的真实来源。</p>';
+          '<p class="demo-note" style="margin:16px 0 0;">演示说明：上列结论由当前已注入来源的示例数据融合而成，仅作样式示意，不带数值与真实测量。接入真实数据并重新蒸馏后，此卡会依据你实际注入的来源重建每条结论，并在「出处」中标注支撑它的来源。</p>';
+      }
+
+      var SUMM = {
+        zhihu: '表达更看重观点的深度与价值判断，关注技术、产品与人文的交叉地带，习惯先立框架再展开论证。',
+        wechat: '生活中的表达克制而真诚、慢热；在意熟悉关系的舒适感，倾向具体、可被认真回应的对话。',
+        qq: '在放得开的熟人群里话更多、节奏更快，玩笑与认真并置，接梗与长讨论都能自然切换。',
+        feishu: '文档与协作表达偏结构化：习惯先说结论、再补依据，注重进度同步与会话效率。',
+        dingtalk: '工作沟通直接务实，任务与执行导向；重要结论倾向落在文档、表格这类可回溯的载体上。',
+        sbti: '自评是显性人格：记录你“认为自己是谁”，用于与上述行为推断互相印证、交叉校准。'
+      };
+
+      /* ── 来源人格卡（每一面都带出处） ── */
+      function paintSrcGrid() {
+        var grid = document.getElementById('sp-grid');
+        if (!grid) return;
+        var ready = state.ready;
+        grid.innerHTML = SOURCES.map(function (s) {
+          var k = s.key;
+          var on = isIn(k);
+          var pill, desc;
+          if (!on) {
+            pill = '<span class="pill todo sp-pill">未注入</span>';
+            desc = '<p class="sp-desc">该来源尚未注入，暂无画像。补入并完成蒸馏后，这一面才会出现。</p>';
+          } else if (!ready) {
+            pill = '<span class="pill todo sp-pill">待蒸馏</span>';
+            desc = '<p class="sp-desc">' + s.name + ' 内容已注入，完成「Agent 蒸馏」后，会在这里生成这一面的来源画像。</p>';
+          } else {
+            pill = '<span class="pill done sp-pill">已蒸馏</span>';
+            desc = '<p class="sp-desc"><b>' + s.dim + '里的我：</b>' + SUMM[k] + '</p>';
+          }
+          return '<article class="sp-card ' + (on ? 'on' : 'off') + '">' +
+            '<div class="sp-top">' +
+            '<span class="sp-name">' + s.name + '<small>' + s.dim + '</small></span>' +
+            pill + '</div>' + desc + '</article>';
+        }).join('');
       }
 
       function refresh() {
-        paintRing();
         paintCovList();
         paintOverview();
         paintFeatures();
+        paintSrcGrid();
         paintSources();
         paintDistill();
       }
 
-      /* ── 注入数据面板 ── */
+      /* ── 注入数据面板（六张来源卡） ── */
+      var SRC_DEFAULT = { wechat: '选择聊天文件', qq: '选择导出文件', feishu: '连接飞书（演示）', dingtalk: '导入钉钉数据（演示）', sbti: '去完成 SBTI' };
+      var INJECT_LABEL = { wechat: '再次注入', qq: '再次导入', feishu: '重新连接（演示）', dingtalk: '重新导入（演示）', sbti: '重新测试' };
       function setPill(id, idT, text, done) {
         var pill = document.getElementById(id);
-        document.getElementById(idT).textContent = text;
-        pill.className = 'pill ' + (done ? 'done' : 'todo') + ' src-badge';
-      }
-      function setStats(id, html) {
-        document.getElementById(id).innerHTML = html;
+        var t = document.getElementById(idT);
+        if (pill) pill.className = 'pill ' + (done ? 'done' : 'todo') + ' src-badge';
+        if (t) t.textContent = text;
       }
       function paintSources() {
-        var w = document.getElementById('act-wechat');
-        var s = document.getElementById('act-sbti');
-        if (state.wechat) {
-          setPill('badge-wechat', 'badge-wechat-t', '已接入', true);
-          setStats('stats-wechat', '<li><span>本地消息（示例）</span><span class="num">12,483 条</span></li><li><span>说话人分离</span><span class="num">self / other 已区分</span></li><li><span>最近注入</span><span class="num">刚刚</span></li>');
-          w.textContent = '再次注入（可多次）';
-          w.className = 'btn btn-secondary';
-        } else {
-          setPill('badge-wechat', 'badge-wechat-t', '未接入', false);
-          setStats('stats-wechat', '<li><span>状态</span><span class="num">等待导入</span></li>');
-          w.textContent = '选择聊天文件';
-          w.className = state.sbti ? 'btn btn-primary' : 'btn btn-secondary';
-        }
-        if (state.sbti) {
-          setPill('badge-sbti', 'badge-sbti-t', '已完成', true);
-          setStats('stats-sbti', '<li><span>四维判定（示例）</span><span class="num">已完成</span></li><li><span>最近测试</span><span class="num">刚刚</span></li>');
-          s.textContent = '重新测试（可重测）';
-          s.className = 'btn btn-secondary';
-        } else {
-          setPill('badge-sbti', 'badge-sbti-t', '未完成', false);
-          setStats('stats-sbti', '<li><span>状态</span><span class="num">尚未开始</span></li>');
-          s.textContent = '去完成 SBTI';
-          s.className = 'btn btn-primary';
-        }
+        SOURCES.forEach(function (s) {
+          var k = s.key;
+          if (k === 'zhihu') {
+            setPill('badge-zhihu', 'badge-zhihu-t', '已注入', true);
+            return;
+          }
+          var on = isIn(k);
+          setPill('badge-' + k, 'badge-' + k + '-t', on ? '已注入' : '未注入', on);
+          var a = document.getElementById('act-' + k);
+          if (!a) return;
+          a.textContent = on ? (INJECT_LABEL[k] || '再次注入') : SRC_DEFAULT[k];
+          a.className = (k === 'sbti' && !on) ? 'btn btn-primary' : 'btn btn-secondary';
+        });
       }
 
       /* ── 蒸馏面板 ── */
@@ -1033,6 +1203,10 @@
         if (state.running) {
           btn.disabled = true;
           btn.textContent = '蒸馏中…';
+        } else if (!anyInjected()) {
+          btn.disabled = true;
+          btn.title = '请先注入任意一个数据源';
+          btn.textContent = '开始蒸馏';
         } else if (state.ready) {
           btn.disabled = false;
           btn.textContent = '重新蒸馏';
@@ -1040,12 +1214,14 @@
           btn.disabled = false;
           btn.textContent = '开始蒸馏';
         }
-        ['wechat', 'sbti'].forEach(function (k) {
-          var on = state[k];
+        SOURCES.forEach(function (s) {
+          var k = s.key;
+          var on = isIn(k);
           var chip = document.getElementById('req-' + k);
+          if (!chip) return;
           chip.className = 'req-chip ' + (on ? 'ok' : 'no');
           var b = document.getElementById('req-' + k + '-t');
-          b.textContent = (k === 'sbti' ? (on ? '已完成' : '未完成') : (on ? '已接入' : '未接入'));
+          if (b) b.textContent = on ? '已注入' : '未注入';
         });
       }
 
@@ -1115,33 +1291,39 @@
       });
 
       document.getElementById('act-wechat').addEventListener('click', function () { openModal('modal-wechat'); });
+      document.getElementById('act-qq').addEventListener('click', function () { openModal('modal-qq'); });
+      document.getElementById('act-feishu').addEventListener('click', function () { openModal('modal-feishu'); });
+      document.getElementById('act-dingtalk').addEventListener('click', function () { openModal('modal-dingtalk'); });
       document.getElementById('act-sbti').addEventListener('click', function () { openModal('modal-sbti'); });
       document.getElementById('act-zhihu').addEventListener('click', function () {
         state.zhihuTime = '今天 · ' + new Date().toTimeString().slice(0, 5);
-        document.getElementById('zhihu-sync').textContent = state.zhihuTime;
+        var sync = document.getElementById('zhihu-sync');
+        if (sync) sync.textContent = state.zhihuTime;
         state.srcVersion += 1;
         refresh();
         showToast('已重新同步知乎公开数据（演示）。数据已更新，建议在「Agent 蒸馏」中重新蒸馏。');
       });
 
-      document.getElementById('wechat-confirm').addEventListener('click', function () {
-        var m = document.getElementById('modal-wechat');
-        if (state.running) { closeModal(m); return; }
-        state.wechat = true;
-        state.srcVersion += 1;
-        closeModal(m);
-        refresh();
-        showToast('示例：已注入 12,483 条本地消息（self / other 已分离）。可以再次注入，持续更新这份私域人格。');
-      });
-
-      document.getElementById('sbti-confirm').addEventListener('click', function () {
-        var m = document.getElementById('modal-sbti');
-        if (state.running) { closeModal(m); return; }
-        state.sbti = true;
-        state.srcVersion += 1;
-        closeModal(m);
-        refresh();
-        showToast('SBTI 已完成（演示）。你眼中的自己，已加入人格融合。');
+      var MODAL_MAP = { wechat: 'modal-wechat', qq: 'modal-qq', feishu: 'modal-feishu', dingtalk: 'modal-dingtalk', sbti: 'modal-sbti' };
+      var CONFIRM_TOAST = {
+        wechat: '示例：已注入本地微信消息（self / other 已分离）。可以再次注入，持续更新这份私域人格。',
+        qq: '示例：已注入 QQ 会话（self / other 已分离）。可以再次导入，持续更新这份私域人格。',
+        feishu: '示例：已通过飞书官方 API 拉取工作数据。职场画像的来源已就位。',
+        dingtalk: '示例：已导入钉钉文档与本地消息。职场画像的来源已就位。',
+        sbti: 'SBTI 已完成（演示）。你眼中的自己，已加入人格融合。'
+      };
+      ['wechat', 'qq', 'feishu', 'dingtalk', 'sbti'].forEach(function (key) {
+        var btn = document.getElementById(key + '-confirm');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var m = document.getElementById(MODAL_MAP[key]);
+          if (state.running) { if (m) closeModal(m); return; }
+          INJECTED[key] = true;
+          state.srcVersion += 1;
+          if (m) closeModal(m);
+          refresh();
+          showToast(CONFIRM_TOAST[key]);
+        });
       });
 
       /* ── 蒸馏运行 ── */
@@ -1173,15 +1355,17 @@
 
       document.getElementById('act-distill').addEventListener('click', function () {
         if (state.running) return;
+        if (!anyInjected()) { showToast('请先注入任意一个数据源，再开始蒸馏。'); return; }
         state.running = true;
         resetStages();
         figWorking();
         paintDistill();
+        var list = nameList();
         var steps = [
-          { note: '已接入 ' + doneCount() + ' / 3 份来源' },
-          { note: '说话人 · 内容类型已区分' },
-          { note: '融合 ' + (state.wechat ? '微信 · ' : '') + '知乎' + (state.sbti ? ' · SBTI' : '') + ' 证据' },
-          { note: '特征写入可检索的 Persona 索引' },
+          { note: '已注入 ' + injectedKeys().length + ' 个来源：' + list },
+          { note: '按来源分别提取内容证据' },
+          { note: '逐源蒸馏 · 生成来源人格卡' },
+          { note: '融合证据 · 写入可检索的 Persona 索引' },
           { note: '可随时按 Persona 实例化 Agent' }
         ];
         setStageDoing(0, steps[0].note);
@@ -1196,7 +1380,7 @@
             state.distillVersion = state.srcVersion;
             refresh();
             figReady();
-            showToast('蒸馏完成：Persona 已更新，你的 Agent 已就绪，可以开始匹配了。');
+            showToast('蒸馏完成：' + list + ' 已融合为可解释的 Persona，你的 Agent 已就绪。');
             return;
           }
           setStageDoing(i, steps[i].note);
@@ -1218,10 +1402,10 @@
         var saved = localStorage.getItem('zhiyu-persona-tab');
         if (saved && panels[saved]) switchTab(saved);
       } catch (e) {}
-      paintRing();
       paintCovList();
       paintOverview();
       paintFeatures();
+      paintSrcGrid();
       paintSources();
       paintDistill();
     })();
