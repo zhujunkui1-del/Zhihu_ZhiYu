@@ -1,0 +1,113 @@
+name: "📤 导出问题"
+description: "导出聊天记录时遇到问题"
+title: "[导出] "
+labels: ["bug", "export"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📤 导出问题反馈
+        
+        导出遇到问题？我们来帮你看！
+        
+        > ⚠️ **大量消息导出（>50万条）？** 请使用流式导出功能！
+        > 📖 [查看用户手册](https://sdjz.wiki/post/qce%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C)
+
+  - type: input
+    id: qce-version
+    attributes:
+      label: "📦 QCE 版本"
+      placeholder: "v5.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: export-format
+    attributes:
+      label: "📁 导出格式"
+      options:
+        - "HTML"
+        - "JSON"
+        - "TXT"
+        - "Excel"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: chat-type
+    attributes:
+      label: "💬 聊天类型"
+      options:
+        - "群聊"
+        - "私聊/好友"
+        - "批量导出"
+    validations:
+      required: true
+
+  - type: input
+    id: message-count
+    attributes:
+      label: "📊 大约消息数量"
+      placeholder: "50000"
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "🤔 发生了什么？"
+      placeholder: |
+        描述导出问题
+        
+        比如:
+        - 导出卡在 50%
+        - 内存溢出 / OOM 错误
+        - 消息丢失
+        - 图片/视频无法显示
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: "📋 错误信息"
+      description: "来自终端、Web 界面或程序目录下的 `logs` 文件夹"
+      render: shell
+      placeholder: |
+        粘贴终端或 Web 界面的错误信息
+        
+        [ERROR] xxx
+
+  - type: checkboxes
+    id: evidence
+    attributes:
+      label: "📎 日志和截图确认"
+      description: "请确认已提供完整日志和必要截图；如果某项不适用，请在问题描述中说明原因。"
+      options:
+        - label: "我已提供完整日志；即使启动失败，也已提供启动失败时生成的日志。"
+          required: true
+        - label: "我已提供必要截图；如果不适用，已在问题描述中说明。"
+          required: true
+
+  - type: checkboxes
+    id: export-options
+    attributes:
+      label: "⚙️ 使用的导出选项"
+      description: "勾选你启用的选项"
+      options:
+        - label: "流式导出（超大消息量专用）"
+        - label: "导出为 ZIP 压缩包"
+        - label: "快速导出（跳过资源下载）"
+        - label: "设置了时间范围"
+        - label: "设置了关键词过滤"
+        - label: "设置了排除用户"
+
+  - type: dropdown
+    id: resource-status
+    attributes:
+      label: "🖼️ 资源下载情况"
+      description: "图片/视频/语音等媒体文件"
+      options:
+        - "正常下载"
+        - "部分缺失"
+        - "全部缺失"
+        - "跳过了资源下载"
+        - "不确定"

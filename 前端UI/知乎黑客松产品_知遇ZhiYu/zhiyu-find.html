@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="知遇 · 发现 —— 今天，要和谁相遇？">
+  <title>知遇 · 发现</title>
+  <style>
+    :root {
+      --bg:      #eef3fc;
+      --surface: #ffffff;
+      --fg:      #16263f;
+      --muted:   #5d6c88;
+      --border:  #d7e1f1;
+      --accent:  #0d64fd;
+      --accent-soft: color-mix(in oklch, var(--accent) 13%, transparent);
+      --accent-faint: color-mix(in oklch, var(--accent) 5%, transparent);
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --fg-softer: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      --fs-h1: clamp(28px, 3vw, 38px);
+      --fs-h2: clamp(21px, 2.2vw, 28px);
+      --gap-xs: 8px;
+      --gap-sm: 12px;
+      --gap-md: 20px;
+      --gap-lg: 28px;
+      --radius: 10px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    h1, h2 { font-family: var(--font-display); }
+    h1 { font-size: var(--fs-h1); line-height: 1.25; margin: 0; letter-spacing: 0.01em; }
+    h2 { font-size: var(--fs-h2); line-height: 1.3; margin: 0; }
+    h3 { font-size: 16.5px; margin: 0; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 84%, black); border-color: color-mix(in oklch, var(--accent) 84%, black); }
+    .btn-primary[disabled] { opacity: 0.7; cursor: default; }
+    .btn-secondary { background: var(--surface); color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--accent-faint); }
+    .btn-ghost { background: transparent; color: var(--fg); padding-inline: 6px; }
+    .btn-ghost:hover { color: var(--accent); }
+    .btn-arrow::after { content: '→'; transition: transform 0.15s ease; }
+    .btn-arrow:hover::after { transform: translateX(3px); }
+
+    /* ─── 应用壳（与首页一致） ─────────────────────────────────── */
+    .app-shell { display: flex; min-height: 100vh; }
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0;
+      width: 248px;
+      z-index: 20;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 18px 14px 16px;
+    }
+    .side-brand { display: block; padding: 2px 6px 0; }
+    .brand-row { display: inline-flex; align-items: center; gap: 11px; }
+    .brand-plate {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      box-shadow: 0 8px 20px color-mix(in oklch, var(--fg) 8%, transparent);
+      overflow: hidden;
+    }
+    .brand-plate img { width: 37px; height: auto; }
+    .brand-word { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
+    .brand-tag { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; }
+    .side-nav { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%;
+      min-height: 46px;
+      padding: 9px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--fg);
+      font-size: 14.5px;
+      font-weight: 500;
+      text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--muted); transition: color 0.15s ease; }
+    .nav-item:hover { background: var(--fg-soft); }
+    .nav-item.active { background: var(--accent); color: var(--surface); }
+    .nav-item.active svg { color: var(--surface); }
+    .side-foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .zh-avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-family: var(--font-display);
+      font-size: 17px;
+      border: 1px solid var(--border);
+    }
+    .side-foot .nav-item { flex: 1; min-height: 42px; }
+    .main { flex: 1; margin-left: 248px; min-width: 0; padding: 34px clamp(22px, 4vw, 54px) 72px; }
+    .main-inner { max-width: 1180px; margin-inline: auto; }
+
+    /* ─── 页头与页签 ───────────────────────────────────────────── */
+    .find-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+    .find-head h1 { max-width: 16ch; }
+    .find-head .sub { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; max-width: 62ch; }
+    .head-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 13px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in oklch, var(--surface) 78%, transparent);
+      color: var(--muted);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .seg {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      background: color-mix(in oklch, var(--surface) 70%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .seg button {
+      min-height: 42px;
+      padding: 8px 18px;
+      border: 0;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .seg button:hover { color: var(--fg); }
+    .seg button.active { background: var(--fg); color: var(--surface); }
+
+    .tab-panel[hidden] { display: none; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+    }
+    .panel + .panel { margin-top: 18px; }
+    .panel-eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 8px; }
+
+    /* ─── 搜索 ─────────────────────────────────────────────────── */
+    .search-box { display: flex; gap: 10px; align-items: center; }
+    .search-input {
+      flex: 1;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 0 14px;
+      min-height: 50px;
+    }
+    .search-input svg { width: 18px; height: 18px; color: var(--muted); flex: 0 0 auto; }
+    .search-input input {
+      flex: 1; min-width: 0;
+      border: 0; background: transparent;
+      font: inherit; font-size: 15px;
+      color: var(--fg);
+      padding: 12px 0;
+    }
+    .search-input input:focus { outline: none; }
+    .search-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-faint); }
+    .search-box .btn { flex: 0 0 auto; }
+
+    .filters {
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .filter-field { position: relative; display: flex; align-items: center; gap: 9px; }
+    .filter-field label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .filter-field::after {
+      content: '';
+      position: absolute;
+      right: 13px;
+      top: 50%;
+      width: 7px; height: 7px;
+      border-right: 1.6px solid var(--muted);
+      border-bottom: 1.6px solid var(--muted);
+      transform: translateY(-70%) rotate(45deg);
+      pointer-events: none;
+    }
+    .filter-field select {
+      min-height: 40px;
+      padding: 7px 32px 7px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--fg);
+      font: inherit;
+      font-size: 13.5px;
+      appearance: none;
+      cursor: pointer;
+    }
+    .switch-wrap { display: inline-flex; align-items: center; gap: 9px; margin-left: auto; }
+    .switch-wrap span { font-size: 13px; color: var(--muted); }
+    .switch { position: relative; width: 38px; height: 22px; flex: 0 0 auto; }
+    .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+    .switch i {
+      position: absolute; inset: 0;
+      background: var(--border);
+      border-radius: 999px;
+      transition: background 0.18s ease;
+      pointer-events: none;
+    }
+    .switch i::after {
+      content: '';
+      position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--surface);
+      transition: transform 0.18s ease;
+      box-shadow: 0 1px 3px color-mix(in oklch, var(--fg) 22%, transparent);
+    }
+    .switch input:checked + i { background: color-mix(in oklch, var(--fg) 52%, transparent); }
+    .switch input:checked + i::after { transform: translateX(16px); }
+
+    .result-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin: 22px 0 12px;
+      color: var(--muted); font-size: 13px;
+    }
+    .reset-btn {
+      border: 0; background: transparent; color: var(--muted);
+      font-size: 12.5px; min-height: 40px; padding: 0 6px;
+    }
+    .reset-btn:hover { color: var(--accent); }
+
+    /* ─── 候选人格卡 ───────────────────────────────────────────── */
+    .cand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px; }
+    .persona-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex; flex-direction: column;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .persona-card:hover { border-color: color-mix(in oklch, var(--accent) 36%, var(--border)); box-shadow: 0 12px 30px color-mix(in oklch, var(--fg) 7%, transparent); }
+    .p-head { display: flex; align-items: center; gap: 12px; }
+    .p-avatar {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+    }
+    .p-title { font-size: 15.5px; font-weight: 600; }
+    .p-pill {
+      display: inline-flex; align-items: center;
+      margin-top: 3px;
+      padding: 2px 8px;
+      background: var(--fg-soft);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .p-meta { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+    .p-meta li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg); }
+    .p-meta svg { width: 14px; height: 14px; color: var(--muted); flex: 0 0 auto; }
+    .p-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+    .p-tag {
+      padding: 3px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .p-actions {
+      display: flex; align-items: center; gap: 4px;
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .p-actions .btn { min-height: 40px; padding: 7px 10px; font-size: 13px; }
+    .sim-block { margin: 14px 0 0; }
+    .sim-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--muted); margin-bottom: 7px; }
+    .sim-top .num { color: var(--fg); font-weight: 600; font-size: 14px; }
+    .track { height: 7px; border-radius: 999px; background: var(--fg-soft); overflow: hidden; }
+    .track i { display: block; height: 100%; border-radius: 999px; background: color-mix(in oklch, var(--fg) 64%, transparent); }
+
+    .demo-note {
+      margin: 18px 0 0;
+      padding: 11px 14px;
+      background: var(--accent-faint);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.75;
+    }
+    .empty-state { text-align: center; padding: 44px 20px 36px; color: var(--muted); }
+    .empty-state .big { font-family: var(--font-display); font-size: 20px; color: var(--fg); margin-bottom: 8px; }
+    .empty-state p { margin: 0 auto; max-width: 40ch; font-size: 13.5px; line-height: 1.75; }
+
+    /* ─── 随机推荐 ─────────────────────────────────────────────── */
+    .random-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+    .random-head h2 { max-width: 22ch; }
+    .random-head p { margin: 8px 0 0; color: var(--muted); font-size: 13.5px; max-width: 56ch; line-height: 1.75; }
+
+    /* ─── 快速匹配 ─────────────────────────────────────────────── */
+    .quick-intro { max-width: 60ch; }
+    .quick-intro p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .req-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .req-chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .req-chip b { font-weight: 600; color: var(--fg); }
+    .quick-actions { display: flex; align-items: center; gap: 14px; margin-top: 20px; flex-wrap: wrap; }
+    .quick-hint { color: var(--muted); font-size: 12.5px; max-width: 44ch; line-height: 1.7; }
+    .quick-result { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .quick-result[hidden] { display: none; }
+    .quick-result > h3 { margin-bottom: 4px; }
+    .quick-result > .meta { display: block; margin-bottom: 16px; }
+
+    /* ─── 人格卡弹窗 ───────────────────────────────────────────── */
+    .modal {
+      position: fixed; inset: 0; z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 22px;
+    }
+    .modal.open { display: grid; }
+    .modal-backdrop { position: absolute; inset: 0; background: color-mix(in oklch, var(--fg) 48%, transparent); backdrop-filter: blur(3px); }
+    .modal-dialog {
+      position: relative;
+      width: min(100%, 560px);
+      max-height: min(86vh, 760px);
+      overflow: auto;
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 26px;
+      box-shadow: 0 36px 110px color-mix(in oklch, var(--fg) 40%, transparent);
+    }
+    .modal-close {
+      position: absolute; top: 14px; right: 14px;
+      width: 40px; height: 40px;
+      border: 0; border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      display: grid; place-items: center;
+    }
+    .modal-close:hover { background: var(--fg-soft); color: var(--fg); }
+    .modal-close svg { width: 18px; height: 18px; }
+    .profile-title { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .profile-title .p-avatar { width: 56px; height: 56px; font-size: 15px; }
+    .profile-section { margin-top: 18px; }
+    .profile-section h3 { font-size: 15px; margin-bottom: 8px; }
+    .profile-section p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.8; }
+    .source-state { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 7px; }
+    .source-state li { display: flex; justify-content: space-between; font-size: 13px; padding: 8px 0 0; border-top: 1px solid var(--border); }
+    .source-state li span:first-child { color: var(--fg); }
+    .source-state li span:last-child { color: var(--muted); font-size: 12.5px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .modal-actions .btn { flex: 1; }
+
+    /* ─── 提示条 ───────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 26px;
+      transform: translate(-50%, 12px);
+      z-index: 70;
+      background: var(--fg);
+      color: var(--surface);
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      box-shadow: 0 16px 44px color-mix(in oklch, var(--fg) 30%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: min(86vw, 480px);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 920px) {
+      .app-shell { flex-direction: column; }
+      .sidebar {
+        position: static;
+        width: 100%; height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+      }
+      .side-nav { flex-direction: row; flex-wrap: wrap; margin-top: 12px; gap: 6px; flex: none; }
+      .nav-item { width: auto; min-height: 42px; padding: 8px 12px; font-size: 13.5px; }
+      .side-foot { margin-top: 10px; border-top: 0; padding-top: 0; }
+      .main { margin-left: 0; padding: 26px 18px 60px; }
+      .panel { padding: 18px; }
+      .search-box { flex-direction: column; align-items: stretch; }
+      .search-input { width: 100%; }
+      .search-box .btn { width: 100%; }
+      .switch-wrap { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" data-od-id="sidebar">
+      <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
+        <span class="brand-row">
+          <span class="brand-plate"><img src="data:image/webp;base64,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" width="260" height="204" alt="知遇 Logo"></span>
+          <span>
+            <span class="brand-word">知遇</span>
+            <span class="brand-tag meta">先认识，再相遇</span>
+          </span>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="主导航" data-od-id="side-nav">
+        <button class="nav-item" type="button" data-nav="首页" data-href="zhiyu-home.html" data-od-id="nav-home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3z"></path></svg>
+          <span>首页</span>
+        </button>
+        <button class="nav-item active" type="button" data-nav="发现" data-od-id="nav-find" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.8 8.2-2.6 5.2-5.2 2.6 2.6-5.2z"></path></svg>
+          <span>发现</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="我的人格" data-href="zhiyu-persona.html" data-od-id="nav-persona">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
+          <span>我的人格</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="Agent 匹配" data-href="zhiyu-agent-match.html" data-od-id="nav-match">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+          <span>Agent 匹配</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          <span>通知</span>
+        </button>
+      </nav>
+
+      <div class="side-foot" data-od-id="sidebar-account">
+        <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
+        <button class="nav-item" type="button" data-nav="设置" data-href="zhiyu-settings.html" data-od-id="nav-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main" id="find" data-od-id="find-main">
+      <div class="main-inner">
+        <header class="find-head">
+          <div>
+            <p class="meta" style="margin: 0 0 10px;">知遇 · 发现</p>
+            <h1>今天，要和谁相遇？</h1>
+            <p class="sub">搜索你感兴趣的知乎用户、让系统随机推荐，或直接用你的人格做快速匹配——遇到想进一步了解的人，再让 Agent 先聊聊。</p>
+          </div>
+          
+        </header>
+
+        <div class="seg" role="tablist" aria-label="发现方式" data-od-id="find-tabs">
+          <button class="active" type="button" role="tab" aria-selected="true" data-tab="search" data-od-id="tab-search">找特定的人</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="random" data-od-id="tab-random">随机推荐</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="quick" data-od-id="tab-quick">快速匹配</button>
+        </div>
+
+        <!-- ① 搜索 -->
+        <section class="tab-panel" id="tab-search" data-od-id="find-search" role="tabpanel">
+          <div class="panel">
+            <form id="search-form" novalidate="">
+              <div class="search-box">
+                <label class="search-input">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                  <input type="search" id="search-q" name="q" placeholder="输入知乎昵称，找到想认识的人" autocomplete="off">
+                </label>
+                <button class="btn btn-primary" type="submit" data-od-id="search-submit">搜索</button>
+              </div>
+            </form>
+
+            <div class="filters" aria-label="搜索结果筛选">
+              <div class="filter-field">
+                <label for="filter-city">所在地</label>
+                <select id="filter-city">
+                  <option value="">全部地区</option>
+                  <option value="北京">北京</option>
+                  <option value="上海">上海</option>
+                  <option value="杭州">杭州</option>
+                  <option value="深圳">深圳</option>
+                  <option value="成都">成都</option>
+                </select>
+              </div>
+              <div class="filter-field">
+                <label for="filter-persona">人格倾向</label>
+                <select id="filter-persona">
+                  <option value="">全部</option>
+                  <option value="深度思考型">深度思考型</option>
+                  <option value="好奇探索型">好奇探索型</option>
+                  <option value="温和共情型">温和共情型</option>
+                  <option value="理性辩手型">理性辩手型</option>
+                  <option value="体验派">体验派</option>
+                </select>
+              </div>
+              <label class="switch-wrap">
+                <span>只看接受 Agent 对话</span>
+                <span class="switch"><input type="checkbox" id="filter-agent"><i aria-hidden="true"></i></span>
+              </label>
+            </div>
+
+            <div class="result-meta">
+              <span id="result-count">共 6 位演示结果</span>
+              <button class="reset-btn" type="button" id="reset-filters" data-od-id="search-reset">重置筛选</button>
+            </div>
+            <div class="cand-grid" id="search-results" data-od-id="search-results"></div>
+            
+          </div>
+        </section>
+
+        <!-- ② 随机推荐 -->
+        <section class="tab-panel" id="tab-random" data-od-id="find-random" role="tabpanel" hidden="">
+          <div class="panel">
+            <p class="panel-eyebrow">随机推荐 · 随机抓取一位</p>
+            <div class="random-head">
+              <div>
+                <h2>不知道想找谁？让系统替你抓一位。</h2>
+                <p>随机展示一位知乎用户；觉得不合适就换一批，直到遇到想深入了解的人。</p>
+              </div>
+              <button class="btn btn-secondary" type="button" id="reroll-btn" data-od-id="random-reroll">换一批 · 随机人格</button>
+            </div>
+            <div class="cand-grid" id="random-results" data-od-id="random-results"></div>
+            
+          </div>
+        </section>
+
+        <!-- ③ 快速匹配 -->
+        <section class="tab-panel" id="tab-quick" data-od-id="find-quick" role="tabpanel" hidden="">
+          <div class="panel">
+            <p class="panel-eyebrow">快速匹配 · 直接用人格找人</p>
+            <div class="quick-intro">
+              <h2>用你的人格，直接找到最可能同频的人。</h2>
+              <p>快速匹配根据 SBTI 测试结果与人格蒸馏数据计算候选人的相似度；如果你对某位候选人感兴趣，可以再进入 Agent 对话做进一步判断。</p>
+            </div>
+            <div class="req-chips">
+              <span class="req-chip">SBTI 测试结果：<b>未完成</b></span>
+              <span class="req-chip">人格蒸馏：<b>未开始</b></span>
+              
+            </div>
+            <div class="quick-actions">
+              <button class="btn btn-primary" type="button" id="quick-run" data-od-id="quick-run-btn">开始快速匹配</button>
+              
+            </div>
+            <div class="quick-result" id="quick-result" data-od-id="quick-result" hidden="">
+              <h3>匹配结果（示例相似度）</h3>
+              <span class="meta" style="display: block;">按相似度从高到低排列 · 相似度基于演示人格计算</span>
+              <div class="cand-grid" id="quick-results" style="margin-top: 16px;" data-od-id="quick-results"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- 人格卡弹窗 -->
+  <div class="modal" id="persona-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" data-od-id="persona-modal">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭人格卡">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <div class="profile-title">
+        <span class="p-avatar" id="modal-avatar">01</span>
+        <div>
+          <h3 id="modal-title">演示人格 01</h3>
+          <span class="p-pill">AI 演示人格</span>
+        </div>
+      </div>
+      <div class="profile-section">
+        <h3>人格画像（演示）</h3>
+        <p id="modal-desc">在接入知乎 API 后，这里会展示 TA 基于公开内容生成的人格卡。</p>
+      </div>
+      <div class="profile-section">
+        <h3>数据与沟通设置</h3>
+        <ul class="source-state">
+          <li><span>所在地</span><span id="modal-city">—</span></li>
+          <li><span>人格倾向</span><span id="modal-type">—</span></li>
+          <li><span>接受 Agent 对话</span><span id="modal-agent">—</span></li>
+        </ul>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">关闭</button>
+        <button class="btn btn-primary" type="button" id="modal-chat" data-od-id="modal-chat-btn">让我的 Agent 先聊聊</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+      var toast = document.getElementById('toast');
+      var timer = null;
+      function showToast(text) {
+        if (!toast) return;
+        toast.textContent = text;
+        toast.classList.add('show');
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { toast.classList.remove('show'); }, 2800);
+      }
+
+      var personas = [
+        { id: 'demo-01', title: '演示人格 01', code: '01', city: '杭州', type: '深度思考型', tags: ['技术 × 人文', '慢热但真诚'], agent: true, sim: 87, desc: '习惯先把事情想清楚再开口；对技术背后的价值判断更感兴趣，喜欢深入但不咄咄逼人的讨论。' },
+        { id: 'demo-02', title: '演示人格 02', code: '02', city: '北京', type: '好奇探索型', tags: ['好奇心驱动', '跨学科聊天'], agent: true, sim: 82, desc: '随时在收集新问题；喜欢把两个不相干的领域放在一起聊，愿意先听你的观点再补充。' },
+        { id: 'demo-03', title: '演示人格 03', code: '03', city: '上海', type: '温和共情型', tags: ['倾听型', '喜欢具体生活'], agent: false, sim: 76, desc: '对情绪和细节敏感，喜欢从真实生活出发的交流，慢节奏但很有耐心。' },
+        { id: 'demo-04', title: '演示人格 04', code: '04', city: '深圳', type: '理性辩手型', tags: ['观点碰撞', '先讲逻辑'], agent: true, sim: 79, desc: '享受观点被认真挑战的感觉；讨论时先立论再反驳，不喜欢含糊其辞。' },
+        { id: 'demo-05', title: '演示人格 05', code: '05', city: '北京', type: '深度思考型', tags: ['写作与阅读', '低社交需求'], agent: true, sim: 84, desc: '表达偏向书面与准确；在熟悉话题上话很多，陌生场合则保持观察。' },
+        { id: 'demo-06', title: '演示人格 06', code: '06', city: '成都', type: '体验派', tags: ['行动派', '先试再说'], agent: false, sim: 71, desc: '更相信体验而不是标签；喜欢被邀请参与具体的事，而不是抽象的自我介绍。' }
+      ];
+
+      function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+      function cardHtml(p, withSim) {
+        var sim = withSim ? '<div class="sim-block"><div class="sim-top"><span>与你的相似度 · 示例</span><span class="num">' + p.sim + '%</span></div><div class="track"><i style="width:' + p.sim + '%;"></i></div></div>' : '';
+        return '<article class="persona-card" data-id="' + esc(p.id) + '" data-city="' + esc(p.city) + '" data-type="' + esc(p.type) + '" data-agent="' + (p.agent ? '1' : '0') + '" data-od-id="persona-card-' + esc(p.id) + '">' +
+          '<div class="p-head"><span class="p-avatar">' + esc(p.code) + '</span><div><div class="p-title">' + esc(p.title) + '</div><span class="p-pill">AI 演示人格</span></div></div>' +
+          '<ul class="p-meta">' +
+          '<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 21s-7-5.1-7-11a7 7 0 1 1 14 0c0 5.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>' + esc(p.city) + '</li>' +
+          '<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"/></svg>' + esc(p.type) + '</li>' +
+          '<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + (p.agent ? '接受 Agent 对话' : '暂未开放 Agent 对话') + '</li>' +
+          '</ul>' +
+          '<div class="p-tags">' + p.tags.map(function (t) { return '<span class="p-tag">' + esc(t) + '</span>'; }).join('') + '</div>' + sim +
+          '<div class="p-actions">' +
+          '<button class="btn btn-ghost btn-arrow" type="button" data-action="profile">查看人格卡</button>' +
+          (p.agent ? '<button class="btn btn-ghost" type="button" data-action="chat">让 Agent 先聊聊</button>' : '') +
+          '</div></article>';
+      }
+
+      function renderList(containerId, list, withSim) {
+        var box = document.getElementById(containerId);
+        if (!box) return;
+        if (!list.length) {
+          box.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><div class="big">没有符合条件的结果</div><p>试试清空筛选，或换一个关键词——也可能是 TA 还没有开放 Agent 对话。</p></div>';
+          return;
+        }
+        box.innerHTML = list.map(function (p) { return cardHtml(p, withSim); }).join('');
+      }
+
+      function all() { return personas.slice(); }
+      function visiblePersona(id) {
+        for (var i = 0; i < personas.length; i += 1) if (personas[i].id === id) return personas[i];
+        return null;
+      }
+
+      /* 页签 */
+      var tabs = document.querySelectorAll('[data-tab]');
+      var panels = {
+        search: document.getElementById('tab-search'),
+        random: document.getElementById('tab-random'),
+        quick: document.getElementById('tab-quick')
+      };
+      function switchTab(name) {
+        Array.prototype.forEach.call(tabs, function (tab) {
+          var on = tab.getAttribute('data-tab') === name;
+          tab.classList.toggle('active', on);
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        Object.keys(panels).forEach(function (key) { panels[key].hidden = key !== name; });
+      }
+      Array.prototype.forEach.call(tabs, function (tab) {
+        tab.addEventListener('click', function () { switchTab(tab.getAttribute('data-tab')); });
+      });
+
+      /* 搜索 + 筛选 */
+      var searchQ = document.getElementById('search-q');
+      function applySearch(ev) {
+        if (ev) ev.preventDefault();
+        var q = (searchQ.value || '').trim().toLowerCase();
+        var city = document.getElementById('filter-city').value;
+        var type = document.getElementById('filter-persona').value;
+        var onlyAgent = document.getElementById('filter-agent').checked;
+        var list = all().filter(function (p) {
+          var hay = (p.title + ' ' + p.tags.join(' ') + ' ' + p.type).toLowerCase();
+          var ok = true;
+          if (q) ok = ok && hay.indexOf(q) > -1;
+          if (city) ok = ok && p.city === city;
+          if (type) ok = ok && p.type === type;
+          if (onlyAgent) ok = ok && p.agent;
+          return ok;
+        });
+        renderList('search-results', list, false);
+        document.getElementById('result-count').textContent = '共 ' + list.length + ' 位演示结果';
+      }
+      document.getElementById('search-form').addEventListener('submit', applySearch);
+      ['filter-city', 'filter-persona', 'filter-agent'].forEach(function (id) {
+        document.getElementById(id).addEventListener('change', applySearch);
+      });
+      document.getElementById('reset-filters').addEventListener('click', function () {
+        searchQ.value = '';
+        document.getElementById('filter-city').value = '';
+        document.getElementById('filter-persona').value = '';
+        document.getElementById('filter-agent').checked = false;
+        applySearch();
+      });
+
+      /* 随机推荐：从六位里打乱取三位 */
+      function renderRandom() {
+        var pool = all().slice();
+        for (var i = pool.length - 1; i > 0; i -= 1) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+        }
+        renderList('random-results', pool.slice(0, 3), true);
+      }
+      document.getElementById('reroll-btn').addEventListener('click', renderRandom);
+
+      /* 快速匹配 */
+      var quickRun = document.getElementById('quick-run');
+      quickRun.addEventListener('click', function () {
+        quickRun.disabled = true;
+        quickRun.textContent = '正在匹配…';
+        setTimeout(function () {
+          var ranked = all().slice().sort(function (a, b) { return b.sim - a.sim; }).slice(0, 3);
+          renderList('quick-results', ranked, true);
+          document.getElementById('quick-result').hidden = false;
+          quickRun.textContent = '重新匹配（演示）';
+          quickRun.disabled = false;
+          showToast('匹配完成：已按示例相似度为你排序三位候选人。');
+        }, 1000);
+      });
+
+      /* 弹窗与行内操作 */
+      var modal = document.getElementById('persona-modal');
+      var activePersonaId = null;
+      function openProfile(id) {
+        var p = visiblePersona(id);
+        if (!p) return;
+        activePersonaId = id;
+        document.getElementById('modal-avatar').textContent = p.code;
+        document.getElementById('modal-title').textContent = p.title;
+        document.getElementById('modal-desc').textContent = p.desc;
+        document.getElementById('modal-city').textContent = p.city;
+        document.getElementById('modal-type').textContent = p.type;
+        document.getElementById('modal-agent').textContent = p.agent ? '接受' : '暂未开放';
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        modal.querySelector('.modal-close').focus();
+      }
+      function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+      modal.querySelectorAll('[data-close]').forEach(function (el) {
+        el.addEventListener('click', closeModal);
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+      document.getElementById('modal-chat').addEventListener('click', function () {
+        var p = visiblePersona(activePersonaId);
+        closeModal();
+        if (p && p.agent) showToast('已将「' + p.title + '」的 Agent 对话放入后台，完成后会通知你。');
+        else showToast('该人格暂未开放 Agent 对话，可先快速匹配。');
+      });
+
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var card = btn.closest('.persona-card');
+        var id = card ? card.getAttribute('data-id') : null;
+        var p = visiblePersona(id);
+        if (btn.getAttribute('data-action') === 'profile' && p) openProfile(p.id);
+        if (btn.getAttribute('data-action') === 'chat') {
+          if (p && p.agent) showToast('已将「' + p.title + '」的 Agent 对话放入后台，完成后会通知你。');
+          else showToast('该人格暂未开放 Agent 对话，可先快速匹配。');
+        }
+      });
+
+      /* 侧边栏 */
+      Array.prototype.forEach.call(document.querySelectorAll('[data-nav]'), function (btn) {
+        btn.addEventListener('click', function () {
+          if (btn.classList.contains('active')) return;
+          var href = btn.getAttribute('data-href');
+          if (href) { window.location.href = href; return; }
+          showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
+        });
+      });
+
+      applySearch();
+      renderRandom();
+    })();
+  </script>
+
+
+</body></html>

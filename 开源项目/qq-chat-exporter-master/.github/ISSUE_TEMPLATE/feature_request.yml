@@ -1,0 +1,61 @@
+name: "💡 功能建议"
+description: "有想法？我们很想听！"
+title: "[功能] "
+labels: ["feature-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🚀 分享你的想法！
+        
+        提交前，看看是否已有人提过或属于已知限制：
+        
+        - [已知问题汇总](https://github.com/shuakami/qq-chat-exporter/issues/164)
+        - [已有功能建议](https://github.com/shuakami/qq-chat-exporter/issues?q=label%3Afeature-request)
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "😤 遇到的问题"
+      description: "这个功能解决什么问题？"
+      placeholder: |
+        我经常需要...但目前...
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "💭 你的想法"
+      description: "描述你想要的功能"
+      placeholder: |
+        如果 QCE 能够...就太好了
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "🔄 替代方案"
+      description: "有没有尝试过其他方法？"
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: "📂 类别"
+      options:
+        - "导出功能"
+        - "界面/UI"
+        - "性能优化"
+        - "新消息类型支持"
+        - "平台支持"
+        - "定时任务"
+        - "表情包"
+        - "其他"
+
+  - type: dropdown
+    id: importance
+    attributes:
+      label: "⭐ 有多重要？"
+      options:
+        - "有了更好"
+        - "会经常用"
+        - "对我很关键"

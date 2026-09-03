@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="知遇 · 我的人格 —— 让 Agent 认识的你，是完整的你。">
+  <title>知遇 · 我的人格</title>
+  <style>
+    :root {
+      --bg:      #eef3fc;
+      --surface: #ffffff;
+      --fg:      #16263f;
+      --muted:   #5d6c88;
+      --border:  #d7e1f1;
+      --accent:  #0d64fd;
+      --accent-soft: color-mix(in oklch, var(--accent) 13%, transparent);
+      --accent-faint: color-mix(in oklch, var(--accent) 5%, transparent);
+      --fg-soft: color-mix(in oklch, var(--fg) 6%, transparent);
+      --fg-softer: color-mix(in oklch, var(--fg) 3%, transparent);
+      --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Source Han Serif CN', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+      --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Consolas, monospace;
+      --fs-h1: clamp(28px, 3vw, 38px);
+      --fs-h2: clamp(21px, 2.2vw, 28px);
+      --gap-xs: 8px;
+      --gap-sm: 12px;
+      --gap-md: 20px;
+      --gap-lg: 28px;
+      --radius: 10px;
+      --radius-lg: 16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.55;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    h1, h2 { font-family: var(--font-display); }
+    h1 { font-size: var(--fs-h1); line-height: 1.25; margin: 0; letter-spacing: 0.01em; }
+    h2 { font-size: var(--fs-h2); line-height: 1.32; margin: 0; }
+    h3 { font-size: 16px; margin: 0; }
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+    .meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.05s ease;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+    .btn-primary:hover { background: color-mix(in oklch, var(--accent) 84%, black); border-color: color-mix(in oklch, var(--accent) 84%, black); }
+    .btn-primary[disabled], .btn-secondary[disabled] { opacity: 0.62; cursor: default; }
+    .btn-secondary { background: var(--surface); color: var(--fg); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); background: var(--accent-faint); }
+    .btn-ghost { background: transparent; color: var(--fg); padding-inline: 6px; }
+    .btn-ghost:hover { color: var(--accent); }
+    .btn-arrow::after { content: '→'; transition: transform 0.15s ease; }
+    .btn-arrow:hover::after { transform: translateX(3px); }
+
+    /* ─── 应用壳 ───────────────────────────────────────────────── */
+    .app-shell { display: flex; min-height: 100vh; }
+    .sidebar {
+      position: fixed; top: 0; bottom: 0; left: 0;
+      width: 248px; z-index: 20;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 18px 14px 16px;
+    }
+    .side-brand { display: block; padding: 2px 6px 0; }
+    .brand-row { display: inline-flex; align-items: center; gap: 11px; }
+    .brand-plate {
+      width: 42px; height: 42px;
+      border-radius: 13px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: grid; place-items: center;
+      box-shadow: 0 8px 20px color-mix(in oklch, var(--fg) 8%, transparent);
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .brand-plate img { width: 36px; height: auto; }
+    .brand-word { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.14em; }
+    .brand-tag { display: block; margin-top: 2px; color: var(--muted); font-size: 10.5px; letter-spacing: 0.08em; }
+    .side-nav { display: flex; flex-direction: column; gap: 5px; margin-top: 26px; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%;
+      min-height: 46px;
+      padding: 9px 12px;
+      border: 0; border-radius: 12px;
+      background: transparent;
+      color: var(--fg);
+      font-size: 14.5px;
+      font-weight: 500;
+      text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-item svg { width: 19px; height: 19px; flex: 0 0 auto; color: var(--muted); transition: color 0.15s ease; }
+    .nav-item:hover { background: var(--fg-soft); }
+    .nav-item.active { background: var(--accent); color: var(--surface); }
+    .nav-item.active svg { color: var(--surface); }
+    .side-foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .zh-avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      font-family: var(--font-display);
+      font-size: 17px;
+      border: 1px solid var(--border);
+    }
+    .side-foot .nav-item { flex: 1; min-height: 42px; }
+
+    .main { flex: 1; margin-left: 248px; min-width: 0; padding: 34px clamp(22px, 4vw, 54px) 72px; }
+    .main-inner { max-width: 1180px; margin-inline: auto; }
+
+    /* ─── 页头与页签 ───────────────────────────────────────────── */
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+    .page-head h1 { max-width: 22ch; }
+    .page-head .sub { margin: 10px 0 0; color: var(--muted); font-size: 14.5px; max-width: 66ch; line-height: 1.75; }
+    .cov-chip {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in oklch, var(--surface) 78%, transparent);
+      color: var(--muted);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .cov-chip b { color: var(--fg); font-weight: 600; }
+    .cov-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    .seg {
+      display: inline-flex; gap: 4px;
+      padding: 4px;
+      background: color-mix(in oklch, var(--surface) 70%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .seg button {
+      min-height: 42px;
+      padding: 8px 20px;
+      border: 0; border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .seg button:hover { color: var(--fg); }
+    .seg button.active { background: var(--fg); color: var(--surface); }
+
+    .tab-panel[hidden] { display: none; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px;
+    }
+    .panel + .panel { margin-top: 18px; }
+    .panel-eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px; }
+
+    .demo-note {
+      margin: 18px 0 0;
+      padding: 11px 14px;
+      background: var(--accent-faint);
+      border-radius: 12px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.75;
+    }
+
+    /* ─── 人格卡 ───────────────────────────────────────────────── */
+    .card-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; }
+    .card-side { display: flex; flex-direction: column; }
+    .ov-lead { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 56ch; line-height: 1.8; }
+    .ov-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+
+    .dial-box {
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+    }
+    .dial { position: relative; width: 150px; height: 150px; }
+    .dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .dial circle { fill: none; stroke-width: 11; }
+    .dial-track { stroke: var(--border); }
+    .dial-fill { stroke: var(--accent); stroke-linecap: round; }
+    .dial-num {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center; gap: 2px;
+      font-size: 34px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .dial-num em { font-style: normal; font-size: 15px; color: var(--muted); margin-top: 10px; }
+    .dial-box > span { margin-top: 4px; font-size: 12.5px; color: var(--muted); letter-spacing: 0.05em; }
+
+    .cov-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; width: 100%; }
+    .cov-list li {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px;
+    }
+    .cov-mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; }
+    .cov-mark svg { width: 11px; height: 11px; }
+    .cov-mark.on { background: var(--accent-soft); color: var(--accent); }
+    .cov-mark.off { background: var(--fg-soft); color: var(--muted); }
+    .cov-name { flex: 1; }
+    .cov-name small { display: block; color: var(--muted); font-size: 11px; }
+    .cov-state { color: var(--muted); font-size: 12px; }
+    .cov-state.on { color: var(--accent); }
+
+    .feat-block { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
+    .feat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+    .feat-head .meta { font-size: 11.5px; }
+    .trait-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+    .trait-row { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .trait-row:last-child { padding-bottom: 0; border-bottom: 0; }
+    .trait-top { display: flex; align-items: baseline; gap: 10px; }
+    .trait-name { font-size: 14.5px; font-weight: 600; }
+    .trait-val { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .trait-desc { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .trait-bottom { display: flex; align-items: baseline; gap: 14px; margin-top: 7px; }
+    .trait-bottom .trait-desc { flex: 1; min-width: 0; margin: 0; }
+    .trait-tag {
+      flex: 0 0 auto;
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+    .track { height: 7px; border-radius: 999px; background: var(--fg-soft); overflow: hidden; }
+    .track i { display: block; height: 100%; border-radius: 999px; background: color-mix(in oklch, var(--fg) 62%, transparent); }
+    .trait-val { float: right; font-size: 11.5px; }
+    .feat-empty { padding: 6px 0 2px; }
+    .feat-empty p { margin: 0; color: var(--muted); font-size: 13.5px; max-width: 62ch; line-height: 1.8; }
+    .feat-dims { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .fdim {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 12px;
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 12.5px;
+      color: var(--fg);
+    }
+    .fdim .dot { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in oklch, var(--fg) 30%, transparent); }
+
+    /* ─── 注入数据 ─────────────────────────────────────────────── */
+    .sec-intro { max-width: 66ch; margin-bottom: 22px; }
+    .sec-intro > p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .src-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch; }
+    .src-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex; flex-direction: column;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+    .src-card:hover { border-color: color-mix(in oklch, var(--accent) 36%, var(--border)); box-shadow: 0 12px 30px color-mix(in oklch, var(--fg) 7%, transparent); }
+    .src-top { display: flex; align-items: flex-start; gap: 12px; }
+    .src-mark {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      background: var(--fg-soft);
+      color: var(--fg);
+      display: grid; place-items: center;
+      flex: 0 0 auto;
+    }
+    .src-mark svg { width: 20px; height: 20px; }
+    .src-title { font-size: 15.5px; font-weight: 600; }
+    .src-dim { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+    .src-badge { margin-left: auto; flex: 0 0 auto; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .pill.todo { background: var(--fg-soft); color: var(--muted); }
+    .pill.todo .dot { background: color-mix(in oklch, var(--muted) 55%, transparent); }
+    .pill.done { background: var(--accent-faint); color: var(--accent); }
+    .pill.done .dot { background: var(--accent); }
+    .src-card > p { margin: 14px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.8; }
+    .src-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+    .src-steps li { display: flex; align-items: baseline; gap: 9px; font-size: 12.5px; color: var(--muted); }
+    .src-steps .num { color: var(--fg); font-size: 11px; }
+    .src-stats { list-style: none; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px dashed var(--border); display: grid; gap: 4px; }
+    .src-stats li { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
+    .src-stats .num { color: var(--fg); }
+    .src-foot { margin-top: auto; padding-top: 16px; display: flex; align-items: center; gap: 8px; }
+    .src-foot .btn { flex: 1; min-height: 42px; padding: 8px 12px; font-size: 13.5px; }
+    .src-note { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+
+    /* ─── Agent 蒸馏 ───────────────────────────────────────────── */
+    .pipe { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 16px 0 22px; }
+    .pipe .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      border-radius: 999px;
+      font-size: 12.5px;
+    }
+    .pipe svg { width: 13px; height: 13px; color: var(--muted); flex: 0 0 auto; }
+    .run-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; align-items: stretch; }
+    .stage-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+    .stage-list li {
+      display: flex; align-items: center; gap: 13px;
+      padding: 11px 4px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+    .stage-ic {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 1.6px solid var(--border);
+      display: grid; place-items: center;
+      flex: 0 0 auto;
+      color: transparent;
+    }
+    .stage-ic svg { width: 12px; height: 12px; }
+    .stage-list li .st-name { flex: 1; }
+    .stage-list li .st-note { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+    .stage-list li.done { color: var(--fg); }
+    .stage-list li.done .stage-ic { border-color: var(--fg); background: var(--fg); color: var(--surface); }
+    .stage-list li.doing { color: var(--fg); font-weight: 500; }
+    .stage-list li.doing .stage-ic { border-color: var(--accent); }
+    .stage-list li.doing .stage-ic svg { width: 13px; height: 13px; color: var(--accent); }
+    .stage-list li.doing .st-note { color: var(--accent); }
+    .stage-list li.todo { color: var(--muted); }
+    .agent-fig {
+      background: var(--fg-softer);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      min-height: 260px;
+    }
+    .agent-fig img { width: 148px; height: 148px; object-fit: contain; }
+    .agent-fig figcaption { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--fg); }
+    .agent-fig .cap-sub { margin-top: 4px; font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+    .run-req { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .run-req .meta { font-size: 11.5px; }
+    .req-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .req-chip b { font-weight: 600; color: var(--fg); }
+    .req-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .req-chip.ok .dot { background: var(--accent); }
+    .req-chip.no .dot { background: color-mix(in oklch, var(--muted) 55%, transparent); }
+    .run-actions { display: flex; align-items: center; gap: 14px; margin-top: 20px; flex-wrap: wrap; }
+    .run-hint { color: var(--muted); font-size: 12.5px; max-width: 46ch; line-height: 1.7; }
+    .dirty-note {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 13px;
+      background: var(--accent-faint);
+      border-radius: 10px;
+      color: var(--accent);
+      font-size: 12.5px;
+    }
+    .dirty-note .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+    .dirty-note[hidden] { display: none; }
+
+    /* ─── 弹窗与提示 ───────────────────────────────────────────── */
+    .modal {
+      position: fixed; inset: 0; z-index: 50;
+      display: none;
+      place-items: center;
+      padding: 22px;
+    }
+    .modal.open { display: grid; }
+    .modal-backdrop { position: absolute; inset: 0; background: color-mix(in oklch, var(--fg) 48%, transparent); backdrop-filter: blur(3px); }
+    .modal-dialog {
+      position: relative;
+      width: min(100%, 560px);
+      max-height: min(86vh, 720px);
+      overflow: auto;
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 26px;
+      box-shadow: 0 36px 110px color-mix(in oklch, var(--fg) 40%, transparent);
+    }
+    .modal-close {
+      position: absolute; top: 14px; right: 14px;
+      width: 40px; height: 40px;
+      border: 0; border-radius: 50%;
+      background: transparent;
+      color: var(--muted);
+      display: grid; place-items: center;
+    }
+    .modal-close:hover { background: var(--fg-soft); color: var(--fg); }
+    .modal-close svg { width: 18px; height: 18px; }
+    .modal h3 { font-size: 19px; font-family: var(--font-display); }
+    .modal .panel-eyebrow { margin-bottom: 6px; }
+    .modal-body { margin-top: 14px; }
+    .modal-body > p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.85; }
+    .modal-steps { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+    .modal-steps li { display: flex; gap: 12px; font-size: 13.5px; line-height: 1.7; }
+    .modal-steps .num {
+      flex: 0 0 auto;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--fg-soft);
+      display: grid; place-items: center;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .modal-steps b { font-weight: 600; }
+    .modal-steps small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .modal-actions .btn { flex: 1; }
+
+    .toast {
+      position: fixed;
+      left: 50%; bottom: 26px;
+      transform: translate(-50%, 12px);
+      z-index: 70;
+      background: var(--fg);
+      color: var(--surface);
+      padding: 11px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      box-shadow: 0 16px 44px color-mix(in oklch, var(--fg) 30%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: min(86vw, 520px);
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 1120px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .run-grid { grid-template-columns: 1fr; }
+      .src-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 920px) {
+      .app-shell { flex-direction: column; }
+      .sidebar {
+        position: static;
+        width: 100%; height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+      }
+      .side-nav { flex-direction: row; flex-wrap: wrap; margin-top: 12px; gap: 6px; flex: none; }
+      .nav-item { width: auto; min-height: 42px; padding: 8px 12px; font-size: 13.5px; }
+      .side-foot { margin-top: 10px; border-top: 0; padding-top: 0; }
+      .main { margin-left: 0; padding: 26px 18px 60px; }
+      .panel { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" data-od-id="sidebar">
+      <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
+        <span class="brand-row">
+          <span class="brand-plate"><img src="logo1.png" alt="知遇" width="36" height="29"></span>
+          <span>
+            <span class="brand-word">知遇</span>
+            <span class="brand-tag meta">先认识，再相遇</span>
+          </span>
+        </span>
+      </a>
+
+      <nav class="side-nav" aria-label="主导航" data-od-id="side-nav">
+        <button class="nav-item" type="button" data-nav="首页" data-href="zhiyu-home.html" data-od-id="nav-home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3z"></path></svg>
+          <span>首页</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="发现" data-href="zhiyu-find.html" data-od-id="nav-find">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m15.8 8.2-2.6 5.2-5.2 2.6 2.6-5.2z"></path></svg>
+          <span>发现</span>
+        </button>
+        <button class="nav-item active" type="button" data-nav="我的人格" data-od-id="nav-persona" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"></path></svg>
+          <span>我的人格</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="Agent 匹配" data-href="zhiyu-agent-match.html" data-od-id="nav-match">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+          <span>Agent 匹配</span>
+        </button>
+        <button class="nav-item" type="button" data-nav="通知" data-href="zhiyu-notify.html" data-od-id="nav-notify">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          <span>通知</span>
+        </button>
+      </nav>
+
+      <div class="side-foot" data-od-id="sidebar-account">
+        <span class="zh-avatar" title="你的知乎头像（演示占位，授权后展示真实头像）">知</span>
+        <button class="nav-item" type="button" data-nav="设置" data-href="zhiyu-settings.html" data-od-id="nav-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"></path><path d="M2 14h4M10 8h4M18 16h4"></path></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main" id="persona" data-od-id="persona-main">
+      <div class="main-inner">
+        <header class="page-head">
+          <div>
+            <p class="meta" style="margin: 0 0 10px;">知遇 · 我的人格</p>
+            <h1>把完整的你，交给 Agent。</h1>
+            <p class="sub">人格不是标签，而是三份证据的融合：微信里的私域、知乎里的公开表达，和你眼中的 SBTI。数据就绪后再蒸馏，Agent 才有底气替你判断该和谁同频。</p>
+          </div>
+          
+        </header>
+
+        <div class="seg" role="tablist" aria-label="我的人格内容" data-od-id="persona-tabs">
+          <button class="active" type="button" role="tab" aria-selected="true" data-tab="card" data-od-id="persona-tab-card">人格卡</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="sources" data-od-id="persona-tab-sources">注入数据</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="distill" data-od-id="persona-tab-distill">Agent 蒸馏</button>
+        </div>
+
+        <!-- ① 人格卡 -->
+        <section class="tab-panel" id="tab-card" data-od-id="persona-card" role="tabpanel" aria-label="人格卡">
+          <div class="panel">
+            <div class="card-grid">
+              <div>
+                <p class="panel-eyebrow">人格卡 · 结果</p>
+                <h2 id="ov-title">人格还差两份证据。</h2>
+                <p class="ov-lead" id="ov-lead">人格融合不会草率下结论。先补齐下面这份证据清单，蒸馏后的人格特征才会带上来源、可以解释——而不是几个拍脑袋的标签。</p>
+                <div class="ov-actions" id="ov-actions"></div>
+              </div>
+
+              <aside class="card-side">
+                <div class="dial-box">
+                  <div class="dial">
+                    <svg viewBox="0 0 120 120" role="img" aria-label="人格完整度">
+                      <circle class="dial-track" cx="60" cy="60" r="52"></circle>
+                      <circle class="dial-fill" id="ringFill" cx="60" cy="60" r="52"></circle>
+                    </svg>
+                    <div class="dial-num num"><span id="ring-num">33</span><em>%</em></div>
+                  </div>
+                  <span>数据覆盖度 · 完整度不等同于真实度</span>
+                </div>
+                <ul class="cov-list" aria-label="数据源覆盖情况">
+                  <li data-cov="zhihu">
+                    <span class="cov-mark on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="cov-name">知乎 · 公共表达<small>Observed · 公开内容推断</small></span>
+                    <span class="cov-state on">已接入</span>
+                  </li>
+                  <li data-cov="wechat">
+                    <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
+                    <span class="cov-name">微信 · 私域表达<small>Observed · 本地聊天分析</small></span>
+                    <span class="cov-state">未接入</span>
+                  </li>
+                  <li data-cov="sbti">
+                    <span class="cov-mark off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span>
+                    <span class="cov-name">SBTI · 显性自评<small>Self-reported · 你眼中的自己</small></span>
+                    <span class="cov-state">未完成</span>
+                  </li>
+                </ul>
+              </aside>
+            </div>
+
+            <div class="feat-block" data-od-id="persona-features">
+              <div class="feat-head">
+                <h3>人格特征 · 每条都带来源</h3>
+                <span class="meta">观察人格 vs 自评人格，可对照可解释</span>
+              </div>
+              <div id="feat-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ② 注入数据 -->
+        <section class="tab-panel" id="tab-sources" data-od-id="persona-sources" role="tabpanel" aria-label="注入数据" hidden="">
+          <div class="panel">
+            <p class="panel-eyebrow">注入数据 · Multi-source Fusion</p>
+            <div class="sec-intro">
+              <h2>从三个侧面认识你，而不是替你下定义。</h2>
+              <p>微信还原真实生活中的你，知乎理解你在公开表达里的关注与倾向，SBTI 记录你眼中的自己。三种证据融合成一个可检索、可解释的 Persona——所有来源都能被追问。</p>
+            </div>
+
+            <div class="src-grid">
+              <article class="src-card" data-od-id="src-card-wechat">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M8.5 9.5h7M8.5 13h4"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">微信聊天记录</div>
+                    <span class="src-dim">私域人格 · 本地处理</span>
+                  </div>
+                  <span class="pill todo src-badge" id="badge-wechat"><span class="dot"></span><span id="badge-wechat-t">未接入</span></span>
+                </div>
+                <p>通过 WeFlow 导出你与常聊对象的记录，系统只提取“你自己的发言”作为人格证据，还原日常表达、情绪反应与决策习惯。</p>
+                <ol class="src-steps">
+                  <li><span class="num">01</span>WeFlow 本地读取并导出聊天记录</li>
+                  <li><span class="num">02</span>本地完成说话人分离（self / other）</li>
+                  <li><span class="num">03</span>仅注入蒸馏后的结果，可多次更新</li>
+                </ol>
+                <ul class="src-stats" id="stats-wechat">
+                  <li><span>状态</span><span class="num">等待导入</span></li>
+                </ul>
+                <div class="src-foot">
+                  <button class="btn btn-secondary" type="button" id="act-wechat" data-od-id="wechat-action">选择聊天文件</button>
+                </div>
+              </article>
+
+              <article class="src-card" data-od-id="src-card-zhihu">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M9 8h7M9 12h5"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">知乎公开数据</div>
+                    <span class="src-dim">公共人格 · 已授权</span>
+                  </div>
+                  <span class="pill done src-badge" id="badge-zhihu"><span class="dot"></span><span id="badge-zhihu-t">已接入</span></span>
+                </div>
+                <p>分析你授权的公开回答、关注与想法，理解你在公共表达里关注什么、如何思考、知识结构长在哪里。</p>
+                <ul class="src-stats">
+                  <li><span>回答 / 想法 / 关注话题</span><span class="num">87 / 302 / 41</span></li>
+                  <li><span>最近同步</span><span class="num" id="zhihu-sync">今天 · 刚刚</span></li>
+                </ul>
+                <div class="src-foot">
+                  <button class="btn btn-secondary" type="button" id="act-zhihu" data-od-id="zhihu-action">重新同步</button>
+                </div>
+              </article>
+
+              <article class="src-card" data-od-id="src-card-sbti">
+                <div class="src-top">
+                  <span class="src-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M9 3.5h6M9.5 12l2 2 3-3.5"></path></svg>
+                  </span>
+                  <div>
+                    <div class="src-title">SBTI 测试</div>
+                    <span class="src-dim">显性人格 · 自评</span>
+                  </div>
+                  <span class="pill todo src-badge" id="badge-sbti"><span class="dot"></span><span id="badge-sbti-t">未完成</span></span>
+                </div>
+                <p>由你自评的显性人格，也是快速匹配的必要信号之一。完成后会与“从行为观察到的你”对照，判断哪些判断来自你，哪些来自数据。</p>
+                <ol class="src-steps">
+                  <li><span class="num">01</span>完成 SBTI 四维测试（约 12 分钟）</li>
+                  <li><span class="num">02</span>结果作为 Self-reported 进入融合</li>
+                  <li><span class="num">03</span>随时可重测，结果随之更新</li>
+                </ol>
+                <ul class="src-stats" id="stats-sbti">
+                  <li><span>状态</span><span class="num">尚未开始</span></li>
+                </ul>
+                <div class="src-foot">
+                  <button class="btn btn-primary" type="button" id="act-sbti" data-od-id="sbti-action">去完成 SBTI</button>
+                </div>
+              </article>
+            </div>
+
+            
+          </div>
+        </section>
+
+        <!-- ③ Agent 蒸馏 -->
+        <section class="tab-panel" id="tab-distill" data-od-id="persona-distill" role="tabpanel" aria-label="Agent 蒸馏" hidden="">
+          <div class="panel">
+            <p class="panel-eyebrow">Agent 蒸馏 · Persona 训练</p>
+            <div class="sec-intro">
+              <h2>把原始材料，训练成能代表你的 Agent。</h2>
+              <p>Persona 是长期保存、可向量化检索的人格数据；Agent 是它在需要替你交流时按需启动的运行实例。蒸馏把三份证据规整成这份可解释的底稿——数据更新后，随时可以重新蒸馏。</p>
+            </div>
+
+            <div class="pipe" aria-label="蒸馏流程">
+              <span class="tag">原始材料</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">Persona 蒸馏</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">Persona 索引</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              <span class="tag">Agent 实例</span>
+            </div>
+
+            <div class="run-grid">
+              <div>
+                <div class="run-req">
+                  <span class="meta">数据源就绪情况</span>
+                  <span class="req-chip ok"><span class="dot"></span>知乎 <b>已接入</b></span>
+                  <span class="req-chip no" id="req-wechat"><span class="dot"></span>微信 <b id="req-wechat-t">未接入</b></span>
+                  <span class="req-chip no" id="req-sbti"><span class="dot"></span>SBTI <b id="req-sbti-t">未完成</b></span>
+                </div>
+
+                <ol class="stage-list" id="stage-list" data-od-id="distill-stages">
+                  <li class="todo" data-stage="0">
+                    <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="st-name">校验已接入的数据源</span>
+                    <span class="st-note" data-note="0"></span>
+                  </li>
+                  <li class="todo" data-stage="1">
+                    <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="st-name">提取内容证据 · 区分来源</span>
+                    <span class="st-note" data-note="1"></span>
+                  </li>
+                  <li class="todo" data-stage="2">
+                    <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="st-name">多源融合 · 计算人格特征</span>
+                    <span class="st-note" data-note="2"></span>
+                  </li>
+                  <li class="todo" data-stage="3">
+                    <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="st-name">蒸馏 · 写入 Persona 索引</span>
+                    <span class="st-note" data-note="3"></span>
+                  </li>
+                  <li class="todo" data-stage="4">
+                    <span class="stage-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                    <span class="st-name">Agent 实例就绪</span>
+                    <span class="st-note" data-note="4"></span>
+                  </li>
+                </ol>
+
+                <div class="run-req">
+                  <span class="meta">Agent 状态</span>
+                  <span class="pill todo" id="agent-pill"><span class="dot"></span><span id="agent-pill-t">待生成</span></span>
+                </div>
+
+                <div class="dirty-note" id="dirty-note" hidden="">
+                  <span class="dot"></span>
+                  <span>检测到新的数据更新——重新蒸馏后，人格卡与匹配结果才会同步刷新。</span>
+                </div>
+
+                <div class="run-actions">
+                  <button class="btn btn-primary" type="button" id="act-distill" data-od-id="distill-action">开始蒸馏</button>
+                  <span class="run-hint">蒸馏是异步任务：发起后可以离开此页，完成后 Agent 会在后台保持就绪，不占用你的其它操作。</span>
+                </div>
+              </div>
+
+              <figure class="agent-fig" data-od-id="agent-figure">
+                <img id="agent-gif" src="待机_5秒_320x320_20fps_透明.gif" alt="刘看山角色动画，用于表示 Agent 当前状态" width="148" height="148">
+                <figcaption id="agent-cap">Agent 待生成</figcaption>
+                <p class="cap-sub" id="agent-sub">完成人格蒸馏后，这里会亮起“已就绪”。就绪的 Agent 会按你的 Persona 去发现页替你认识人。</p>
+              </figure>
+            </div>
+
+            
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- 微信接入弹窗 -->
+  <div class="modal" id="modal-wechat" role="dialog" aria-modal="true" aria-labelledby="wechat-title" data-od-id="modal-wechat">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <p class="panel-eyebrow">注入数据 · 微信</p>
+      <h3 id="wechat-title">接入微信聊天记录（WeFlow）</h3>
+      <div class="modal-body">
+        <p>WeFlow 在本地读取并导出聊天数据，你在本页完成“说话人分离”后，只把蒸馏结果交给知遇。你可以多次注入、持续更新这份私域人格。</p>
+        <ol class="modal-steps">
+          <li><span class="num">01</span><span><b>在电脑上打开 WeFlow</b><small>它是本地数据处理工具，聊天记录不出本机。</small></span></li>
+          <li><span class="num">02</span><span><b>选择要分析的联系人或群聊</b><small>仅“你自己的发言”会作为人格证据，对方内容只作理解上下文。</small></span></li>
+          <li><span class="num">03</span><span><b>导出结构化文件并交给知遇</b><small>本页仅接收处理结果，原始聊天记录不会长期上传。</small></span></li>
+        </ol>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">取消</button>
+        <button class="btn btn-primary" type="button" id="wechat-confirm" data-od-id="wechat-confirm">我已导出 · 选择文件</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- SBTI 弹窗 -->
+  <div class="modal" id="modal-sbti" role="dialog" aria-modal="true" aria-labelledby="sbti-title" data-od-id="modal-sbti">
+    <div class="modal-backdrop" data-close=""></div>
+    <section class="modal-dialog">
+      <button class="modal-close" type="button" data-close="" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+      </button>
+      <p class="panel-eyebrow">注入数据 · SBTI</p>
+      <h3 id="sbti-title">完成 SBTI 四维自评</h3>
+      <div class="modal-body">
+        <p>SBTI 记录的是“你认为自己是怎样的人”，属于显性人格；它与你从行为中被观察到的特征形成对照。测试约 12 分钟，完成后可随时重测，重测结果会重新参与融合。</p>
+        <ol class="modal-steps">
+          <li><span class="num">01</span><span><b>四维倾向自评</b><small>围绕精力来源、信息偏好、决策方式与生活结构作答。</small></span></li>
+          <li><span class="num">02</span><span><b>结果进入融合</b><small>作为 Self-reported 信号，与知乎、微信的 Observed 证据合并。</small></span></li>
+          <li><span class="num">03</span><span><b>用于快速匹配</b><small>它是“快速匹配”的关键输入之一，帮助直接过滤出同频候选人。</small></span></li>
+        </ol>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" data-close="">稍后再测</button>
+        <button class="btn btn-primary" type="button" id="sbti-confirm" data-od-id="sbti-confirm">开始测试</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+      var toast = document.getElementById('toast');
+      var timer = null;
+      function showToast(text) {
+        if (!toast) return;
+        toast.textContent = text;
+        toast.classList.add('show');
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { toast.classList.remove('show'); }, 3000);
+      }
+
+      /* ── 状态（与首页口径一致：知乎已接入，其余未完成） ── */
+      var state = {
+        zhihu: true,
+        wechat: false,
+        sbti: false,
+        ready: false,
+        running: false,
+        zhihuTime: '今天 · 刚刚',
+        srcVersion: 0,
+        distillVersion: -1
+      };
+      var CIRC = 2 * Math.PI * 52;
+      var ring = document.getElementById('ringFill');
+
+      function doneCount() { return (state.zhihu ? 1 : 0) + (state.wechat ? 1 : 0) + (state.sbti ? 1 : 0); }
+      function pct() { return Math.round(doneCount() / 3 * 100); }
+      function missing() { return 3 - doneCount(); }
+      function dirty() { return state.ready && state.srcVersion !== state.distillVersion; }
+
+      /* ── 进度环 ── */
+      function paintRing() {
+        var p = pct();
+        var num = document.getElementById('ring-num');
+        var head = document.getElementById('head-cov');
+        num.textContent = p;
+        head.textContent = p;
+        ring.style.strokeDasharray = CIRC;
+        ring.style.strokeDashoffset = CIRC * (1 - p / 100);
+      }
+
+      /* ── 覆盖清单（人格卡右侧） ── */
+      function paintCovList() {
+        var map = { zhihu: state.zhihu, wechat: state.wechat, sbti: state.sbti };
+        var label = { zhihu: ['已接入', '未接入'], wechat: ['已接入', '未接入'], sbti: ['已完成', '未完成'] };
+        document.querySelectorAll('.cov-list li').forEach(function (li) {
+          var k = li.getAttribute('data-cov');
+          var on = map[k];
+          li.querySelector('.cov-mark').className = 'cov-mark ' + (on ? 'on' : 'off');
+          li.querySelector('.cov-mark svg').outerHTML = on
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
+          var st = li.querySelector('.cov-state');
+          st.textContent = on ? label[k][0] : label[k][1];
+          st.className = 'cov-state' + (on ? ' on' : '');
+        });
+      }
+
+      /* ── 人格卡标题与引导区 ── */
+      var FEATS = [
+        { name: '思维风格', v: 82, desc: '偏深度与系统化：习惯先搭框架再填细节，喜欢追问“为什么”，对技术背后的价值判断更敏感。', tag: '示例数据' },
+        { name: '沟通习惯', v: 70, desc: '表达克制但真诚、慢热；偏好有来有回、可以被认真挑战的讨论，不喜欢含糊其辞。', tag: '示例数据' },
+        { name: '兴趣结构', v: 76, desc: '技术 × 人文的交叉地带：关注产品、叙事与科普，跨领域话题往往最能打开话匣子。', tag: '示例数据' },
+        { name: '价值观权重', v: 88, desc: '更看重“学习与创造”，其次职业与社交；价值判断常先于情绪表达。', tag: '示例数据' },
+        { name: '社交风格', v: 64, desc: '主动性中等、内向度偏高：熟悉的场域话多，陌生场合更倾向先观察再开口。', tag: '示例数据' }
+      ];
+
+      function paintOverview() {
+        var title = document.getElementById('ov-title');
+        var lead = document.getElementById('ov-lead');
+        var actions = document.getElementById('ov-actions');
+        if (!state.ready) {
+          if (missing() > 0) {
+            title.textContent = '人格还差' + missing() + '份证据。';
+            lead.textContent = '人格融合不会草率下结论。先补齐上面这份证据清单，蒸馏后的人格特征才会带上来源、可以解释——而不是几个拍脑袋的标签。';
+          } else {
+            title.textContent = '证据齐了，准备蒸馏。';
+            lead.textContent = '三份证据都已就绪。现在去「Agent 蒸馏」发起蒸馏，把原始材料训练成可解释的 Persona 与你的 Agent。';
+          }
+        } else {
+          title.textContent = '这是一份可解释的“我”。';
+          lead.textContent = '以下是基于已接入数据生成的示例人格特征，每条都保留来源、可以追问“为什么”。补入更多数据后，随时可以重新蒸馏刷新。';
+        }
+        actions.innerHTML = buildOvActions();
+      }
+
+      function buildOvActions() {
+        if (state.ready) {
+          return '<a class="btn btn-primary btn-arrow" href="zhiyu-find.html" data-od-id="ov-find">带着 Agent 去发现页</a>' +
+            '<button class="btn btn-ghost btn-arrow" type="button" data-cmd="sources">再补点数据</button>';
+        }
+        if (missing() === 0) {
+          return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="distill" data-od-id="ov-distill">开始蒸馏</button>';
+        }
+        var href = state.sbti ? 'distill' : 'sources';
+        return '<button class="btn btn-primary btn-arrow" type="button" data-cmd="' + href + '" data-od-id="ov-next">' + (state.sbti ? '去开始蒸馏' : '去注入数据') + '</button>';
+      }
+
+      /* ── 特征列表 ── */
+      function paintFeatures() {
+        var box = document.getElementById('feat-list');
+        if (!state.ready) {
+          box.innerHTML = '<div class="feat-empty">' +
+            '<p>蒸馏尚未完成，这里还没有可展示的特征。完成「注入数据」并在「Agent 蒸馏」中开始训练后，人格卡会按下面这些维度列出基于证据的特征——每条都会标注来源。</p>' +
+            '<div class="feat-dims">' +
+            '<span class="fdim"><span class="dot"></span>思维风格</span>' +
+            '<span class="fdim"><span class="dot"></span>沟通习惯</span>' +
+            '<span class="fdim"><span class="dot"></span>兴趣结构</span>' +
+            '<span class="fdim"><span class="dot"></span>价值观权重</span>' +
+            '<span class="fdim"><span class="dot"></span>社交风格</span>' +
+            '</div></div>';
+          return;
+        }
+        box.innerHTML = '<ul class="trait-list">' + FEATS.map(function (f, i) {
+          return '<li class="trait-row" data-od-id="feature-row-' + (i + 1) + '">' +
+            '<div class="trait-top"><span class="trait-name">' + f.name + '</span>' +
+            '<span class="num trait-val">' + f.v + '</span></div>' +
+            '<div class="track" role="progressbar" aria-valuenow="' + f.v + '" aria-valuemin="0" aria-valuemax="100" aria-label="' + f.name + ' 示例值 ' + f.v + '"><i style="width:' + f.v + '%;"></i></div>' +
+            '<div class="trait-bottom"><p class="trait-desc">' + f.desc + '</p>' +
+            '<span class="trait-tag">' + f.tag + '</span></div>' +
+            '</li>';
+        }).join('') + '</ul>' +
+          '<p class="demo-note" style="margin:16px 0 0;">演示说明：当前人格由示例数据生成，用于演示完整的人格卡界面。接入你的真实微信 / 知乎 / SBTI 数据后，此卡会基于你的内容重建，并标注每条特征的真实来源。</p>';
+      }
+
+      function refresh() {
+        paintRing();
+        paintCovList();
+        paintOverview();
+        paintFeatures();
+        paintSources();
+        paintDistill();
+      }
+
+      /* ── 注入数据面板 ── */
+      function setPill(id, idT, text, done) {
+        var pill = document.getElementById(id);
+        document.getElementById(idT).textContent = text;
+        pill.className = 'pill ' + (done ? 'done' : 'todo') + ' src-badge';
+      }
+      function setStats(id, html) {
+        document.getElementById(id).innerHTML = html;
+      }
+      function paintSources() {
+        var w = document.getElementById('act-wechat');
+        var s = document.getElementById('act-sbti');
+        if (state.wechat) {
+          setPill('badge-wechat', 'badge-wechat-t', '已接入', true);
+          setStats('stats-wechat', '<li><span>本地消息（示例）</span><span class="num">12,483 条</span></li><li><span>说话人分离</span><span class="num">self / other 已区分</span></li><li><span>最近注入</span><span class="num">刚刚</span></li>');
+          w.textContent = '再次注入（可多次）';
+          w.className = 'btn btn-secondary';
+        } else {
+          setPill('badge-wechat', 'badge-wechat-t', '未接入', false);
+          setStats('stats-wechat', '<li><span>状态</span><span class="num">等待导入</span></li>');
+          w.textContent = '选择聊天文件';
+          w.className = state.sbti ? 'btn btn-primary' : 'btn btn-secondary';
+        }
+        if (state.sbti) {
+          setPill('badge-sbti', 'badge-sbti-t', '已完成', true);
+          setStats('stats-sbti', '<li><span>四维判定（示例）</span><span class="num">已完成</span></li><li><span>最近测试</span><span class="num">刚刚</span></li>');
+          s.textContent = '重新测试（可重测）';
+          s.className = 'btn btn-secondary';
+        } else {
+          setPill('badge-sbti', 'badge-sbti-t', '未完成', false);
+          setStats('stats-sbti', '<li><span>状态</span><span class="num">尚未开始</span></li>');
+          s.textContent = '去完成 SBTI';
+          s.className = 'btn btn-primary';
+        }
+      }
+
+      /* ── 蒸馏面板 ── */
+      function paintDistill() {
+        var pill = document.getElementById('agent-pill');
+        var pillT = document.getElementById('agent-pill-t');
+        if (state.ready) {
+          pill.className = 'pill done';
+          pillT.textContent = '已就绪';
+        } else {
+          pill.className = 'pill todo';
+          pillT.textContent = state.running ? '蒸馏中…' : '待生成';
+        }
+        document.getElementById('dirty-note').hidden = !dirty();
+        var btn = document.getElementById('act-distill');
+        if (state.running) {
+          btn.disabled = true;
+          btn.textContent = '蒸馏中…';
+        } else if (state.ready) {
+          btn.disabled = false;
+          btn.textContent = '重新蒸馏';
+        } else {
+          btn.disabled = false;
+          btn.textContent = '开始蒸馏';
+        }
+        ['wechat', 'sbti'].forEach(function (k) {
+          var on = state[k];
+          var chip = document.getElementById('req-' + k);
+          chip.className = 'req-chip ' + (on ? 'ok' : 'no');
+          var b = document.getElementById('req-' + k + '-t');
+          b.textContent = (k === 'sbti' ? (on ? '已完成' : '未完成') : (on ? '已接入' : '未接入'));
+        });
+      }
+
+      function resetStages() {
+        document.querySelectorAll('#stage-list li').forEach(function (li) {
+          li.className = 'todo';
+          var idx = li.getAttribute('data-stage');
+          li.querySelector('[data-note="' + idx + '"]').textContent = '';
+        });
+      }
+      function setStageDoing(i, note) {
+        document.querySelectorAll('#stage-list li').forEach(function (li) {
+          var idx = +li.getAttribute('data-stage');
+          li.className = idx < i ? 'done' : (idx === i ? 'doing' : 'todo');
+          li.querySelector('[data-note="' + idx + '"]').textContent = (idx === i) ? (note || '…') : '';
+        });
+      }
+
+      /* ── 页签 ── */
+      var tabs = document.querySelectorAll('[data-tab]');
+      var panels = {
+        card: document.getElementById('tab-card'),
+        sources: document.getElementById('tab-sources'),
+        distill: document.getElementById('tab-distill')
+      };
+      function switchTab(name) {
+        tabs.forEach(function (t) {
+          var on = t.getAttribute('data-tab') === name;
+          t.classList.toggle('active', on);
+          t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        Object.keys(panels).forEach(function (k) { panels[k].hidden = k !== name; });
+        try { localStorage.setItem('zhiyu-persona-tab', name); } catch (e) {}
+      }
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () { switchTab(t.getAttribute('data-tab')); });
+      });
+
+      /* ── 人格卡引导按钮（事件委托） ── */
+      document.getElementById('ov-actions').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-cmd]');
+        if (!btn) return;
+        switchTab(btn.getAttribute('data-cmd'));
+      });
+
+      /* ── 弹窗 ── */
+      function openModal(id) {
+        var m = document.getElementById(id);
+        if (!m) return;
+        m.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        m.querySelector('.modal-close').focus();
+      }
+      function closeModal(m) {
+        m.classList.remove('open');
+        document.body.style.overflow = '';
+      }
+      document.querySelectorAll('.modal').forEach(function (m) {
+        m.querySelectorAll('[data-close]').forEach(function (el) {
+          el.addEventListener('click', function () { closeModal(m); });
+        });
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.modal.open').forEach(closeModal);
+        }
+      });
+
+      document.getElementById('act-wechat').addEventListener('click', function () { openModal('modal-wechat'); });
+      document.getElementById('act-sbti').addEventListener('click', function () { openModal('modal-sbti'); });
+      document.getElementById('act-zhihu').addEventListener('click', function () {
+        state.zhihuTime = '今天 · ' + new Date().toTimeString().slice(0, 5);
+        document.getElementById('zhihu-sync').textContent = state.zhihuTime;
+        state.srcVersion += 1;
+        refresh();
+        showToast('已重新同步知乎公开数据（演示）。数据已更新，建议在「Agent 蒸馏」中重新蒸馏。');
+      });
+
+      document.getElementById('wechat-confirm').addEventListener('click', function () {
+        var m = document.getElementById('modal-wechat');
+        if (state.running) { closeModal(m); return; }
+        state.wechat = true;
+        state.srcVersion += 1;
+        closeModal(m);
+        refresh();
+        showToast('示例：已注入 12,483 条本地消息（self / other 已分离）。可以再次注入，持续更新这份私域人格。');
+      });
+
+      document.getElementById('sbti-confirm').addEventListener('click', function () {
+        var m = document.getElementById('modal-sbti');
+        if (state.running) { closeModal(m); return; }
+        state.sbti = true;
+        state.srcVersion += 1;
+        closeModal(m);
+        refresh();
+        showToast('SBTI 已完成（演示）。你眼中的自己，已加入人格融合。');
+      });
+
+      /* ── 蒸馏运行 ── */
+      var gif = document.getElementById('agent-gif');
+      var cap = document.getElementById('agent-cap');
+      var sub = document.getElementById('agent-sub');
+      function setFig(src, capT, capS) {
+        gif.src = src;
+        cap.textContent = capT;
+        sub.textContent = capS;
+      }
+      function figIdle() {
+        setFig('待机_5秒_320x320_20fps_透明.gif', 'Agent 待生成', '完成人格蒸馏后，这里会亮起“已就绪”。就绪的 Agent 会按你的 Persona 去发现页替你认识人。');
+      }
+      function figWorking() {
+        setFig('电脑_6秒_320x320_20fps_透明.gif', '正在蒸馏…', '正在读取数据源并计算人格特征。蒸馏是异步任务，你可以离开本页，完成后 Agent 会在后台保持就绪。');
+      }
+      function figReady() {
+        setFig('打招呼_4秒_320x320_20fps_透明.gif', '我的 Agent 已就绪', 'Agent 已按你的 Persona 就绪。现在去发现页发起快速匹配，或指定对象进行 Agent 对话。');
+      }
+      function allStagesDone() {
+        document.querySelectorAll('#stage-list li').forEach(function (li) {
+          var idx = +li.getAttribute('data-stage');
+          li.className = 'done';
+          var note = li.querySelector('[data-note="' + idx + '"]');
+          note.textContent = (idx === 4) ? '完成' : '';
+        });
+      }
+
+      document.getElementById('act-distill').addEventListener('click', function () {
+        if (state.running) return;
+        state.running = true;
+        resetStages();
+        figWorking();
+        paintDistill();
+        var steps = [
+          { note: '已接入 ' + doneCount() + ' / 3 份来源' },
+          { note: '说话人 · 内容类型已区分' },
+          { note: '融合 ' + (state.wechat ? '微信 · ' : '') + '知乎' + (state.sbti ? ' · SBTI' : '') + ' 证据' },
+          { note: '特征写入可检索的 Persona 索引' },
+          { note: '可随时按 Persona 实例化 Agent' }
+        ];
+        setStageDoing(0, steps[0].note);
+        var i = 0;
+        var runTimer = setInterval(function () {
+          i += 1;
+          if (i >= steps.length) {
+            clearInterval(runTimer);
+            allStagesDone();
+            state.running = false;
+            state.ready = true;
+            state.distillVersion = state.srcVersion;
+            refresh();
+            figReady();
+            showToast('蒸馏完成：Persona 已更新，你的 Agent 已就绪，可以开始匹配了。');
+            return;
+          }
+          setStageDoing(i, steps[i].note);
+        }, 900);
+      });
+
+      /* ── 侧边栏 ── */
+      document.querySelectorAll('[data-nav]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (btn.classList.contains('active')) return;
+          var href = btn.getAttribute('data-href');
+          if (href) { window.location.href = href; return; }
+          showToast('「' + btn.getAttribute('data-nav') + '」页面将在后续页面原型中开放。');
+        });
+      });
+
+      /* ── 初始化 ── */
+      try {
+        var saved = localStorage.getItem('zhiyu-persona-tab');
+        if (saved && panels[saved]) switchTab(saved);
+      } catch (e) {}
+      paintRing();
+      paintCovList();
+      paintOverview();
+      paintFeatures();
+      paintSources();
+      paintDistill();
+    })();
+  </script>
+
+</body></html>

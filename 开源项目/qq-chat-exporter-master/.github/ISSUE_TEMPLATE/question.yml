@@ -1,0 +1,58 @@
+name: "❓ 使用问题"
+description: "关于 QCE 使用的疑问"
+title: "[问题] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ❓ 使用问题
+        
+        有疑问？先看看这些资源：
+        
+        - 📖 [用户手册](https://shuakami.github.io/qq-chat-exporter/)
+        - 📌 [已知问题汇总](https://github.com/shuakami/qq-chat-exporter/issues/164)
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: "📂 问题类型"
+      options:
+        - "导出相关"
+        - "定时任务"
+        - "表情包"
+        - "资源/媒体文件"
+        - "界面/操作"
+        - "其他"
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "🤔 你的问题"
+      placeholder: |
+        描述你想了解的内容
+        
+        比如:
+        - 如何导出超大群聊？
+        - 定时任务怎么设置？
+        - 导出的文件在哪里？
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: "📝 已尝试的方法"
+      placeholder: "你已经尝试过什么？（可选）"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "✅ 确认"
+      options:
+        - label: "我已查看用户手册"
+          required: true
+        - label: "我已搜索过现有 issue"
+          required: true

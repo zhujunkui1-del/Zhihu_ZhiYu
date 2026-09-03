@@ -1,0 +1,1272 @@
+#!/usr/bin/env python3
+"""QCE Plugin Complete Package Builder - Cross Platform"""
+
+import os
+import sys
+import json
+import shutil
+import platform
+import subprocess
+import zipfile
+import tarfile
+from pathlib import Path
+from urllib.request import urlretrieve
+from datetime import datetime
+from plugin_runtime import (
+    FIND_QQ_PS1,
+    copy_native_server_binary,
+    get_napcat_latest_version,
+    stage_plugin_runtime,
+)
+
+def get_qce_version():
+    """Get QCE version from package.json or environment variable"""
+    # Priority: QCE_VERSION env > package.json
+    if os.environ.get('QCE_VERSION'):
+        return os.environ['QCE_VERSION'].lstrip('v')
+    
+    try:
+        with open('plugins/qq-chat-exporter/package.json', 'r', encoding='utf-8') as f:
+            pkg = json.load(f)
+            return pkg.get('version', 'unknown')
+    except:
+        return 'unknown'
+
+VERSION = get_qce_version()
+SOURCE_PLUGIN_DIR = "plugins/qq-chat-exporter"
+RUNTIME_PLUGIN_ID = "napcat-plugin-qce"
+
+def get_platform_info():
+    """Detect current platform"""
+    system = platform.system()
+    machine = platform.machine().lower()
+    
+    if system == "Windows":
+        return "Windows", "x64", ".zip"
+    elif system == "Darwin":
+        arch = "arm64" if machine == "arm64" else "x64"
+        return "macOS", arch, ".tar.gz"
+    elif system == "Linux":
+        return "Linux", "x64", ".tar.gz"
+    else:
+        print(f"[!] Unsupported platform: {system}")
+        sys.exit(1)
+
+def download_file(url, dest):
+    """Download file with progress"""
+    print(f"[->] Downloading: {url}")
+    urlretrieve(url, dest)
+    print(f"[x] Downloaded: {dest}")
+
+def run_command(cmd, cwd=None, shell=False):
+    """Run shell command"""
+    result = subprocess.run(cmd, cwd=cwd, shell=shell, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[!] Command failed: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+        print(f"[!] Error: {result.stderr}")
+        return False
+    return True
+
+def build_rust_server(pack_dir):
+    """Build the Rust server (qce-server) and place it in the package root."""
+    try:
+        dest = copy_native_server_binary(Path(pack_dir))
+    except Exception as e:
+        print(f"[FAIL] Rust server binary staging failed: {e}")
+        sys.exit(1)
+    print(f"[PASS] Rust server binary added: {dest}")
+
+def extract_zip(zip_path, dest_dir):
+    """Extract ZIP file"""
+    print(f"[->] Extracting: {zip_path}")
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(dest_dir)
+    print(f"[x] Extracted to: {dest_dir}")
+
+def write_napcat_builtin_plugin_config(config_dir):
+    """Disable the builtin #napcat reply command by default."""
+    builtin_config_dir = os.path.join(config_dir, "plugins", "napcat-plugin-builtin")
+    os.makedirs(builtin_config_dir, exist_ok=True)
+
+    builtin_config = {
+        "prefix": "#napcat",
+        "enableReply": False,
+        "description": "这是一个内置插件的配置示例"
+    }
+
+    with open(os.path.join(builtin_config_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(builtin_config, f, indent=2, ensure_ascii=False)
+
+def copy_directory(src, dst):
+    """Copy directory recursively"""
+    if os.path.exists(dst):
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+
+def rewrite_runtime_plugin_package(plugin_dir):
+    """Rewrite release package metadata to the NapCat official plugin ID."""
+    package_json = os.path.join(plugin_dir, "package.json")
+    with open(package_json, "r", encoding="utf-8") as f:
+        package_data = json.load(f)
+    package_data["name"] = RUNTIME_PLUGIN_ID
+    with open(package_json, "w", encoding="utf-8") as f:
+        json.dump(package_data, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+def create_archive(source_dir, output_file, format_type):
+    """Create archive (zip or tar.gz)"""
+    print(f"[->] Creating archive: {output_file}")
+    
+    if format_type == ".zip":
+        with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(source_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, os.path.dirname(source_dir))
+                    zipf.write(file_path, arcname)
+    else:
+        with tarfile.open(output_file, "w:gz") as tar:
+            tar.add(source_dir, arcname=os.path.basename(source_dir))
+    
+    size = os.path.getsize(output_file)
+    print(f"[x] Created: {output_file} ({size / 1024 / 1024:.2f} MB)")
+
+def main():
+    print("=" * 50)
+    print("NapCat + QCE Plugin - Complete Package Builder")
+    print("=" * 50)
+    print()
+    
+    # Detect platform
+    os_name, arch, archive_ext = get_platform_info()
+    
+    # Get QCE version for output filename
+    qce_version = VERSION
+    print(f"[*] QCE Version: {qce_version}")
+    
+    # Directory name (without version for internal use)
+    pack_dir = f"NapCat-QCE-{os_name}-{arch}"
+    # Output filename (with version)
+    output_basename = f"NapCat-QCE-{os_name}-{arch}-v{qce_version}"
+    
+    print(f"[*] Platform: {os_name} {arch}")
+    print(f"[*] Package: {output_basename}")
+    print()
+    
+    # Get NapCat version
+    napcat_version = get_napcat_latest_version("[1/11]")
+    napcat_url = f"https://github.com/NapNeko/NapCatQQ/releases/download/{napcat_version}/NapCat.Shell.zip"
+    print()
+    
+    # Clean old files
+    print("[2/11] Cleaning old files...")
+    if os.path.exists(pack_dir):
+        shutil.rmtree(pack_dir)
+    if os.path.exists("NapCat.Shell.zip"):
+        os.remove("NapCat.Shell.zip")
+    if os.path.exists("temp_napcat_extract"):
+        shutil.rmtree("temp_napcat_extract")
+    print("[x] Cleaned")
+    print()
+    
+    # Download NapCat
+    print(f"[3/11] Downloading NapCat.Shell {napcat_version}...")
+    try:
+        download_file(napcat_url, "NapCat.Shell.zip")
+    except Exception as e:
+        print(f"[!] Download failed: {e}")
+        sys.exit(1)
+    print()
+    
+    # Extract NapCat
+    print("[4/11] Extracting NapCat.Shell...")
+    temp_extract_dir = "temp_napcat_extract"
+    if os.path.exists(temp_extract_dir):
+        shutil.rmtree(temp_extract_dir)
+    os.makedirs(temp_extract_dir)
+    extract_zip("NapCat.Shell.zip", temp_extract_dir)
+    
+    # Check if there's a NapCat.Shell subdirectory or if files are directly in temp dir
+    extracted_napcat = os.path.join(temp_extract_dir, "NapCat.Shell")
+    if os.path.exists(extracted_napcat):
+        # If there's a NapCat.Shell subdirectory, move it
+        shutil.move(extracted_napcat, pack_dir)
+        shutil.rmtree(temp_extract_dir)
+    else:
+        # If files are directly in temp dir, rename the temp dir
+        os.rename(temp_extract_dir, pack_dir)
+    
+    # Fix NapCat bug: loadNapCat.js has wrong path (./napcat/napcat.mjs instead of ./napcat.mjs)
+    load_napcat_path = os.path.join(pack_dir, "loadNapCat.js")
+    if os.path.exists(load_napcat_path):
+        print("[4.1/11] Fixing loadNapCat.js path bug...")
+        fixed_content = '''const path = require('path');
+const CurrentPath = path.dirname(__filename);
+(async () => {
+  await import('file://' + path.join(CurrentPath, './napcat.mjs'));
+})();
+'''
+        with open(load_napcat_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(fixed_content)
+        print("[x] Fixed loadNapCat.js")
+
+    # Drop artifacts that belong to other platforms.  NapCat.Shell.zip is the
+    # same archive on every platform, so without this step the Linux/macOS
+    # tarballs ship with launcher-*.bat, NapCatWinBootHook.dll and
+    # NapCatWinBootMain.exe — pure dead weight that confuses users ("why is
+    # there a .bat file in my Linux package?").
+    print("[4.1.1/11] Pruning other-platform artifacts...")
+    if os_name == "Windows":
+        prune_files = [
+            "launcher.sh", "launcher-user.sh", "start-standalone.sh",
+            "qq_magic.cpp", "qq_magic.so", "qq_magic.dylib",
+        ]
+    else:
+        prune_files = [
+            "launcher.bat", "launcher-user.bat",
+            "launcher-win10.bat", "launcher-win10-user.bat",
+            "quickLoginExample.bat", "reset-qq-path.bat", "KillQQ.bat",
+            "NapCatWinBootHook.dll", "NapCatWinBootMain.exe",
+        ]
+    pruned = []
+    for fname in prune_files:
+        fpath = os.path.join(pack_dir, fname)
+        if os.path.exists(fpath):
+            os.remove(fpath)
+            pruned.append(fname)
+    if pruned:
+        print(f"[x] Removed {len(pruned)} other-platform file(s): {', '.join(pruned)}")
+    else:
+        print("[x] No other-platform artifacts to remove")
+    
+    # Update launcher scripts with portable QQ support (GUI file picker + path memory)
+    print("[4.2/11] Updating launcher scripts with portable QQ support...")
+    
+    # Common launcher logic for portable QQ support.
+    #
+    # Notes on `(x86)` paths (issue #291):
+    # When QQ is installed under "C:\Program Files (x86)\Tencent\QQNT\", any
+    # `%QQPath%` style expansion that happens *inside* a `( ... )` block will
+    # paste the literal `)` from `(x86)` into the parser stream and prematurely
+    # close the block, producing errors like
+    # `\Tencent\QQNT\QQ.exe was unexpected at this time`.
+    # We mitigate this by:
+    #   1) hoisting `%ProgramFiles(x86)%` to `!PFX86!` before the candidate-paths
+    #      `for ... in (...)` so the parser never sees a literal `(x86)` inside
+    #      parentheses;
+    #   2) reading `%QQPath%` / `%NAPCAT_QQ_PATH%` / `%QQ_PATH_CONFIG%` via
+    #      delayed expansion (`!var!`) inside any `( ... )` block, which expands
+    #      *after* CMD has finished parsing the block boundaries.
+    launcher_common_logic = '''
+if not defined QCE_LOG_DIR set "QCE_LOG_DIR=%cd%\\logs"
+if not exist "%QCE_LOG_DIR%" mkdir "%QCE_LOG_DIR%"
+if not defined QCE_LOG_FILE set "QCE_LOG_FILE=%QCE_LOG_DIR%\\qce-runtime.log"
+echo [%date% %time%] [launcher] starting >> "%QCE_LOG_FILE%"
+
+:resolve_qq_path
+rem Priority 1: Command line argument
+if not "%~1"=="" (
+    if exist "%~1" (
+        set "QQPath=%~1"
+        goto :save_and_boot
+    ) else (
+        echo [Error] Provided QQ path is invalid: %~1
+        goto :try_env
+    )
+)
+
+:try_env
+rem Priority 2: Environment variable
+if not "%NAPCAT_QQ_PATH%"=="" (
+    if exist "!NAPCAT_QQ_PATH!" (
+        set "QQPath=!NAPCAT_QQ_PATH!"
+        goto :napcat_boot
+    ) else (
+        echo [Warning] NAPCAT_QQ_PATH is set but invalid: !NAPCAT_QQ_PATH!
+    )
+)
+
+:try_saved
+rem Priority 3: Saved path from previous run
+if exist "%QQ_PATH_CONFIG%" (
+    set /p SavedPath=<"!QQ_PATH_CONFIG!"
+    if exist "!SavedPath!" (
+        set "QQPath=!SavedPath!"
+        echo [Info] Using saved QQ path: !SavedPath!
+        goto :napcat_boot
+    )
+)
+
+:try_registry
+rem Priority 4: Multi-source probe (registry, App Paths, protocol handler,
+rem shortcuts) via find-qq.ps1 (issue #589)
+if exist "%cd%\\find-qq.ps1" (
+    for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%cd%\\find-qq.ps1" 2^>nul`) do set "QQPath=%%i"
+    if not "!QQPath!"=="" if exist "!QQPath!" goto :save_and_boot
+)
+
+rem Priority 4b: Direct registry query (fallback when PowerShell is unavailable)
+for /f "tokens=2*" %%a in ('reg query "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\QQ" /v "UninstallString" 2^>nul') do (
+    set "RetString=%%~b"
+    for %%x in ("!RetString!") do set "pathWithoutUninstall=%%~dpx"
+    set "QQPath=!pathWithoutUninstall!QQ.exe"
+    if exist "!QQPath!" goto :save_and_boot
+)
+
+:try_common_paths
+rem Priority 5: Common installation paths
+rem Hoist %ProgramFiles(x86)% out of the for-list so the literal `(x86)` does
+rem not collide with the surrounding `for ... in (...)` parentheses (#291).
+set "PFX86=%ProgramFiles(x86)%"
+for %%p in (
+    "%ProgramFiles%\\Tencent\\QQNT\\QQ.exe"
+    "!PFX86!\\Tencent\\QQNT\\QQ.exe"
+    "%LocalAppData%\\Programs\\Tencent\\QQNT\\QQ.exe"
+    "C:\\Program Files\\Tencent\\QQNT\\QQ.exe"
+    "D:\\Program Files\\Tencent\\QQNT\\QQ.exe"
+) do (
+    if exist %%p (
+        set "QQPath=%%~p"
+        goto :save_and_boot
+    )
+)
+
+:manual_select
+echo.
+echo ============================================
+echo   QQ Installation Not Found
+echo ============================================
+echo.
+echo Could not detect QQ installation automatically.
+echo This may happen if you are using a portable/green version of QQ.
+echo.
+echo If QQ ^(QQNT^) is not installed yet, download it first:
+echo   https://im.qq.com/
+echo.
+echo Options:
+echo   [1] Browse for QQ.exe (GUI file picker)
+echo   [2] Enter path manually
+echo   [3] Exit
+echo.
+set /p choice="Select option (1/2/3): "
+
+if "%choice%"=="1" goto :gui_select
+if "%choice%"=="2" goto :text_input
+if "%choice%"=="3" exit /b 1
+goto :manual_select
+
+:gui_select
+echo.
+echo [Info] Opening file picker...
+for /f "delims=" %%i in ('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.OpenFileDialog; $f.Filter = 'QQ Executable (QQ.exe)|QQ.exe|All Files (*.*)|*.*'; $f.Title = 'Select QQ.exe'; $f.InitialDirectory = 'C:\\Program Files'; if ($f.ShowDialog() -eq 'OK') { $f.FileName } else { '' }"') do set "QQPath=%%i"
+
+if "%QQPath%"=="" (
+    echo [Error] No file selected.
+    goto :manual_select
+)
+goto :validate_path
+
+:text_input
+echo.
+set /p "QQPath=Enter full path to QQ.exe: "
+
+:validate_path
+if not exist "!QQPath!" (
+    echo [Error] File not found: !QQPath!
+    goto :manual_select
+)
+
+for %%f in ("!QQPath!") do set "filename=%%~nxf"
+if /i not "%filename%"=="QQ.exe" (
+    echo [Warning] Selected file is not QQ.exe, continue anyway? (Y/N)
+    set /p confirm="Confirm: "
+    if /i not "!confirm!"=="Y" goto :manual_select
+)
+
+:save_and_boot
+if not exist "%cd%\\config" mkdir "%cd%\\config"
+echo !QQPath!>"%QQ_PATH_CONFIG%"
+echo [Info] QQ path saved to config\\qq_path.txt
+
+:napcat_boot
+echo.
+echo [Info] Using QQ: "!QQPath!"
+
+rem Check if this is QQNT (required) vs old QQ
+set "isOldQQ="
+if not "!QQPath:\Bin\QQ.exe=!"=="!QQPath!" set "isOldQQ=1"
+if defined isOldQQ (
+    echo.
+    echo ============================================
+    echo   [Error] Incompatible QQ Version Detected
+    echo ============================================
+    echo.
+    echo The selected QQ appears to be the OLD version ^(QQ 9.x^).
+    echo NapCat requires QQNT ^(QQ 9.9.x or later^).
+    echo.
+    echo Your path: "!QQPath!"
+    echo.
+    echo QQNT paths typically look like:
+    echo   - C:\Program Files\Tencent\QQNT\QQ.exe
+    echo   - %LocalAppData%\Programs\Tencent\QQNT\QQ.exe
+    echo.
+    echo Please:
+    echo   1. Download QQNT from https://im.qq.com/
+    echo   2. Run reset-qq-path.bat to clear saved path
+    echo   3. Run this launcher again
+    echo.
+    goto :end_script
+)
+
+call :sync_patch_package
+
+echo.
+
+set NAPCAT_MAIN_PATH=%NAPCAT_MAIN_PATH:\\=/%
+echo (async () =^> {await import("file:///%NAPCAT_MAIN_PATH%")})() > "%NAPCAT_LOAD_PATH%"
+
+rem 回退：部分新版 QQNT 的注入 hook 不再重定向 loadNapCat.js 的读取，
+rem 物理复制一份到 QQ 的 resources\\app 目录，避免 "Cannot find module ... loadNapCat.js"。
+if not "!QQPackageJson!"=="" (
+    for %%f in ("!QQPackageJson!") do copy /y "%NAPCAT_LOAD_PATH%" "%%~dpfloadNapCat.js" >nul 2>&1
+)
+
+"%NAPCAT_LAUNCHER_PATH%" "!QQPath!" "%NAPCAT_INJECT_PATH%" %*
+goto :end_script
+
+:sync_patch_package
+set "QQPackageJson="
+set "QQDir="
+for %%f in ("!QQPath!") do set "QQDir=%%~dpf"
+
+if exist "!QQDir!resources\\app\\package.json" (
+    set "QQPackageJson=!QQDir!resources\\app\\package.json"
+)
+
+if "!QQPackageJson!"=="" if exist "!QQDir!versions" (
+    for /f "delims=" %%d in ('dir /b /ad /o-n "!QQDir!versions" 2^>nul') do (
+        if exist "!QQDir!versions\\%%d\\resources\\app\\package.json" (
+            set "QQPackageJson=!QQDir!versions\\%%d\\resources\\app\\package.json"
+            goto :sync_patch_package_found
+        )
+    )
+)
+
+:sync_patch_package_found
+if "!QQPackageJson!"=="" (
+    echo [Warning] QQNT package.json not found, using bundled qqnt.json.
+    goto :eof
+)
+
+echo [Info] Syncing qqnt.json from installed QQNT metadata...
+set "QCE_QQ_PACKAGE_JSON=!QQPackageJson!"
+set "QCE_PATCH_PACKAGE=%NAPCAT_PATCH_PACKAGE%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$ErrorActionPreference='Stop';" ^
+    "$source = Get-Content -Raw -LiteralPath $env:QCE_QQ_PACKAGE_JSON | ConvertFrom-Json;" ^
+    "$patch = [ordered]@{};" ^
+    "foreach ($name in 'name','verHash','version','linuxVersion','linuxVerHash','private','description','productName','author','homepage','sideEffects','bin','buildVersion') { if ($source.PSObject.Properties.Name -contains $name) { $patch[$name] = $source.$name } };" ^
+    "$patch['main'] = './loadNapCat.js';" ^
+    "$patch['isPureShell'] = $true;" ^
+    "$patch['isByteCodeShell'] = $true;" ^
+    "$patch['platform'] = 'win32';" ^
+    "$patch['eleArch'] = 'x64';" ^
+    "$patch | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $env:QCE_PATCH_PACKAGE -Encoding UTF8"
+
+if errorlevel 1 (
+    echo [Warning] Failed to refresh qqnt.json, falling back to bundled metadata.
+) else (
+    echo [Info] qqnt.json refreshed successfully.
+)
+goto :eof
+
+:end_script
+'''
+
+    # launcher-user.bat (no admin, with pause)
+    # 切到脚本所在目录再展开 %cd%（Issue #286：在管理员模式下双击 .bat 时，CMD 的初始
+    # CWD 是 C:\Windows\system32，照搬 %cd% 会得到 system32 下不存在的可执行路径）。
+    launcher_user_bat = '''@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+set NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json
+set NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js
+set NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll
+set NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe
+set NAPCAT_MAIN_PATH=%cd%\\napcat.mjs
+set QQ_PATH_CONFIG=%cd%\\config\\qq_path.txt
+''' + launcher_common_logic + '''
+pause
+exit /b
+'''
+
+    # launcher.bat (admin mode, no pause)
+    # 提权重启时把脚本所在目录传给新窗口（%~dp0），并在 elevation 之后再 cd 一次，
+    # 避免 elevated CMD 落在 C:\Windows\system32 后用错的 %cd% 拼出找不到的可执行路径
+    # （Issue #286）。
+    launcher_bat = '''@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+net session >nul 2>&1
+if %errorLevel% == 0 (
+    echo Administrator mode detected.
+) else (
+    echo Please run this script in administrator mode.
+    powershell -Command "Start-Process 'wt.exe' -ArgumentList 'cmd /c cd /d \\"%~dp0\\" && \\"%~f0\\" %*' -Verb runAs"
+    exit
+)
+
+cd /d "%~dp0"
+set NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json
+set NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js
+set NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll
+set NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe
+set NAPCAT_MAIN_PATH=%cd%\\napcat.mjs
+set QQ_PATH_CONFIG=%cd%\\config\\qq_path.txt
+''' + launcher_common_logic
+
+    # launcher-win10.bat (admin mode for win10, no pause)
+    launcher_win10_bat = '''@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+net session >nul 2>&1
+if %errorLevel% == 0 (
+    echo Administrator mode detected.
+) else (
+    echo Please run this script in administrator mode.
+    powershell -Command "Start-Process 'cmd.exe' -ArgumentList '/c cd /d \\"%~dp0\\" && \\"%~f0\\" %*' -Verb runAs"
+    exit
+)
+
+cd /d "%~dp0"
+set NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json
+set NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js
+set NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll
+set NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe
+set NAPCAT_MAIN_PATH=%cd%\\napcat.mjs
+set QQ_PATH_CONFIG=%cd%\\config\\qq_path.txt
+''' + launcher_common_logic
+
+    # launcher-win10-user.bat (no admin, with pause)
+    launcher_win10_user_bat = '''@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+set NAPCAT_PATCH_PACKAGE=%cd%\\qqnt.json
+set NAPCAT_LOAD_PATH=%cd%\\loadNapCat.js
+set NAPCAT_INJECT_PATH=%cd%\\NapCatWinBootHook.dll
+set NAPCAT_LAUNCHER_PATH=%cd%\\NapCatWinBootMain.exe
+set NAPCAT_MAIN_PATH=%cd%\\napcat.mjs
+set QQ_PATH_CONFIG=%cd%\\config\\qq_path.txt
+''' + launcher_common_logic + '''
+pause
+exit /b
+'''
+
+    # reset-qq-path.bat
+    reset_qq_path_bat = '''@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+
+echo.
+echo ============================================
+echo   Reset QQ Path Configuration
+echo ============================================
+echo.
+
+set QQ_PATH_CONFIG=%cd%\\config\\qq_path.txt
+
+if exist "%QQ_PATH_CONFIG%" (
+    echo Current saved path:
+    type "!QQ_PATH_CONFIG!"
+    echo.
+    echo.
+    set /p confirm="Delete saved path and reconfigure? (Y/N): "
+    if /i "!confirm!"=="Y" (
+        del "!QQ_PATH_CONFIG!"
+        echo [Info] Saved path deleted.
+        echo [Info] Run launcher-user.bat to reconfigure.
+    ) else (
+        echo [Info] Operation cancelled.
+    )
+) else (
+    echo [Info] No saved QQ path found.
+)
+
+echo.
+pause
+'''
+
+    launcher_files = {
+        "launcher.bat": launcher_bat,
+        "launcher-user.bat": launcher_user_bat,
+        "launcher-win10.bat": launcher_win10_bat,
+        "launcher-win10-user.bat": launcher_win10_user_bat,
+        "reset-qq-path.bat": reset_qq_path_bat,
+        "find-qq.ps1": FIND_QQ_PS1
+    }
+
+    # Only emit the Windows .bat launchers in Windows packages — they are pure
+    # dead weight in Linux/macOS tarballs and confuse new users.
+    if os_name == "Windows":
+        for filename, content in launcher_files.items():
+            filepath = os.path.join(pack_dir, filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"  [x] Created {filename}")
+        print("[x] Launcher scripts updated")
+    else:
+        print("[x] Skipped Windows .bat launchers (non-Windows build)")
+    
+    print("[x] Extracted")
+    print()
+    
+    # Create plugin directories
+    print("[5/11] Creating plugin directories...")
+    os.makedirs(f"{pack_dir}/plugins", exist_ok=True)
+    os.makedirs(f"{pack_dir}/static", exist_ok=True)
+    print("[x] Created")
+    print()
+    
+    # Copy plugin files
+    print("[6/11] Copying plugin files...")
+    plugin_dir = f"{pack_dir}/plugins/{RUNTIME_PLUGIN_ID}"
+    stage_plugin_runtime(
+        Path(SOURCE_PLUGIN_DIR),
+        Path(plugin_dir),
+        RUNTIME_PLUGIN_ID,
+        qce_version,
+    )
+    print("[x] Copied")
+    print()
+    
+    # Copy frontend files
+    print("[8/11] Copying frontend files...")
+    frontend_out = os.environ.get("QCE_FRONTEND_OUT", "qce-v4-tool/out")
+    if not os.path.exists(f"{frontend_out}/index.html"):
+        if os.environ.get("QCE_FRONTEND_OUT"):
+            print(f"[FAIL] QCE_FRONTEND_OUT is missing index.html: {frontend_out}")
+            sys.exit(1)
+        print("[-] Building frontend...")
+        pnpm_cmd = "pnpm.cmd" if os_name == "Windows" else "pnpm"
+        run_command([pnpm_cmd, "install"], cwd="qce-v4-tool")
+        run_command([pnpm_cmd, "run", "build"], cwd="qce-v4-tool")
+    copy_directory(frontend_out, f"{pack_dir}/static/qce")
+    print("[x] Copied")
+    print()
+    
+    # Update config files
+    print("[9/11] Updating config files...")
+    config_dir = f"{pack_dir}/config"
+    os.makedirs(config_dir, exist_ok=True)
+    
+    napcat_config = {
+        "fileLog": True,
+        "consoleLog": True,
+        "fileLogLevel": "debug",
+        "consoleLogLevel": "info",
+        "packetBackend": "auto",
+        "packetServer": "",
+        "o3HookMode": 1
+    }
+
+    plugins_config = {
+        "napcat-plugin-builtin": True,
+        RUNTIME_PLUGIN_ID: True
+    }
+    
+    onebot_config = {
+        "network": {
+            "httpServers": [],
+            "httpSseServers": [],
+            "httpClients": [],
+            "websocketServers": [],
+            "websocketClients": []
+        },
+        "musicSignUrl": "",
+        "enableLocalFile2Url": True,
+        "parseMultMsg": False,
+        "debug": False,
+        "heartInterval": 30000,
+        "messagePostFormat": "array",
+        "reportSelfMessage": False,
+        "token": ""
+    }
+    
+    with open(f"{config_dir}/napcat.json", "w") as f:
+        json.dump(napcat_config, f, indent=2)
+
+    with open(f"{config_dir}/plugins.json", "w") as f:
+        json.dump(plugins_config, f, indent=2)
+
+    with open(f"{config_dir}/onebot11.json", "w") as f:
+        json.dump(onebot_config, f, indent=2)
+
+    write_napcat_builtin_plugin_config(config_dir)
+    
+    print("[x] Updated")
+    print()
+    
+    # Pre-compile qq_magic.so for Linux (fixes qq_magic_napi_register symbol issue)
+    if os_name == "Linux":
+        print("[9.3/11] Pre-compiling qq_magic.so for Linux...")
+        
+        # Linux QQ does not export qq_magic_napi_register, the symbol NapCat
+        # uses to bypass module-signing checks.  We ship a tiny stub library
+        # that defines the symbol and forwards to the real
+        # napi_module_register at runtime via dlsym.  Pulling in <node_api.h>
+        # used to fail silently on the GitHub Actions ubuntu-latest runner
+        # (no header on the default include path), which is why earlier Linux
+        # release tarballs shipped without qq_magic.so at all.  The dlfcn
+        # version below has no Node-side build dependency.
+        qq_magic_cpp = '''// Auto-generated by scripts/quick-pack.py.
+// Provides the qq_magic_napi_register symbol that Linux QQ does not export
+// itself, so NapCat's native addons can register without an "undefined
+// symbol" dlopen failure.  napi_module_register is resolved from the host
+// process at runtime, which avoids a build-time dependency on <node_api.h>.
+#include <dlfcn.h>
+
+extern "C" void qq_magic_napi_register(void *m) {
+    typedef void (*reg_fn)(void *);
+    static reg_fn fn = (reg_fn) dlsym(RTLD_DEFAULT, "napi_module_register");
+    if (fn) {
+        fn(m);
+    }
+}
+'''
+        cpp_path = f"{pack_dir}/qq_magic.cpp"
+        so_path = f"{pack_dir}/qq_magic.so"
+
+        with open(cpp_path, "w", encoding="utf-8") as f:
+            f.write(qq_magic_cpp)
+
+        compile_success = run_command([
+            "g++", "-shared", "-fPIC", "-O2",
+            "-o", so_path, cpp_path, "-ldl",
+        ])
+
+        if compile_success and os.path.exists(so_path):
+            print("[x] qq_magic.so compiled successfully")
+            # Keep qq_magic.cpp alongside the .so so users on architectures
+            # we did not build for can rebuild it themselves with a one-liner
+            # (the launcher also falls back to in-place compilation).
+        else:
+            print("[!] Warning: Could not pre-compile qq_magic.so")
+            print("[!] Launcher will fall back to in-place compilation when run.")
+            if os.path.exists(so_path):
+                os.remove(so_path)
+        print()
+
+        # Pre-compile libnapcat_launcher.so for Linux (fixes issue #433).
+        #
+        # Before this, launcher-user.sh ran `node napcat-bootstrap.mjs`, which
+        # loaded QQ's wrapper.node into a plain Node.js process. wrapper.node
+        # is built for the Electron embedder, so its std::vector<...> state
+        # was half-initialised on Linux and the first realloc after login
+        # segfaulted (the SIGSEGV users on Fedora 44 / Debian 13 / NixOS /
+        # Arch / Ubuntu 24.04 reported in #433).
+        #
+        # The fix is to launch the real QQ Electron binary with an
+        # LD_PRELOAD shim that swaps QQ's package.json `main` to point at our
+        # loadNapCat.js, so wrapper.node ends up inside the Electron embedder
+        # it was built for. The source for that shim lives in
+        # scripts/napcat-launcher/launcher.cpp; we compile it here.
+        print("[9.4/11] Pre-compiling libnapcat_launcher.so for Linux...")
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        launcher_src_dir = os.path.join(repo_root, "scripts", "napcat-launcher")
+        launcher_cpp = os.path.join(launcher_src_dir, "launcher.cpp")
+        if not os.path.isfile(launcher_cpp):
+            print(f"[!] {launcher_cpp} not found; cannot pre-compile Linux launcher.")
+        else:
+            dest_cpp = f"{pack_dir}/launcher.cpp"
+            dest_so = f"{pack_dir}/libnapcat_launcher.so"
+            shutil.copy2(launcher_cpp, dest_cpp)
+
+            launcher_compile_ok = run_command([
+                "g++", "-shared", "-fPIC", "-O2",
+                "-o", dest_so, dest_cpp, "-ldl",
+            ])
+
+            if launcher_compile_ok and os.path.exists(dest_so):
+                print("[x] libnapcat_launcher.so compiled successfully")
+                # Ship launcher.cpp alongside the .so so users on
+                # unsupported architectures (e.g. arm64 runners that do not
+                # match this build host) can rebuild it themselves; the
+                # generated launcher-user.sh also retries in-place compile.
+            else:
+                print("[!] Warning: Could not pre-compile libnapcat_launcher.so")
+                print("[!] launcher-user.sh will fall back to in-place compilation.")
+                if os.path.exists(dest_so):
+                    os.remove(dest_so)
+        print()
+
+    # Create standalone mode scripts
+    print("[9.5/11] Creating standalone mode scripts...")
+    
+    # Create standalone mode launcher
+    # Raw string: every backslash below belongs to the emitted JavaScript.
+    # Without the r prefix Python turns the \n in text.endsWith('\n') into a
+    # real newline, and the shipped qce-standalone.mjs fails to parse at all.
+    standalone_mjs = r'''#!/usr/bin/env node
+/**
+ * QCE 独立模式启动脚本
+ * 无需 NapCat 登录即可运行，用于浏览已导出的聊天记录和资源
+ */
+import { spawn, spawnSync } from 'node:child_process';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// macOS: 从浏览器下载并用「访达」解压的包，每个文件都会带上 com.apple.quarantine。
+// Apple Silicon 的 AMFI 会在 execve() 时直接 SIGKILL 这种「被隔离 + 仅临时签名」的
+// 二进制，且不会留下任何日志——表现为网页打不开却查不到任何报错。完整模式的
+// launcher-user.sh 已经做了同样的清理，这里覆盖独立模式自己拉起 qce-server 的路径。
+function clearQuarantine(target) {
+    if (process.platform !== 'darwin') return;
+    try {
+        spawnSync('xattr', ['-cr', target], { stdio: 'ignore' });
+    } catch {
+        // 尽力而为：清不掉时后面的 spawn 会照常报错
+    }
+}
+
+function securityConfigPath() {
+    const override = (process.env.QCE_CONFIG_DIR || '').trim();
+    const dir = override || path.join(os.homedir(), '.qq-chat-exporter');
+    return path.join(dir, 'security.json');
+}
+
+function userConfigPath() {
+    return path.join(os.homedir(), '.qq-chat-exporter', 'user-config.json');
+}
+
+function readAutoOpenBrowserSetting(configPath) {
+    try {
+        const value = JSON.parse(readFileSync(configPath, 'utf8'))?.autoOpenBrowser;
+        return typeof value === 'boolean' ? value : true;
+    } catch {
+        return true; // 文件不存在/无法读取时沿用历史默认值（打开）
+    }
+}
+
+function browserOpenCommand(url) {
+    if (process.platform === 'darwin') return { cmd: 'open', args: [url] };
+    if (process.platform === 'win32') return { cmd: 'cmd', args: ['/c', 'start', '', url] };
+    return { cmd: 'xdg-open', args: [url] };
+}
+
+// 开关名与完整模式一致（plugins/qq-chat-exporter/runtime/rustBridge.mjs）：
+// QCE_NO_AUTO_OPEN=1 是硬开关，优先于设置页的开关；未设置时才看持久化设置。
+function tryOpenBrowser(url) {
+    if (process.env.QCE_NO_AUTO_OPEN === '1') return;
+    if (!readAutoOpenBrowserSetting(userConfigPath())) return;
+    try {
+        const { cmd, args } = browserOpenCommand(url);
+        const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+        child.on('error', () => {}); // 无图形界面的机器上没有浏览器可开，忽略即可
+        child.unref();
+    } catch {
+        // 尽力而为：上面打印出来的链接才是真正的兜底
+    }
+}
+
+// 等端口真正开始监听。security.json 在上一次运行后就已存在，所以不能只靠它
+// 判断服务端是否就绪——端口被占用时 qce-server 会直接退出，那时报喜（更别说
+// 自动弹一个必然打不开的浏览器标签）纯属误导。
+async function waitForServer(child, port, timeoutMs = 15_000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        if (child.exitCode !== null) return false;
+        const ready = await new Promise((resolve) => {
+            const socket = net.createConnection({ host: '127.0.0.1', port });
+            socket.once('connect', () => { socket.destroy(); resolve(true); });
+            socket.once('error', () => resolve(false));
+            socket.setTimeout(500, () => { socket.destroy(); resolve(false); });
+        });
+        if (ready) return true;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return false;
+}
+
+// Issue #457: 独立模式原本什么都不打印，用户卡在令牌输入框却无处可查。
+async function announceLoginUrl(child, port) {
+    if (!(await waitForServer(child, port))) return;   // 服务端自己会报错，不再叠加误导信息
+    const configFile = securityConfigPath();
+    for (let attempt = 0; attempt < 30; attempt++) {
+        try {
+            const config = JSON.parse(await readFile(configFile, 'utf8'));
+            if (config.accessToken) {
+                const url = `http://127.0.0.1:${port}/qce/auth?token=${encodeURIComponent(config.accessToken)}`;
+                console.log('');
+                console.log(`[QCE] Token: ${config.accessToken}`);
+                console.log(`[QCE] 一键登录: ${url}`);
+                console.log('[QCE] 此链接包含访问令牌，请勿分享给他人');
+                console.log('');
+                tryOpenBrowser(url);
+                return;
+            }
+        } catch {
+            // security.json 还没写出来，继续轮询
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    console.log(`[QCE] 未能读取访问令牌，请打开 ${configFile} 查看 accessToken 字段`);
+}
+
+async function main() {
+    const port = parseInt(process.argv[2]) || 40653;
+    const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+    const binary = path.join(
+        packageRoot,
+        process.platform === 'win32' ? 'qce-server.exe' : 'qce-server'
+    );
+    clearQuarantine(binary);
+
+    const logDir = process.env.QCE_LOG_DIR || path.join(packageRoot, 'logs');
+    mkdirSync(logDir, { recursive: true });
+    const logFile = process.env.QCE_LOG_FILE || path.join(logDir, 'qce-runtime.log');
+    const writeLog = (stream, prefix, chunk) => {
+        const text = String(chunk);
+        appendFileSync(logFile, `[${new Date().toISOString()}] ${prefix} ${text}${text.endsWith('\n') ? '' : '\n'}`);
+        stream.write(text);
+    };
+    writeLog(process.stdout, '[qce-standalone]', 'starting standalone mode\n');
+    const child = spawn(binary, [], {
+        cwd: packageRoot,
+        env: {
+            ...process.env,
+            QCE_SERVER_PORT: String(port),
+            QCE_STANDALONE_MODE: '1',
+            QCE_LOG_DIR: logDir,
+            QCE_LOG_FILE: logFile
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    child.stdout.on('data', (chunk) => writeLog(process.stdout, '[qce-server]', chunk));
+    child.stderr.on('data', (chunk) => writeLog(process.stderr, '[qce-server]', chunk));
+    child.on('error', (error) => {
+        writeLog(process.stderr, '[qce-standalone]', `startup failed: ${error}\n`);
+        process.exit(1);
+    });
+    child.on('exit', (code, signal) => {
+        writeLog(process.stdout, '[qce-standalone]', `exited code=${code ?? 'null'} signal=${signal ?? 'null'}\n`);
+        process.exit(code ?? (signal ? 1 : 0));
+    });
+    const stop = () => child.kill();
+    process.on('SIGINT', stop);
+    process.on('SIGTERM', stop);
+    announceLoginUrl(child, port);
+}
+
+main();
+'''
+    
+    with open(f"{pack_dir}/qce-standalone.mjs", "w", encoding="utf-8", newline="\n") as f:
+        f.write(standalone_mjs)
+    
+    # Create Windows batch launcher for standalone mode
+    if os_name == "Windows":
+        # Issue #286：以管理员双击 .bat 时 CMD 初始 CWD 是 C:\\Windows\\system32，
+        # 这里先 cd 到脚本目录再用相对路径调用入口，避免 Node 找不到文件。
+        standalone_bat = '''@echo off
+chcp 65001 > nul
+title QCE 独立模式
+cd /d "%~dp0"
+set "QCE_LOG_DIR=%~dp0logs"
+if not exist "%QCE_LOG_DIR%" mkdir "%QCE_LOG_DIR%"
+set "QCE_LOG_FILE=%QCE_LOG_DIR%\\qce-runtime.log"
+
+echo.
+echo [QCE] 独立模式
+echo [QCE] 无需登录QQ即可浏览已导出的聊天记录
+echo.
+
+:: 检查 Node.js - 首先尝试使用打包的 Node
+set "NODE_EXE="
+
+:: 检查是否有打包的 Node.js
+if exist "%~dp0node.exe" (
+    set "NODE_EXE=%~dp0node.exe"
+    goto :found_node
+)
+
+:: 检查系统 Node.js
+where node >nul 2>&1
+if %errorlevel% equ 0 (
+    set "NODE_EXE=node"
+    goto :found_node
+)
+
+:: 未找到 Node.js
+echo [错误] 未检测到 Node.js
+echo.
+echo 解决方案:
+echo   1. 安装 Node.js: https://nodejs.org/
+echo   2. 或使用完整版 NapCat+QCE 包（运行 launcher-user.bat）
+echo.
+pause
+exit /b 1
+
+:found_node
+echo [信息] 正在启动独立模式服务器...
+echo.
+"%NODE_EXE%" qce-standalone.mjs %1
+
+pause
+'''.replace("__RUNTIME_PLUGIN_ID__", RUNTIME_PLUGIN_ID)
+        with open(f"{pack_dir}/start-standalone.bat", "w", encoding="utf-8") as f:
+            f.write(standalone_bat)
+    
+    # Create Linux/macOS shell launcher for standalone mode
+    if os_name != "Windows":
+        standalone_sh = '''#!/bin/bash
+# QCE 独立模式启动脚本
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
+echo ""
+echo "[QCE] 独立模式"
+echo "[QCE] 无需登录QQ即可浏览已导出的聊天记录"
+echo ""
+
+# 检查 Node.js
+if ! command -v node &> /dev/null; then
+    echo "[错误] 未检测到 Node.js"
+    echo ""
+    echo "解决方案:"
+    echo "  1. 安装 Node.js: https://nodejs.org/"
+    echo "  2. 或使用完整版 NapCat+QCE 包（运行 ./launcher-user.sh）"
+    echo ""
+    exit 1
+fi
+
+echo "[信息] 正在启动独立模式服务器..."
+echo ""
+node qce-standalone.mjs "$@"
+'''.replace("__RUNTIME_PLUGIN_ID__", RUNTIME_PLUGIN_ID)
+        standalone_sh_path = f"{pack_dir}/start-standalone.sh"
+        with open(standalone_sh_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(standalone_sh)
+        
+        # Make it executable
+        import stat
+        os.chmod(standalone_sh_path, os.stat(standalone_sh_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    
+    print("[x] Created standalone scripts")
+    print()
+    
+    # Create launcher script for Linux/macOS
+    if os_name != "Windows":
+        print("[9.6/11] Creating launcher script...")
+
+        # Bootstrap shim (issue #269): napcat.mjs derives basePath from
+        # `process.execPath`, which on Linux/macOS resolves to the node binary
+        # rather than the QQ binary. As a result, even when NAPCAT_QQ_PATH is
+        # exported the runtime still tries to read
+        #   <node bin dir>/resources/app/versions/<ver>/package.json
+        # and fails with ENOENT (typical on NixOS, Snap, Flatpak, custom
+        # installs, etc.).
+        # We work around this by writing a tiny ESM shim that overrides
+        # `process.execPath` to NAPCAT_QQ_PATH *before* importing napcat.mjs,
+        # then dynamically loads napcat.mjs from the same directory.
+        bootstrap_script = """// Auto-generated by quick-pack.py (issue #269)
+// Bootstrap shim: align process.execPath with NAPCAT_QQ_PATH before NapCat
+// boots, so QQBasicInfoWrapper resolves resources/app/... from the QQ install
+// dir instead of the Node.js install dir.
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const qqPath = (process.env.NAPCAT_QQ_PATH || '').trim();
+if (qqPath) {
+    try {
+        Object.defineProperty(process, 'execPath', {
+            value: qqPath,
+            writable: false,
+            configurable: true,
+            enumerable: true
+        });
+        console.log('[bootstrap] process.execPath overridden -> ' + qqPath);
+    } catch (e) {
+        console.warn('[bootstrap] Failed to override process.execPath: ' + (e && e.message || e));
+    }
+} else {
+    console.warn('[bootstrap] NAPCAT_QQ_PATH not set; falling back to process.execPath = ' + process.execPath);
+}
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const napcatUrl = pathToFileURL(path.join(here, 'napcat.mjs')).href;
+await import(napcatUrl);
+"""
+        bootstrap_path = f"{pack_dir}/napcat-bootstrap.mjs"
+        with open(bootstrap_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(bootstrap_script)
+
+        # The launcher body is maintained as a single source of truth at
+        # scripts/napcat-launcher/launcher-user.sh so it can be linted and
+        # tested directly (see __tests__/unit/napcatLinuxLauncher.test.ts).
+        launcher_tmpl = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts", "napcat-launcher", "launcher-user.sh")
+        with open(launcher_tmpl, "r", encoding="utf-8") as f:
+            launcher_script = f.read()
+        launcher_path = f"{pack_dir}/launcher-user.sh"
+        with open(launcher_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(launcher_script)
+        
+        # Make it executable
+        os.chmod(launcher_path, os.stat(launcher_path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        print("[x] Created (with napcat-bootstrap.mjs shim, issue #269)")
+        print()
+    
+    # Create README
+    print("[10/11] Creating README...")
+    
+    if os_name == "Windows":
+        usage_steps = """使用方法:
+1. 解压到任意目录
+2. 完整模式: 运行 launcher-user.bat (需要登录QQ，支持导出新记录，第一次接触项目的小白用户优先用这个)
+3. 独立模式: 运行 start-standalone.bat (无需登录，仅浏览已导出文件)
+4. 浏览器访问: http://localhost:40653/qce
+   完整模式需输入控制台显示的访问令牌
+
+独立模式说明:
+- 无需安装或登录QQ
+- 可浏览已导出的聊天记录
+- 可使用资源画廊（图片/视频/音频）
+- 不支持导出新的聊天记录"""
+    else:  # Linux/macOS
+        usage_steps = """使用方法:
+1. 解压到任意目录
+2. 完整模式: 运行 ./launcher-user.sh (需要登录QQ，支持导出新记录)
+3. 独立模式: 运行 ./start-standalone.sh (无需登录，仅浏览已导出文件)
+4. 浏览器访问: http://localhost:40653/qce
+   完整模式需输入控制台显示的访问令牌
+
+独立模式说明:
+- 无需安装或登录QQ
+- 可浏览已导出的聊天记录
+- 可使用资源画廊（图片/视频/音频）
+- 不支持导出新的聊天记录
+
+自定义QQ路径:
+- 如果QQ安装在非标准位置，可设置环境变量:
+  export NAPCAT_QQ_PATH=/your/custom/path/qq
+  ./launcher-user.sh"""
+        if os_name == "Linux":
+            usage_steps += """
+
+默认支持的QQ路径: /opt/QQ/qq, /usr/share/QQ/qq, /opt/linuxqq/qq
+
+Linux 说明:
+- 已预编译 qq_magic.so 解决 qq_magic_napi_register 符号问题
+- 启动脚本会自动加载，无需额外配置"""
+        else:  # macOS
+            usage_steps += """
+
+默认支持的QQ路径: /Applications/QQ.app, ~/Applications/QQ.app
+
+macOS 说明（仅 Apple Silicon）:
+- 首次启动会在本目录生成一份专用的 QQ 运行副本，约需 1 GB 空间
+- 需要 Xcode 命令行工具: xcode-select --install
+- 详见 https://shuakami.github.io/qq-chat-exporter/docs/macos-deploy.html"""
+    
+    readme_content = f"""{"=" * 50}
+NapCat + QQ Chat Exporter - 完整包
+{"=" * 50}
+NapCat 版本: {napcat_version}
+QCE 版本: {VERSION}
+平台: {os_name}-{arch}
+构建时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+{"=" * 50}
+
+包含内容:
+- NapCat {napcat_version}
+- QQ Chat Exporter 插件 {VERSION}
+- 预配置的 Web 界面
+- 独立模式支持（无需登录QQ）
+
+如果你是第一次接触项目，优先使用 Shell 模式，不建议先折腾 Framework 模式。
+
+{usage_steps}
+
+系统要求:
+- 已安装的 QQNT（启动时会自动同步本机 QQNT 的版本信息）
+- 下载地址: https://im.qq.com/
+- 独立模式需要 Node.js 18+
+
+常见问题:
+- 如果启动时提示 `Cannot find package 'express'`，通常是当前安装包文件损坏或缺失了。
+- 最简单的处理方式是重新下载官方完整包，完整解压后直接覆盖当前目录，再重新运行 `launcher-user.bat`。
+
+支持:
+- NapCat: https://github.com/NapNeko/NapCatQQ
+- QCE 插件: https://github.com/shuakami/qq-chat-exporter
+{"=" * 50}
+"""
+    
+    with open(f"{pack_dir}/README.txt", "w", encoding="utf-8") as f:
+        f.write(readme_content)
+    
+    print("[x] Created")
+    print()
+    
+    # Build and bundle the Rust server binary
+    print("[10.5/11] Building Rust server (qce-server)...")
+    build_rust_server(pack_dir)
+    print()
+
+    # Create main archive (with version in filename)
+    print("[11/11] Creating main archive...")
+    output_file = f"{output_basename}{archive_ext}"
+    create_archive(pack_dir, output_file, archive_ext)
+    print()
+    
+    # Clean up
+    if os.path.exists("NapCat.Shell.zip"):
+        os.remove("NapCat.Shell.zip")
+    if os.path.exists("temp_napcat_extract"):
+        shutil.rmtree("temp_napcat_extract")
+    
+    # Summary
+    print("=" * 50)
+    print("[x] Package Complete!")
+    print("=" * 50)
+    print()
+    print("Output File:")
+    print(f"  {output_file}")
+    print(f"  Size: {os.path.getsize(output_file) / 1024 / 1024:.2f} MB")
+    print(f"  NapCat: {napcat_version}")
+    print()
+    print("Usage:")
+    print("1. Extract to any directory")
+    print(f"2. Full mode: launcher-user.{'bat' if os_name == 'Windows' else 'sh'}")
+    print(f"3. Standalone mode: start-standalone.{'bat' if os_name == 'Windows' else 'sh'}")
+    print("4. Visit http://localhost:40653/qce")
+    print()
+    print("=" * 50)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[!] Cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n[!] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

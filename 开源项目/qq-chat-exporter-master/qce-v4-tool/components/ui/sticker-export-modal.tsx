@@ -1,0 +1,248 @@
+"use client"
+
+import React, { useState } from "react"
+import { Dialog, DialogContent, DialogTitle } from "./dialog"
+import { Button } from "./button"
+import { Progress } from "./progress"
+import { 
+  Download,
+  FolderOpen,
+  Package,
+  Smile
+} from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+
+interface StickerExportModalProps {
+  isOpen: boolean
+  onClose: () => void
+  exportType: 'single' | 'all'
+  packName?: string
+  onConfirm: () => Promise<{
+    success: boolean
+    packCount: number
+    stickerCount: number
+    exportPath: string
+    error?: string
+  } | null>
+}
+
+export function StickerExportModal({ 
+  isOpen, 
+  onClose, 
+  exportType,
+  packName,
+  onConfirm
+}: StickerExportModalProps) {
+  const [status, setStatus] = useState<'idle' | 'exporting' | 'success' | 'error'>('idle')
+  const [result, setResult] = useState<{
+    packCount: number
+    stickerCount: number
+    exportPath: string
+    error?: string
+  } | null>(null)
+
+  const handleExport = async () => {
+    setStatus('exporting')
+    
+    try {
+      const exportResult = await onConfirm()
+      
+      if (exportResult?.success) {
+        setResult({
+          packCount: exportResult.packCount,
+          stickerCount: exportResult.stickerCount,
+          exportPath: exportResult.exportPath
+        })
+        setStatus('success')
+      } else {
+        setResult({
+          packCount: 0,
+          stickerCount: 0,
+          exportPath: '',
+          error: exportResult?.error || '导出失败'
+        })
+        setStatus('error')
+      }
+    } catch (error) {
+      setResult({
+        packCount: 0,
+        stickerCount: 0,
+        exportPath: '',
+        error: error instanceof Error ? error.message : '导出失败'
+      })
+      setStatus('error')
+    }
+  }
+
+  const handleClose = () => {
+    setStatus('idle')
+    setResult(null)
+    onClose()
+  }
+
+  const openFolder = () => {
+    if (result?.exportPath) {
+      // 在Electron环境下可以直接打开文件夹
+      // 这里只是显示路径，用户可以手动打开
+      navigator.clipboard.writeText(result.exportPath)
+      alert('导出路径已复制到剪贴板')
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent
+        fullScreen
+        overlayClassName="bg-background/80 dark:bg-background/80"
+        className="inset-4 w-auto h-auto rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.14)] dark:shadow-[0_24px_80px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col p-0"
+      >
+        <DialogTitle className="sr-only">
+          {exportType === 'all' ? '导出所有表情包' : `导出 ${packName}`}
+        </DialogTitle>
+
+        <div className="flex-1 flex items-center justify-center px-10">
+          <div className="w-full max-w-[420px]">
+          <AnimatePresence mode="wait">
+            {/* Idle State */}
+            {status === 'idle' && (
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="text-center space-y-4"
+              >
+                <div>
+                  <p className="text-foreground/80 font-medium">
+                    {exportType === 'all' ? '确定要导出所有表情包吗？' : `确定要导出"${packName}"吗？`}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {exportType === 'all' 
+                      ? '将导出所有类型的表情包，包括收藏表情、市场表情包和系统表情包'
+                      : '将导出该表情包中的所有表情文件'}
+                  </p>
+                </div>
+                <div className="flex gap-3 justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleClose}
+                    className="rounded-full"
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    onClick={handleExport}
+                    className="rounded-full"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    开始导出
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Exporting State */}
+            {status === 'exporting' && (
+              <motion.div
+                key="exporting"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="text-center space-y-4"
+              >
+                <div>
+                  <p className="text-foreground/80 font-medium">正在导出表情包...</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    请稍候，正在处理表情文件
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Progress value={undefined} className="h-2" />
+                </div>
+              </motion.div>
+            )}
+
+            {/* Success State */}
+            {status === 'success' && result && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="text-center space-y-4"
+              >
+                <div>
+                  <p className="text-foreground font-semibold text-lg">导出成功</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Package className="w-4 h-4" />
+                      <span>已导出 <span className="font-semibold text-foreground">{result.packCount}</span> 个表情包</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Smile className="w-4 h-4" />
+                      <span>共 <span className="font-semibold text-foreground">{result.stickerCount}</span> 个表情</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">导出路径</p>
+                    <p className="text-sm text-foreground/80 font-mono break-all">
+                      {result.exportPath}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={openFolder}
+                    className="rounded-full"
+                  >
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    复制路径
+                  </Button>
+                  <Button onClick={handleClose} className="rounded-full">
+                    完成
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Error State */}
+            {status === 'error' && result && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="text-center space-y-4"
+              >
+                <div>
+                  <p className="text-foreground font-semibold text-lg">导出失败</p>
+                  <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      {result.error || '未知错误'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleClose}
+                    className="rounded-full"
+                  >
+                    关闭
+                  </Button>
+                  <Button onClick={handleExport} className="rounded-full">
+                    重试
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+
