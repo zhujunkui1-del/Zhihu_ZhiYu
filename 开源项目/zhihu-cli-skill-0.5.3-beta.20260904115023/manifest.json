@@ -1,0 +1,16 @@
+{
+  "package": "zhihu-cli-skill",
+  "version": "0.5.3-beta.20260904115023",
+  "skill": "zhihu",
+  "cli": {
+    "min_version": "0.5.0-beta.20260826061344",
+    "update_manifest_url": "https://developer-cdn.zhihu.com/zhihu-cli/releases/beta/manifest.json",
+    "platforms": [
+      "darwin-arm64",
+      "darwin-amd64",
+      "windows-amd64",
+      "linux-amd64",
+      "linux-arm64"
+    ]
+  }
+}

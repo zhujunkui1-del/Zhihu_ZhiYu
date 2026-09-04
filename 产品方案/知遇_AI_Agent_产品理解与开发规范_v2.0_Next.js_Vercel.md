@@ -941,9 +941,7 @@ Match Report
 例如：
 
 ```text
-Persona 完整度：78%
 
-██████████████░░░░
 
 微信       ✓
 QQ         ✓
