@@ -1,6 +1,6 @@
 1. 微信聊天数据获取 ： WeFlow ，备用 WeChatMsg(Memotrace)，wx_key，PyWxDump,  WeChatDaily , chatlog_alpha
 2. QQ聊天记录获取：qq-chat-exporter，备用 QQFlow
-3. 知乎用户数据获取 ： zhihu-hackathon
+3. 知乎用户数据获取 ： zhihu-hackathon，zhihu-cli-skill-0.5.3-beta.20260904115023
 4. 飞书数据获取：distilly，备用 xiaofeixia
 5. 钉钉数据获取：distilly
 6. SBTI测试 ： sbti-skill 
