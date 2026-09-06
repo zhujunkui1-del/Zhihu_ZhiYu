@@ -1,6 +1,0 @@
-# Development dependencies and generated NapCat overlay
-node_modules/
-
-# Test artifacts
-playwright-report/
-test-results/

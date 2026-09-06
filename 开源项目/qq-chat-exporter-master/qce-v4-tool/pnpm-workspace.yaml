@@ -1,6 +1,0 @@
-packages:
-  - '.'
-
-allowBuilds:
-  sharp: true
-  "@tailwindcss/oxide": true
