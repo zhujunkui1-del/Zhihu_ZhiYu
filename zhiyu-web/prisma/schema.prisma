@@ -1,0 +1,217 @@
+// 知遇 ZhiYu — 数据模型（以《产品方案/多平台数据接入方案.md》《AI模型接入设置方案.md》为准）
+// 注意：embedding 使用 pgvector 扩展（extension 需在数据库中启用，迁移时处理）
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PersonaKind {
+  human // 真人（注册授权用户）
+  public_creator // 知乎公开创作者（大V，非本人入驻）
+  synthetic // AI 演示人格（虚构）
+}
+
+enum PersonaSourceType {
+  wechat
+  qq
+  feishu
+  dingtalk
+  zhihu
+  sbti
+}
+
+enum AgentSessionStatus {
+  pending
+  running
+  analyzing
+  completed
+  failed
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String?  @unique
+  displayName     String?
+  avatarUrl       String?
+  zhihuOpenId     String?  @unique
+  zhihuAuthorized Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  persona            Persona?
+  communicationPrefs CommunicationPrefs?
+  llmConfigs         LlmProviderConfig[]
+  notifications      Notification[]
+}
+
+// 沟通偏好（设置页 02，三个开关默认全开）
+model CommunicationPrefs {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  allowAgentInvite    Boolean @default(true)
+  showSimilarity      Boolean @default(true)
+  allowReportDelivery Boolean @default(true)
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Persona {
+  id           String      @id @default(cuid())
+  userId       String?     @unique
+  kind         PersonaKind @default(human)
+  displayName  String
+  bio          String?
+  // 公开创作者：知乎主页/内容标识，便于展示原文来源
+  publicRef    String?
+  completeness Float       @default(0)
+
+  identity           Json?
+  interests          Json?
+  topics             Json?
+  thinkingStyle      Json?
+  communicationStyle Json?
+  values             Json?
+  socialStyle        Json?
+  personality        Json?
+  confidence         Json?
+  embedding          Unsupported("vector(1536)")?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sources  PersonaSource[]
+  evidence PersonaEvidence[]
+  features PersonaFeature[]
+  matchAsA Match[]           @relation("PersonaAsA")
+  matchAsB Match[]           @relation("PersonaAsB")
+}
+
+// 数据源注入状态（微信 / QQ / 飞书 / 钉钉 / 知乎 / SBTI）
+model PersonaSource {
+  id         String            @id @default(cuid())
+  personaId  String
+  type       PersonaSourceType
+  status     String            @default("not_injected") // not_injected | injected | distilling
+  meta       Json?
+  importedAt DateTime?
+  persona    Persona           @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@unique([personaId, type])
+}
+
+// 人格结论证据（可解释性：为什么认为你是这样的人）
+model PersonaEvidence {
+  id        String  @id @default(cuid())
+  personaId String
+  source    String
+  trait     String
+  value     Float?
+  note      String?
+  url       String?
+  persona   Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+}
+
+// 结构化人格特征/向量分面
+model PersonaFeature {
+  id        String  @id @default(cuid())
+  personaId String
+  key       String
+  value     Json
+  persona   Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@unique([personaId, key])
+}
+
+model Match {
+  id         String   @id @default(cuid())
+  personaAId String
+  personaBId String
+  mode       String   @default("quick")
+  status     String   @default("pending") // pending | agent_running | report_ready
+  score      Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  personaA Persona        @relation("PersonaAsA", fields: [personaAId], references: [id], onDelete: Cascade)
+  personaB Persona        @relation("PersonaAsB", fields: [personaBId], references: [id], onDelete: Cascade)
+  sessions AgentSession[]
+  report   MatchReport?
+
+  @@index([personaAId])
+  @@index([personaBId])
+}
+
+model AgentSession {
+  id              String             @id @default(cuid())
+  matchId         String
+  status          AgentSessionStatus @default(pending)
+  currentRound    Int                @default(0)
+  maxRounds       Int                @default(6)
+  initiatorUserId String?
+  meta            Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime           @default(now())
+
+  match    Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  messages AgentMessage[]
+}
+
+model AgentMessage {
+  id        String       @id @default(cuid())
+  sessionId String
+  role      String // system | agent_a | agent_b | judge
+  content   String
+  round     Int          @default(0)
+  createdAt DateTime     @default(now())
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, round])
+}
+
+model MatchReport {
+  id           String   @id @default(cuid())
+  matchId      String   @unique
+  result       Json
+  overallScore Float
+  summary      String?
+  createdAt    DateTime @default(now())
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // agent_completed | report_received | ...
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// 用户自备 LLM（BYOK）：预设或自定义；apiKey 加密存储
+model LlmProviderConfig {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String // preset | custom
+  providerKey String? // preset id，如 zhipu / deepseek
+  displayName String
+  baseUrl     String
+  apiKeyEnc   String
+  model       String // 请求的 model 参数（预设默认模型或自定义模型名）
+  isDefault   Boolean   @default(false)
+  lastTestAt  DateTime?
+  lastTestOk  Boolean?
+  latencyMs   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
