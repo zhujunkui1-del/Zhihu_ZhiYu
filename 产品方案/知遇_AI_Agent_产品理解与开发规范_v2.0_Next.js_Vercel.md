@@ -830,29 +830,30 @@ Agent Match
 ```text
 用户主动创建
 ↓
-真实用户 Persona
+真人授权 Persona（注册并完成 OAuth/数据授权后可见可查）
 
 用户邀请好友
 ↓
 好友 Persona
 
-授权使用的知乎 / 飞书等官方授权内容
+知乎公开创作者（大V 等）公开创作内容
 ↓
-公共 Persona
+公开创作者 Persona（明示“非本人入驻 / 不代表本人”，支持认领与下架）
 
 AI Synthetic Persona
 ↓
-冷启动 Persona
+冷启动 AI 演示人格（虚构，明确标注）
 ```
 
 必须严格区分：
 
 ```text
-Human Persona
-AI Synthetic Persona
+真人授权 Persona（注册用户）
+公开创作者 Persona（真人，但非本人入驻）
+AI Synthetic Persona（虚构演示）
 ```
 
-AI 虚拟人格不得伪装成真实用户。
+任何一类都不得冒充另一类：AI 演示人格不得伪装成真人；公开创作者人格必须标注“非本人入驻”，不得暗示其在用知遇。
 
 ---
 
@@ -865,15 +866,22 @@ AI 虚拟人格不得伪装成真实用户。
 ```text
                     Match Engine
                          │
-       ┌─────────────────┼─────────────────┐
-       ↓                 ↓                 ↓
-   Real Persona      Invited Persona   AI Persona
-    真实用户            邀请用户          AI模拟人格
+       ┌──────────────┬─┴─────────┬───────────────┐
+       ↓              ↓           ↓               ↓
+   Real Persona  Invited Persona  Public Creator  AI Persona
+    真实用户         邀请用户       公开创作者       AI模拟人格
+                              （明示非入驻）
 ```
 
-当真人不足时：
+当注册真人不足时：
 
-> 提供明确标注的 AI Persona / AI 模拟人格。
+> 提供明确标注的 AI 演示人格，并可预置少量知乎公开创作者 Persona（明示非本人入驻）作为候选补充。
+
+公开创作者 Persona 边界：
+
+- 只使用经官方开放 API / 搜索接口可得的公开创作内容与公开简介；不采集他人的点赞、关注、私信等关系与隐私字段。
+- 页面显著标注“公开资料合成 · 非本人入驻 / 不代表本人”，人格结论附原文来源链接。
+- 提供认领、申诉与下架入口；数量由人工筛选控制（如 10~30 位），不做全平台抓取。
 
 示例：
 
@@ -1563,9 +1571,9 @@ DATABASE_URL
 AI_API_KEY
 
 # 知乎 OAuth（统一 ZHIHU_ 前缀，与 zhihu-hackathon skill 命名对齐）
-ZHIHU_APP_ID
-ZHIHU_OAUTH_APP_KEY
-ZHIHU_OAUTH_ACCESS_SECRET
+ZHIHU_APP_ID                # 开放平台 App ID（非 Secret，可放环境变量或服务端配置）
+ZHIHU_OAUTH_APP_KEY         # OAuth App Key：换 /access_token 用
+ZHIHU_ACCESS_SECRET         # 开放平台 Access Secret：用户数据接口 Authorization: Bearer
 
 # 飞书开放平台（启用飞书接入时）
 FEISHU_APP_ID
@@ -2074,6 +2082,14 @@ type = synthetic
 用户应该知道：
 
 > “系统为什么认为我是这样的人。”
+
+### 公开创作者 Persona 边界
+
+面向知乎大V 等公开创作者预置的人格，属于“真人公开资料合成”，与注册用户、AI 演示人格三者严格区分：
+
+- 仅使用官方开放 API / 搜索接口可得的公开创作内容与公开简介，不采集他人点赞、关注、私信等关系或隐私字段。
+- 全站显著标注“公开资料合成 · 非本人入驻 / 不代表本人”，人格结论附原文来源链接，并提供认领、申诉与下架入口。
+- 公开 ≠ 无限制：批量抓取、无授权读取和超出 API 规则的再加工仍在禁止之列。
 
 ### 用户私有 LLM Key 最小暴露
 
