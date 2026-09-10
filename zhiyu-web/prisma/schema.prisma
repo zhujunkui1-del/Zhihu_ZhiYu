@@ -77,7 +77,7 @@ model Persona {
   socialStyle        Json?
   personality        Json?
   confidence         Json?
-  embedding          Unsupported("vector(1536)")?
+  // TODO(P1): 启用 pgvector（CREATE EXTENSION vector）后恢复 embedding Unsupported("vector(1536)")?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
