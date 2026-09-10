@@ -23,6 +23,8 @@ export interface QuickMatchResult {
   overall: number;
   dimensions: Record<string, QuickDimensionScore>;
   reasons: string[];
+  sbtiType: string | null;
+  sbtiTitle: string | null;
 }
 
 const CODE_ORDER: Record<string, number> = { L: 1, M: 2, H: 3 };
@@ -31,6 +33,12 @@ function sbtiCodes(personality: unknown): string | null {
   const p = (personality ?? {}) as Record<string, unknown>;
   const sbti = p.sbti as { codes?: string } | undefined;
   return sbti?.codes ? sbti.codes.replaceAll("-", "") : null;
+}
+
+function sbtiInfo(personality: unknown): { type: string | null; title: string | null } {
+  const p = (personality ?? {}) as Record<string, unknown>;
+  const sbti = p.sbti as { type?: string; typeTitle?: string } | undefined;
+  return { type: sbti?.type ?? null, title: sbti?.typeTitle ?? null };
 }
 
 function codeSim(a: string, b: string): number | null {
@@ -149,6 +157,8 @@ export function quickMatch(
       overall,
       dimensions: dims,
       reasons,
+      sbtiType: sbtiInfo(c.personality).type,
+      sbtiTitle: sbtiInfo(c.personality).title,
     });
   }
 
