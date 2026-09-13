@@ -12,7 +12,10 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "seed": "node --env-file=.env scripts/seed-demo.mjs && node --env-file=.env scripts/seed-agent-match.mjs",
+    "seed:reset": "npm run seed",
+    "check:deploy": "node scripts/check-deploy-readiness.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

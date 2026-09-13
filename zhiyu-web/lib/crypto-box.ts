@@ -39,14 +39,19 @@ function parseKey(raw: string, envName: string): Buffer {
  * 开发环境允许回落，这样本地不必先配密钥就能跑通全流程。
  */
 function resolveMasterKey(purpose: Purpose): Buffer {
-  for (const name of ENV_FOR_PURPOSE[purpose]) {
+  const candidates = ENV_FOR_PURPOSE[purpose];
+  for (const name of candidates) {
     const raw = process.env[name];
     if (raw) return parseKey(raw, name);
   }
 
   if (process.env.NODE_ENV === "production") {
+    /* 报错要把**所有可接受的变量名**都说出来。
+       之前只说 candidates[0]，于是只配了 AUTH_ENC_KEY 的用户会看到
+       「未配置 USER_LLM_KEY_ENC」而以为自己配错了。 */
     throw new Error(
-      `未配置 ${ENV_FOR_PURPOSE[purpose][0]}：生产环境必须显式提供加密密钥（32 字节 base64）`,
+      `未配置加密密钥：生产环境必须提供 32 字节 base64 的主密钥。` +
+        `请设置 ${candidates.join(" 或 ")} 中的任意一个。`,
     );
   }
   /* 开发兜底：由固定串派生，仅供本地调试；生产走不到这里 */
