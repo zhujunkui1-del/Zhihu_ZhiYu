@@ -1,0 +1,241 @@
+/* 应用外壳：侧栏 + 主内容区
+   移植自原型 `zhiyu-find.html` 的页面自带 .app-shell 结构，
+   并按 `产品方案/视觉与交互规范.md` 的手绘纸感覆盖。 */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── 侧栏 ───────────────────────────────────────────────────────────────── */
+.sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 248px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px 16px;
+  background: rgba(255, 251, 239, 0.74);
+  backdrop-filter: blur(8px);
+  border-right: 1.5px solid var(--line-soft);
+}
+
+.sideBrand {
+  display: block;
+  padding: 4px 6px 2px;
+}
+
+.brandRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 品牌标：方形插画 logo，用 cover 填满手绘方框；
+   底色与 logo 自带底色一致，避免方形出现色块边界。 */
+.brandPlate {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: #f9f1df;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.brandPlate img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%; /* 略上移：让角色居中而不是气泡居中 */
+}
+
+.brandWord {
+  font-family: var(--font-hand);
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.brandTag {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── 导航 ───────────────────────────────────────────────────────────────── */
+.sideNav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 26px;
+  flex: 1;
+}
+
+.navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--r-hand);
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-size: 15.5px;
+  font-weight: 800;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.navItem svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+.navItem:hover {
+  background: var(--fg-softer);
+}
+.navItemActive {
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(201, 80, 58, 0.32);
+}
+.navItemActive svg {
+  color: #fff;
+}
+.navItemActive:hover {
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
+}
+
+/* 后台有 Agent 会话进行中 */
+.navRunningDot {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fffdf6;
+  box-shadow: 0 0 0 1px var(--accent);
+  animation: navDotPulse 1.8s ease-in-out infinite;
+}
+.navItemActive .navRunningDot {
+  border-color: var(--accent-deep);
+  background: #fff;
+  box-shadow: 0 0 0 1px #fff;
+}
+@keyframes navDotPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.28);
+    opacity: 0.72;
+  }
+}
+
+/* ── 底部：设置 + 木牌 ──────────────────────────────────────────────────── */
+.sideFoot {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1.5px dashed var(--line-soft);
+}
+
+.sideStory {
+  position: relative;
+  margin-top: 12px;
+  text-align: center;
+  padding: 0 4px;
+}
+.sideStory img {
+  width: 100%;
+  max-width: 168px;
+  height: 140px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+.sideStory p {
+  margin: 0;
+  color: #805742;
+  font-family: var(--font-hand);
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* ── 主内容区 ───────────────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  margin-left: 248px;
+  min-width: 0;
+  padding: 34px clamp(22px, 4vw, 54px) 72px;
+}
+.mainInner {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* ── 窄屏：侧栏转为顶栏 ─────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1.5px solid var(--line-soft);
+    padding: 12px 16px;
+  }
+  .sideNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 12px;
+    gap: 6px;
+    flex: none;
+  }
+  .navItem {
+    width: auto;
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+  }
+  .sideFoot {
+    margin-top: 10px;
+    border-top: 0;
+    padding-top: 0;
+  }
+  .sideStory {
+    display: none;
+  }
+  .main {
+    margin-left: 0;
+    padding: 26px 18px 60px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navRunningDot {
+    animation: none;
+  }
+}

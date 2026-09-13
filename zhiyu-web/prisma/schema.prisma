@@ -68,6 +68,18 @@ model Persona {
   publicRef    String?
   completeness Float       @default(0)
 
+  // 地域：发现页的「地区」筛选依据。
+  // 真实用户的省份/城市可从知乎资料带入；演示人格为虚构值。
+  province String?
+  city     String?
+
+  // 是否接受他人派 Agent 与我对话。
+  // 发现页据此决定是否显示「让 Agent 先聊聊」按钮。
+  // 注意与 CommunicationPrefs.allowAgentInvite 的分工：
+  //   · allowAgentInvite 是**用户级**开关（设置页 02），约束"别人能不能对我发起"
+  //   · 这里是**人设级**的展示属性，用于列表快速过滤；真正拦截仍以用户级开关为准
+  agentOpen Boolean @default(true)
+
   identity           Json?
   interests          Json?
   topics             Json?
@@ -88,6 +100,9 @@ model Persona {
   features PersonaFeature[]
   matchAsA Match[]           @relation("PersonaAsA")
   matchAsB Match[]           @relation("PersonaAsB")
+
+  @@index([province])
+  @@index([city])
 }
 
 // 数据源注入状态（微信 / QQ / 飞书 / 钉钉 / 知乎 / SBTI）

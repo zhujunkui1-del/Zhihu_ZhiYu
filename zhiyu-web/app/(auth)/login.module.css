@@ -1,0 +1,691 @@
+/* ============================================================================
+   登录页样式（移植自原型 zhiyu-login.html）
+   职责：本页专属。跨页共用组件在 app/globals.css。
+   ========================================================================= */
+
+/* ── 页内通用容器（本页内容比应用页更宽） ───────────────────────────────── */
+.container {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: clamp(22px, 4vw, 54px);
+}
+
+.section {
+  padding-block: clamp(52px, 8vw, 88px);
+}
+.section + .section {
+  border-top: 1px solid var(--border);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap-lg);
+}
+.rowBetween {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  flex-wrap: wrap;
+}
+
+.lead {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: 58ch;
+  margin: 0;
+}
+
+/* ── 顶部导航 ───────────────────────────────────────────────────────────── */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in oklch, var(--bg) 86%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
+}
+.topnavInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  padding-block: 13px;
+}
+.topnav nav {
+  display: flex;
+  gap: clamp(16px, 3vw, 30px);
+}
+.topnav nav a {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  padding: 6px 2px;
+  border-radius: 6px;
+}
+.topnav nav a:hover {
+  color: var(--fg);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+}
+.brandName {
+  font-family: var(--font-hand);
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+/* ── 登录视口 ───────────────────────────────────────────────────────────── */
+.loginHero {
+  position: relative;
+  min-height: calc(100svh - 73px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+.loginInner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.08fr 0.92fr;
+  gap: clamp(48px, 6vw, 104px);
+  align-items: center;
+  flex: 1;
+  padding: 36px 0 88px;
+}
+
+/* 背景光斑 */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.orb1 {
+  width: 560px;
+  height: 560px;
+  top: -220px;
+  left: -190px;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--accent) 20%, transparent) 0%,
+    transparent 68%
+  );
+}
+.orb2 {
+  width: 520px;
+  height: 520px;
+  bottom: -250px;
+  right: -180px;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--accent) 11%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+.heroCopy h1 {
+  max-width: 15ch;
+}
+.heroCopy .lead {
+  margin-top: 22px;
+}
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: color-mix(in oklch, var(--surface) 72%, transparent);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+}
+.scrollNote {
+  margin-top: 30px;
+}
+
+.scrollCue {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+.scrollCue:hover {
+  color: var(--accent);
+}
+.scrollCue svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── 登录卡 ─────────────────────────────────────────────────────────────── */
+.authCardCol {
+  width: 100%;
+  max-width: 440px;
+  margin-inline: auto;
+}
+.authCard {
+  position: relative;
+  background-color: rgba(255, 251, 239, 0.9);
+  background-image: url("/assets/textures/paper.png");
+  background-size: 620px 620px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  padding: 34px 34px 30px;
+  box-shadow: var(--shadow-lg);
+}
+.authHead {
+  text-align: center;
+}
+.authTitle {
+  font-size: 27px;
+  letter-spacing: 0.08em;
+}
+.authSub {
+  margin: 10px auto 0;
+  max-width: 30ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+/* 登录卡里的品牌标比侧栏的大 */
+.authCard :global(.brandPlate) {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.oauthBtn {
+  width: 100%;
+  min-height: 52px;
+  font-size: 16px;
+  gap: 10px;
+}
+.oauthGlyph {
+  width: 20px;
+  height: auto;
+  opacity: 0.98;
+}
+
+.terms {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.cardNote {
+  text-align: center;
+  margin: 12px 0 0;
+  font-size: 11.5px;
+}
+
+.authSuccess {
+  text-align: center;
+  padding: 6px 0 2px;
+}
+.successMark {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.successMark svg {
+  width: 22px;
+  height: 22px;
+}
+.authSuccess h3 {
+  font-size: 17px;
+}
+.authSuccess p {
+  margin: 8px auto 16px;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 30ch;
+  line-height: 1.7;
+}
+
+/* ── 概念流转 ───────────────────────────────────────────────────────────── */
+.conceptGrid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: clamp(40px, 7vw, 96px);
+  align-items: center;
+}
+.flowCard {
+  background-color: rgba(255, 251, 239, 0.86);
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  padding: 34px 26px 30px;
+  box-shadow: var(--shadow);
+}
+.flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.flowNode {
+  flex: 0 0 auto;
+  width: 116px;
+  border: 1.5px solid var(--line);
+  background: color-mix(in oklch, var(--surface) 60%, transparent);
+  border-radius: 999px;
+  padding: 11px 8px;
+  text-align: center;
+}
+.flowNum {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.flowNode strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.flowArrow {
+  flex: 0 0 auto;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+.flowArrow svg {
+  width: 20px;
+  height: 20px;
+}
+.flowNote {
+  margin: 26px auto 0;
+  max-width: 36ch;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* ── 三步机制 ───────────────────────────────────────────────────────────── */
+.howCard {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255, 251, 239, 0.86);
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  padding: 26px 26px 24px;
+  min-height: 320px;
+  box-shadow: var(--shadow);
+}
+.howIndex {
+  font-family: var(--font-hand);
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--fg);
+  opacity: 0.72;
+  margin-bottom: 18px;
+}
+.howCard h3 {
+  margin-bottom: 12px;
+}
+.howDesc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.75;
+}
+.srcList {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.srcList li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 9px;
+}
+.srcList b {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.srcList span {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.miniQuote {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: var(--accent-faint);
+  border-left: 2px solid var(--accent);
+  color: var(--fg);
+  font-size: 13.5px;
+  line-height: 1.75;
+  border-radius: 0 12px 12px 0;
+}
+.matchChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+.matchChips .tag {
+  background: var(--accent-faint);
+  border-color: rgba(226, 102, 79, 0.34);
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
+/* ── Agent 对话与匹配报告 ───────────────────────────────────────────────── */
+.chatGrid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 34px;
+  align-items: stretch;
+}
+.surfaceCard {
+  background-color: rgba(255, 251, 239, 0.86);
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  padding: 26px;
+  box-shadow: var(--shadow);
+}
+.chatHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.agentMini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agentAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--line);
+}
+.agentAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+}
+.chatTitle {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.chatSub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+.typing i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.3s infinite both;
+}
+.typing i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.typing i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.chatLine {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.chatLineB {
+  flex-direction: row-reverse;
+}
+.bubble {
+  max-width: 86%;
+  padding: 11px 14px;
+  border-radius: 4px 16px 16px 16px;
+  background: color-mix(in oklch, var(--surface) 55%, var(--bg));
+  border: 1.5px solid var(--line-soft);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--fg);
+}
+.chatLineB .bubble {
+  border-radius: 16px 4px 16px 16px;
+}
+.chatFootnote {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reportHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.reportHead h3 {
+  font-size: 18px;
+}
+.reportRow {
+  display: grid;
+  grid-template-columns: 92px 1fr 64px;
+  gap: 14px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+}
+.reportRowFirst {
+  border-top: 0;
+}
+.reportLabel {
+  font-size: 13.5px;
+  color: var(--fg);
+}
+.reportVal {
+  text-align: right;
+  font-size: 13px;
+  color: var(--fg);
+}
+.reportTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--fg);
+}
+.reportTotal strong {
+  font-family: var(--font-hand);
+  font-size: 22px;
+  font-weight: 900;
+}
+.reportNote {
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  background: var(--accent-faint);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--fg);
+}
+
+/* ── 金句 ───────────────────────────────────────────────────────────────── */
+.quoteWrap {
+  max-width: 860px;
+  margin-inline: auto;
+  text-align: center;
+}
+.quote {
+  font-family: var(--font-display);
+  font-size: clamp(25px, 3vw, 36px);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  margin: 0;
+  color: var(--fg);
+}
+.quoteAuthor {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 24px;
+}
+
+/* ── 收尾 CTA ───────────────────────────────────────────────────────────── */
+.ctaShell {
+  background-color: rgba(255, 251, 239, 0.9);
+  background-image: url("/assets/textures/paper.png");
+  background-size: 620px 620px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  padding: clamp(40px, 6vw, 72px) clamp(24px, 6vw, 72px);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.ctaShell .lead {
+  margin: 18px auto 30px;
+}
+.ctaBtn {
+  min-height: 54px;
+  padding-inline: 34px;
+  font-size: 16px;
+}
+
+/* ── 页脚 ───────────────────────────────────────────────────────────────── */
+.pagefoot {
+  padding-block: var(--gap-xl);
+  color: var(--muted);
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--surface) 70%, transparent);
+}
+
+/* ── 居中区块的标题组 ───────────────────────────────────────────────────── */
+.centerHead {
+  text-align: center;
+  max-width: 46ch;
+  margin-inline: auto;
+}
+
+/* ── 响应式 ─────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .loginInner {
+    grid-template-columns: 1fr;
+    gap: 44px;
+    padding-bottom: 96px;
+  }
+  .heroCopy h1 {
+    max-width: 22ch;
+  }
+  .conceptGrid,
+  .chatGrid {
+    grid-template-columns: 1fr;
+  }
+  .grid3 {
+    grid-template-columns: 1fr;
+  }
+  .howCard {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .topnav nav {
+    display: none;
+  }
+  .authCard {
+    padding: 24px 20px 22px;
+  }
+  .scrollCue {
+    display: none;
+  }
+  .reportRow {
+    grid-template-columns: 76px 1fr 52px;
+    gap: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing i {
+    animation: none;
+  }
+}

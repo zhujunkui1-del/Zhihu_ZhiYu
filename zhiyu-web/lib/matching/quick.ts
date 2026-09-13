@@ -81,6 +81,22 @@ export function quickMatch(
   candidates: MatchablePersona[],
   limit = 10,
 ): QuickMatchResult[] {
+  return scoreAll(me, candidates).sort((x, y) => y.overall - x.overall).slice(0, limit);
+}
+
+/**
+ * 给所有候选打分，**不截断、不排序**。
+ *
+ * 与 quickMatch 的区别：quickMatch 是「找最合拍的 N 个」，
+ * 返回前 N 名即可；而发现页的搜索/随机推荐需要给**每一位**候选配一个相似度
+ * （卡片上要显示"与你的相似度"），此时提前截断会丢掉大部分人的分数。
+ *
+ * 两者共用同一套评分逻辑，只是要不要排序截断的区别。
+ */
+export function scoreAll(
+  me: MatchablePersona,
+  candidates: MatchablePersona[],
+): QuickMatchResult[] {
   const results: QuickMatchResult[] = [];
 
   for (const c of candidates) {
@@ -162,5 +178,6 @@ export function quickMatch(
     });
   }
 
-  return results.sort((x, y) => y.overall - x.overall).slice(0, limit);
+  /* 不排序、不截断：由调用方决定（quickMatch 排序后取前 N）。 */
+  return results;
 }

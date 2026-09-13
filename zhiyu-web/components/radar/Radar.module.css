@@ -1,0 +1,330 @@
+/* 相遇雷达样式（移植自原型 zhiyu-theme.css 的 .radar-* 段） */
+
+/* 可拖拽视口 */
+.viewport {
+  position: relative;
+  height: clamp(520px, 62vh, 680px);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none; /* 让 pointer 拖拽在触屏上生效 */
+  user-select: none;
+}
+.dragging {
+  cursor: grabbing;
+}
+
+/* 变换层：拖拽/缩放都作用在这里 */
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* 轨道环。
+   原型的 --line-soft 是 rgba(83,42,23,.24)，在「自适应」取景（k≈0.5）下
+   实际只有约 0.7px，几乎看不见。而轨道环承载「半径 = 相似度」的参照含义，
+   看不见就失去了意义，所以这里比原型略加深。
+   同理加粗到 1.6 是为了缩放后仍能读出。 */
+.ring {
+  stroke: rgba(83, 42, 23, 0.4);
+  stroke-width: 1.6;
+  stroke-dasharray: 7 7;
+}
+.ringInner {
+  stroke: rgba(226, 102, 79, 0.62);
+  stroke-width: 2;
+  stroke-dasharray: 10 6;
+}
+
+/* 中心到每个人的连线。
+   同样比原型略加深：原型 opacity .7 × 渐变本身半透明，
+   在纸底上几乎看不出「从中心连出去」这个语义。 */
+.link {
+  stroke: url(#zy-radar-line);
+  stroke-width: 1.8;
+  opacity: 1;
+}
+
+/* 轨道环上的相似度标注 */
+.ringTag {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 9px;
+  border: 1.4px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.92);
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-weight: 800;
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ── 中心「我」 ─────────────────────────────────────────────────────────── */
+.me {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.meAvatar {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--fg);
+  background: #fffdf6;
+  box-shadow: 0 8px 22px rgba(95, 55, 24, 0.22);
+}
+.meAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  display: block;
+}
+/* 参考图里中心用一道彩色弧强调 */
+.meRing {
+  position: absolute;
+  inset: -13px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-bottom-color: rgba(52, 140, 255, 0.75);
+  transform: rotate(18deg);
+}
+.meLabel {
+  position: absolute;
+  bottom: -15px;
+  padding: 2px 13px;
+  border: 1.8px solid var(--fg);
+  border-radius: 999px;
+  background: #fffdf6;
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-weight: 900;
+  font-size: 14px;
+}
+
+/* ── 人物节点 ───────────────────────────────────────────────────────────── */
+.node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sideLeft {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  flex: 0 0 auto;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fffdf6;
+  box-shadow: 0 6px 16px rgba(95, 55, 24, 0.16);
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  display: block;
+}
+.avatar:hover {
+  transform: scale(1.07);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(201, 80, 58, 0.28);
+}
+.avatar:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.avatarTop {
+  border-color: var(--accent);
+}
+.topBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2.5px solid #fffdf6;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* 名字 + 人格倾向标签卡 */
+.card {
+  display: grid;
+  gap: 1px;
+  padding: 6px 11px;
+  border: 1.6px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.95);
+  box-shadow: 0 4px 12px rgba(95, 55, 24, 0.1);
+  white-space: nowrap;
+  text-align: left;
+}
+.name {
+  font-family: var(--font-hand);
+  font-size: 14.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--fg);
+}
+/* 第二行：人格倾向 + 相似度并排，压缩标签宽度 */
+.sub {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  line-height: 1.25;
+}
+.type {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sim {
+  font-style: normal;
+  font-family: var(--font-hand);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--accent-deep);
+}
+
+/* ── 右上角控件 ─────────────────────────────────────────────────────────── */
+.tools {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tools button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1.6px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.95);
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(95, 55, 24, 0.1);
+}
+.tools button:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+.wide {
+  width: auto !important;
+  padding: 0 12px;
+  font-size: 13px !important;
+}
+.hint {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-hand);
+}
+
+/* ── 左下角统计 ─────────────────────────────────────────────────────────── */
+.stats {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  display: flex;
+  gap: 14px;
+  padding: 6px 13px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.94);
+  color: var(--muted);
+  font-size: 12px;
+}
+.stats b {
+  font-family: var(--font-hand);
+  font-size: 14px;
+  color: var(--accent-deep);
+}
+
+/* ── 空态 ───────────────────────────────────────────────────────────────── */
+.empty {
+  padding: 62px 22px;
+  text-align: center;
+  color: var(--muted);
+}
+.emptyBig {
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+.empty p {
+  margin: 0 auto;
+  max-width: 42ch;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+/* ── 窄屏 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .viewport {
+    height: clamp(420px, 56vh, 560px);
+  }
+  .avatar {
+    width: 68px;
+    height: 68px;
+  }
+  .meAvatar {
+    width: 72px;
+    height: 72px;
+  }
+  .name {
+    font-size: 13.5px;
+  }
+  .hint {
+    display: none;
+  }
+}
