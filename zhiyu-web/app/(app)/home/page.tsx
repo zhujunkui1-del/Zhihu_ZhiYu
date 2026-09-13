@@ -41,6 +41,8 @@ export default async function HomePage({
   if (!personaId || !userId) redirect("/");
 
   const data = await buildHome(personaId, userId);
+  /* 人设存在但装配失败（理论上不会）时回登录页，而不是渲染半个页面 */
+  if (!data) redirect("/");
 
   return <HomeClient data={data} personaId={personaId} userId={userId} />;
 }
