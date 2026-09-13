@@ -37,7 +37,12 @@ model User {
   username        String?  @unique
   displayName     String?
   avatarUrl       String?
+  // 知乎数字 uid。刻意用 String：
+  // uid 是 18~19 位十进制数，超过 JS 安全整数范围（9007199254740991），
+  // 经 JSON.parse 会**静默舍入**（实测 904491330657081871 → 904491330657081900）。
   zhihuOpenId     String?  @unique
+  // 知乎 hash_id：字符串标识，与 uid 一起用于展示与去重
+  zhihuHashId     String?
   zhihuAuthorized Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -46,6 +51,49 @@ model User {
   communicationPrefs CommunicationPrefs?
   llmConfigs         LlmProviderConfig[]
   notifications      Notification[]
+  sessions           AuthSession[]
+}
+
+/// 应用自己的登录会话。
+///
+/// 为什么落库而不是进程内 Map：本项目部署在 Vercel（Serverless、多实例），
+/// 进程内存储无法跨实例共享，会在请求落到另一个实例时"登录态消失"。
+/// 浏览器只持有不可猜的 `token`（放在 HttpOnly Cookie），
+/// 知乎的 access_token 加密后留在服务端。
+model AuthSession {
+  id        String   @id @default(cuid())
+  /// 随机会话标识（放在 HttpOnly Cookie 里的那个值），全局唯一
+  token     String   @unique
+  userId    String
+  /// 知乎 OAuth access_token 的密文（AES-256-GCM，见 lib/crypto.ts）
+  zhihuTokenEnc String?
+  /// access_token 过期时间；到点后停止读取，不静默改用 Access Secret
+  tokenExpiresAt DateTime?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// OAuth 授权请求的 state（CSRF 防重放）。
+///
+/// 规格要求：服务端生成不可预测的随机值 → 绑定当前浏览器会话 → 短时有效 →
+/// 回调时校验 → **原子消费**（消费掉就不能再用，防重复回调复用）。
+model OAuthState {
+  id        String   @id @default(cuid())
+  state     String   @unique
+  /// 发起授权时浏览器已有的会话 token（用于把 state 绑定到该浏览器）
+  sessionToken String?
+  /// 发起时所在的路径，回调后跳回
+  returnTo  String?
+  consumedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }
 
 // 沟通偏好（设置页 02，三个开关默认全开）

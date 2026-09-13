@@ -276,10 +276,23 @@ try {
         create: {
           userId: demoUser.id,
           kind: "human",
-          displayName: demoUser.displayName ?? "演示用户",
+          displayName: "演示用户",
           ...DEMO_SELF,
         },
       });
+      /* 顺带把昵称归位：早期 demo 登录会覆盖 displayName，
+         自动化测试跑过之后会留下「XX验证用户」这类名字。 */
+      if (demoUser.displayName !== "演示用户") {
+        await prisma.user.update({
+          where: { id: demoUser.id },
+          data: { displayName: "演示用户" },
+        });
+        await prisma.persona.update({
+          where: { id: filled.id },
+          data: { displayName: "演示用户" },
+        });
+        console.log(`演示用户昵称已归位：「${demoUser.displayName}」→「演示用户」`);
+      }
       const hadData = Boolean(before?.interests && before?.communicationStyle);
       console.log(
         `演示用户人设：${hadData ? "原已有数据，已覆盖为完整版" : "原为空壳，已补全"}（${filled.id.slice(0, 12)}…）`,

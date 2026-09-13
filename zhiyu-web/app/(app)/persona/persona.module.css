@@ -516,6 +516,102 @@
   color: var(--fg);
 }
 
+/* ── 知乎同步结果 ───────────────────────────────────────────────────────── */
+.syncBox {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1.8px solid rgba(226, 102, 79, 0.4);
+  border-radius: var(--r-hand-lg);
+  background: linear-gradient(180deg, var(--accent-faint), rgba(255, 251, 239, 0.86));
+}
+
+.syncMsg {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--accent-deep);
+}
+
+.syncCounts {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+.syncCounts li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.92);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.syncCounts b {
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--accent-deep);
+}
+
+.syncLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+.syncLbl {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: var(--font-hand);
+  font-weight: 700;
+}
+.syncTags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.syncSamples {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-soft);
+}
+.syncSamples ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.syncSamples li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.sampleTitle {
+  min-width: 0;
+  flex: 1;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.syncWarn {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
 /* ── 窄屏 ───────────────────────────────────────────────────────────────── */
 @media (max-width: 1080px) {
   .fusionGrid,

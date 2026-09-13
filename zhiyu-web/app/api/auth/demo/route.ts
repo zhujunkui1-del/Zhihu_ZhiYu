@@ -50,9 +50,13 @@ export async function POST(req: NextRequest) {
   }
 
   const demo = await prisma.$transaction(async (tx) => {
+    /* 只在**首次创建**时写入 displayName。
+       已存在时不覆盖 —— 否则任何人（包括自动化测试）一登录就会把 demo 用户的
+       昵称改掉，演示时看到的是上一次调用者传进来的名字。这个坑实际踩过：
+       报告里显示成了「发现页验证用户」。 */
     const user = await tx.user.upsert({
       where: { username: "demo" },
-      update: { displayName },
+      update: {},
       create: { username: "demo", displayName },
     });
 
@@ -79,7 +83,9 @@ export async function POST(req: NextRequest) {
     const persona = existing
       ? await tx.persona.update({
           where: { userId: user.id },
-          data: { ...personaData, displayName },
+          /* 同理不覆盖 displayName：人设名应与用户昵称一致，
+             而不是被每次登录的入参刷掉 */
+          data: personaData,
         })
       : await tx.persona.create({
           data: { userId: user.id, kind: "human", displayName, ...DEMO_PERSONA },

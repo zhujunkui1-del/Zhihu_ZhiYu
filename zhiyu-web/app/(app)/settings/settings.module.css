@@ -1,0 +1,352 @@
+/* 设置页样式（移植自原型 zhiyu-settings.html + 主题层手绘纸感覆盖） */
+
+.pageHead {
+  margin-bottom: 24px;
+}
+.pageHead h1 {
+  max-width: 20ch;
+}
+.sub {
+  margin: 10px 0 0;
+  max-width: 66ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.list {
+  display: grid;
+  gap: 18px;
+}
+
+.card {
+  padding: 26px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.84);
+  box-shadow: var(--shadow);
+}
+.cardHead {
+  margin: 0 2px 16px;
+}
+
+/* ── 行 ─────────────────────────────────────────────────────────────────── */
+.rows {
+  display: grid;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 22px;
+  row-gap: 10px;
+  align-items: center;
+  padding: 18px 2px;
+}
+.row + .row {
+  border-top: 1px dashed var(--line-soft);
+}
+
+.body {
+  min-width: 0;
+}
+.body h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.body p {
+  margin: 7px 0 0;
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+
+/* 控件列：**纵向收成标题行高度**，让开关/按钮的中心与标题齐平。
+   不收的话，多行说明会把控件推到说明文字旁边，看起来像错位（实际踩过）。 */
+.ctl {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  align-self: start;
+  height: 23px;
+  min-height: 0;
+}
+.swT {
+  font-family: var(--font-hand);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.switchWrap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+}
+/* 开关的 44px 触控热区由父级承担，视觉位置贴标题中线 */
+.switchWrap {
+  padding-block: 9px;
+  margin-block: -9px;
+}
+
+.hint {
+  margin: 16px 2px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+/* ── 03 BYOK ────────────────────────────────────────────────────────────── */
+.aiWrap {
+  min-width: 0;
+}
+.aiLead {
+  margin: 0 0 20px;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.85;
+}
+.aiLead b {
+  color: var(--fg);
+}
+
+.warn {
+  margin-bottom: 18px;
+  padding: 11px 15px;
+  border: 1.5px solid rgba(226, 102, 79, 0.45);
+  border-radius: var(--r-hand);
+  background: var(--accent-faint);
+  color: var(--accent-deep);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.gLabel {
+  margin: 0 0 10px;
+  font-family: var(--font-hand);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+  font-family: var(--font-hand);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.chip b {
+  font-weight: 900;
+  font-size: 13px;
+  color: var(--fg);
+}
+.chip small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+.chip:hover {
+  border-color: var(--accent);
+}
+.chipOn {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+  box-shadow: 0 0 0 3px var(--accent-faint);
+}
+.chipOn b {
+  color: var(--accent-deep);
+}
+
+.aiNote {
+  margin: -8px 0 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+}
+.field {
+  display: grid;
+  gap: 7px;
+}
+.field label {
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.input {
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.94);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+}
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-faint);
+}
+.num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.keyZone {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.keyZone .input {
+  width: 100%;
+  padding-right: 46px;
+}
+.eye {
+  position: absolute;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.eye:hover {
+  background: var(--fg-softer);
+  color: var(--fg);
+}
+.eye svg {
+  width: 17px;
+  height: 17px;
+}
+
+.aiActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.aiResult {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.savedBox {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.savedHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.n {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.savedList {
+  display: grid;
+  gap: 9px;
+}
+.savedRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.86);
+}
+.savedMain {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+.savedMain b {
+  font-family: var(--font-hand);
+  font-size: 14.5px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.savedMeta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.defChip {
+  padding: 2px 9px;
+  border: 1.5px solid rgba(226, 102, 79, 0.45);
+  border-radius: 999px;
+  background: var(--accent-faint);
+  color: var(--accent-deep);
+  font-family: var(--font-hand);
+  font-size: 11px;
+  font-weight: 800;
+}
+.aiEmpty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* ── 窄屏 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .ctl {
+    height: auto;
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+  .switchWrap {
+    padding-block: 0;
+    margin-block: 0;
+    min-height: 44px;
+  }
+  .card {
+    padding: 18px;
+  }
+}

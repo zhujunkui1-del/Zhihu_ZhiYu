@@ -170,6 +170,50 @@ export default function PersonaClient({
   const q = bank[index];
   const answered = Object.keys(answers).length;
 
+  /* ── 知乎数据同步 ───────────────────────────────────────────────────── */
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [syncDetail, setSyncDetail] = useState<{
+    counts: Record<string, number>;
+    addedInterests: string[];
+    addedTopics: string[];
+    errors: string[];
+    samples: { title: string; likes: number; type: string }[];
+  } | null>(null);
+
+  const syncZhihu = useCallback(async () => {
+    setSyncing(true);
+    setSyncMsg("正在读取你的知乎公开数据…");
+    setSyncDetail(null);
+    try {
+      const r = await fetch("/api/zhihu/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personaId: board.id }),
+      }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error ?? "同步失败");
+      setSyncDetail({
+        counts: r.counts,
+        addedInterests: r.addedInterests ?? [],
+        addedTopics: r.addedTopics ?? [],
+        errors: r.errors ?? [],
+        samples: r.samples ?? [],
+      });
+      const total = Object.values(r.counts as Record<string, number>).reduce((a, b) => a + b, 0);
+      setSyncMsg(
+        total > 0
+          ? `同步完成：读了 ${total} 条数据。`
+          : "同步完成，但这个账号没有公开的创作/关注/收藏。",
+      );
+      /* 刷新服务端数据，让六源状态与完整度一并更新 */
+      router.refresh();
+    } catch (e) {
+      setSyncMsg(`同步失败：${(e as Error).message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [board.id, router]);
+
   /* 蒸馏阶段状态：已注入就能走到第 2 步，「开始蒸馏」尚未实现后端 */
   const stageState = (i: number): "done" | "doing" | "todo" => {
     if (board.injectedCount === 0) return "todo";
@@ -352,7 +396,16 @@ export default function PersonaClient({
                   ) : null}
 
                   <div className={styles.srcFoot}>
-                    {c.type === "sbti" ? (
+                    {c.type === "zhihu" && isSelf ? (
+                      <button
+                        type="button"
+                        className="btn btnPrimary"
+                        onClick={() => void syncZhihu()}
+                        disabled={syncing}
+                      >
+                        {syncing ? "同步中…" : c.injected ? "重新同步知乎数据" : "连接知乎并同步"}
+                      </button>
+                    ) : c.type === "sbti" ? (
                       <button
                         type="button"
                         className="btn btnPrimary"
@@ -376,6 +429,83 @@ export default function PersonaClient({
               );
             })}
           </div>
+
+          {/* 知乎同步：进度与结果。数据来自真实开放平台接口，不是占位 */}
+          {syncMsg ? (
+            <div className={styles.syncBox}>
+              <p className={styles.syncMsg}>{syncMsg}</p>
+
+              {syncDetail ? (
+                <>
+                  <ul className={styles.syncCounts}>
+                    <li>
+                      <span>我的创作</span>
+                      <b>{syncDetail.counts.contents ?? 0}</b>
+                    </li>
+                    <li>
+                      <span>我的关注</span>
+                      <b>{syncDetail.counts.followees ?? 0}</b>
+                    </li>
+                    <li>
+                      <span>收藏夹</span>
+                      <b>{syncDetail.counts.favlists ?? 0}</b>
+                    </li>
+                    <li>
+                      <span>收藏内容</span>
+                      <b>{syncDetail.counts.favlistContents ?? 0}</b>
+                    </li>
+                  </ul>
+
+                  {syncDetail.addedInterests.length ? (
+                    <p className={styles.syncLine}>
+                      <span className={styles.syncLbl}>新增兴趣标签</span>
+                      <span className={styles.syncTags}>
+                        {syncDetail.addedInterests.slice(0, 14).map((t) => (
+                          <span key={t} className="badge">
+                            {t}
+                          </span>
+                        ))}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {syncDetail.addedTopics.length ? (
+                    <p className={styles.syncLine}>
+                      <span className={styles.syncLbl}>新增话题</span>
+                      <span className={styles.syncTags}>
+                        {syncDetail.addedTopics.slice(0, 10).map((t) => (
+                          <span key={t} className="badge">
+                            {t}
+                          </span>
+                        ))}
+                      </span>
+                    </p>
+                  ) : null}
+
+                  {syncDetail.samples.length ? (
+                    <div className={styles.syncSamples}>
+                      <p className={styles.syncLbl}>读到的创作</p>
+                      <ul>
+                        {syncDetail.samples.map((s, i) => (
+                          <li key={i}>
+                            <span className="badge">{s.type || "内容"}</span>
+                            <span className={styles.sampleTitle}>{s.title}</span>
+                            <span className="meta">赞 {s.likes}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {syncDetail.errors.length ? (
+                    <p className={styles.syncWarn}>
+                      部分接口未取到（不影响其它来源）：{syncDetail.errors.join("；")}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
 

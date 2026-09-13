@@ -1,0 +1,306 @@
+/* 通知中心样式（移植自原型 zhiyu-notify.html + 主题层手绘纸感覆盖） */
+
+.pageHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.pageHead h1 {
+  max-width: 20ch;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.covChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ── 分组页签 ───────────────────────────────────────────────────────────── */
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.78);
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+.seg button {
+  min-height: 40px;
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 12px 9px 13px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 800;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg button:hover {
+  color: var(--fg);
+}
+.segActive {
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep)) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(201, 80, 58, 0.26);
+}
+.segCount {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.secTop {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+/* ── 消息卡 ─────────────────────────────────────────────────────────────── */
+.list {
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 18px 20px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.86);
+  box-shadow: var(--shadow);
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(226, 102, 79, 0.5);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 未读：极浅暖色底 + 左侧暖色条（与发现页通知卡一致的语言） */
+.unread {
+  border-left: 4px solid var(--accent);
+  background: linear-gradient(90deg, var(--accent-faint), rgba(255, 251, 239, 0.86));
+}
+
+.ico {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+}
+.ico svg {
+  width: 21px;
+  height: 21px;
+}
+.kReport .ico {
+  border-color: rgba(226, 102, 79, 0.34);
+  background: var(--accent-faint);
+  color: var(--accent);
+}
+.kDone .kdot {
+  background: var(--accent);
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.kdot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--muted) 55%, transparent);
+}
+.time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.unreadDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-faint);
+}
+
+.title {
+  margin: 8px 0 0;
+  font-family: var(--font-hand);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.desc {
+  margin: 5px 0 0;
+  max-width: 74ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 13px;
+}
+.dchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 11px;
+  border: 1.5px solid rgba(226, 102, 79, 0.4);
+  border-radius: 999px;
+  background: var(--accent-faint);
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 12px;
+  font-weight: 700;
+}
+.dchip b {
+  color: var(--accent-deep);
+  font-weight: 900;
+}
+.open {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  color: var(--accent-deep);
+}
+.open svg {
+  width: 13px;
+  height: 13px;
+  margin-left: 3px;
+}
+
+.sentNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sentNote svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+/* ── 空态 ───────────────────────────────────────────────────────────────── */
+.empty {
+  padding: 40px 26px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-hand-lg);
+  background: var(--fg-softer);
+  text-align: center;
+}
+.emptyBig {
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.empty p {
+  margin: 10px auto 0;
+  max-width: 52ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+
+/* ── 底部说明 ───────────────────────────────────────────────────────────── */
+.notice {
+  margin-top: 20px;
+  padding: 13px 16px;
+  border: 1.5px solid rgba(226, 102, 79, 0.26);
+  border-radius: var(--r-hand);
+  background: var(--accent-faint);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.notice b {
+  color: var(--accent-deep);
+}
+
+/* ── 窄屏 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .card {
+    gap: 12px;
+    padding: 14px;
+  }
+  .ico {
+    width: 40px;
+    height: 40px;
+  }
+  .time {
+    margin-left: 0;
+  }
+}
