@@ -6,6 +6,7 @@ import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
 import BoardRadar from "@/components/BoardRadar";
 import { locText } from "@/lib/regions";
+import { formatDate } from "@/lib/datetime";
 import type { HomeData } from "@/lib/home";
 import type { DiscoverCandidate } from "@/lib/discover";
 import styles from "./home.module.css";
@@ -275,7 +276,7 @@ export default function HomeClient({
                 <div key={n.id} className={`${styles.ntItem} ${n.read ? "" : styles.ntUnread}`}>
                   <span className={styles.ntTitle}>{n.title}</span>
                   <span className="meta">
-                    {new Date(n.createdAt).toLocaleDateString("zh-CN")}
+                    {formatDate(n.createdAt)}
                   </span>
                 </div>
               ))}

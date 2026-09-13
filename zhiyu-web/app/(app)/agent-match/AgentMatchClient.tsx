@@ -5,6 +5,7 @@ import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
 import PersonaRadar from "@/components/PersonaRadar";
 import type { AgentMatchData, ReportView, SessionView } from "@/lib/agent-match";
+import { formatListTime } from "@/lib/datetime";
 import styles from "./agent-match.module.css";
 
 type Tab = "running" | "reports";
@@ -25,14 +26,9 @@ function statusClass(s: string): string {
   return styles.pillTodo;
 }
 
+/** 日期展示统一走 lib/datetime（显式钉时区，避免 hydration 不一致） */
 function fmtDate(d: Date | string): string {
-  const t = new Date(d);
-  return t.toLocaleString("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatListTime(d);
 }
 
 export default function AgentMatchClient({

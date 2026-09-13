@@ -6,6 +6,7 @@ import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
 import PersonaRadar from "@/components/PersonaRadar";
 import type { PersonaBoard, SourceChip } from "@/lib/persona-view";
+import { formatDate } from "@/lib/datetime";
 import styles from "./persona.module.css";
 
 type Tab = "card" | "sources" | "distill";
@@ -389,7 +390,7 @@ export default function PersonaClient({
                       <li>
                         <span>最近同步</span>
                         <span className="num">
-                          {new Date(c.importedAt).toLocaleDateString("zh-CN")}
+                          {formatDate(c.importedAt)}
                         </span>
                       </li>
                     </ul>

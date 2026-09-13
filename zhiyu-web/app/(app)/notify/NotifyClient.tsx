@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { NotifyData, NotifyCategory } from "@/lib/notify";
+import { formatListTime } from "@/lib/datetime";
 import styles from "./notify.module.css";
 
 type Tab = "all" | NotifyCategory;
@@ -14,23 +15,15 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "report", label: "发来的报告" },
 ];
 
-/** 相对时间：今天/昨天/日期 */
+/**
+ * 相对时间：今天/昨天/日期。
+ *
+ * 必须走 lib/datetime —— 它是**时区显式**的。
+ * 之前用裸 `toLocaleTimeString("zh-CN")`，服务端在 UTC、浏览器在本地时区，
+ * 会渲染出不同文本（实测差 8 小时），触发 React hydration 不一致。
+ */
 function relTime(d: Date): string {
-  const now = new Date();
-  const t = new Date(d);
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-  if (sameDay(t, now)) {
-    return `今天 ${t.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
-  }
-  const y = new Date(now);
-  y.setDate(y.getDate() - 1);
-  if (sameDay(t, y)) {
-    return `昨天 ${t.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`;
-  }
-  return t.toLocaleDateString("zh-CN");
+  return formatListTime(d);
 }
 
 export default function NotifyClient({
