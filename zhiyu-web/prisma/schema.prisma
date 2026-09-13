@@ -203,6 +203,8 @@ model Match {
   personaB Persona        @relation("PersonaAsB", fields: [personaBId], references: [id], onDelete: Cascade)
   sessions AgentSession[]
   report   MatchReport?
+  /// 这条匹配的结果被发布到知乎社区圈子的记录
+  communityPosts CommunityPost[]
 
   @@index([personaAId])
   @@index([personaBId])
@@ -254,7 +256,6 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId, createdAt])
 }
 
@@ -277,4 +278,28 @@ model LlmProviderConfig {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// 知乎社区 API 的发布记录。
+///
+/// 存在的两个理由：
+///   1. **节流**：官方文档硬约束「发布想法每小时最多 5 条」。
+///      Vercel 是多实例 Serverless，进程内计数无法跨实例共享，
+///      所以必须落库才能真实节流。
+///   2. **可追溯**：每条动态对应哪次匹配、发到哪个圈子、
+///      返回的 content_token 是什么，都要能查（便于排查与删除）。
+model CommunityPost {
+  id           String   @id @default(cuid())
+  matchId      String?
+  match        Match?   @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  circleKey    String
+  circleName   String
+  circleId     String
+  title        String
+  /// 发布成功返回的想法 token
+  contentToken String
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([matchId])
 }
