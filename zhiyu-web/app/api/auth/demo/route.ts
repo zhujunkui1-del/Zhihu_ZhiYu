@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { createSession, SESSION_COOKIE } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -100,10 +101,26 @@ export async function POST(req: NextRequest) {
     return { user, persona };
   });
 
-  return NextResponse.json({
+  /* 建立**真实的服务端会话**（HttpOnly Cookie），而不是只把 userId 交给浏览器。
+     为什么：页面身份解析 `resolveIdentity()` 生产环境只认会话 Cookie；
+     如果演示登录不种 Cookie，生产环境就没有任何可用的登录路径了。
+     顺带也比 localStorage 更安全——脚本读不到。 */
+  const token = await createSession({ userId: demo.user.id });
+
+  const res = NextResponse.json({
     ok: true,
     userId: demo.user.id,
     personaId: demo.persona.id,
     displayName: demo.user.displayName,
   });
+  res.cookies.set({
+    name: SESSION_COOKIE,
+    value: token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 30 * 24 * 60 * 60,
+  });
+  return res;
 }

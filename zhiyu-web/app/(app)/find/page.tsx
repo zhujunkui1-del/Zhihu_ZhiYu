@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { buildDiscover } from "@/lib/discover";
-import { prisma } from "@/lib/db";
+import { resolveIdentity } from "@/lib/auth/current-user";
 import DiscoverClient from "./DiscoverClient";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +12,8 @@ export const dynamic = "force-dynamic";
  * 全部交给 `DiscoverClient`。这样首屏就带完整数据，不需要客户端再打一次接口，
  * 也不会出现"先空后闪"。
  *
- * 会话：与其他受保护页面一致，用 `?personaId=` 传入（演示阶段）；
- * 缺失时回退到 demo 用户，避免手输 URL 就掉登录页。
- * 接入知乎 OAuth 后改为读 HttpOnly 会话 Cookie。
+ * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话，生产环境无会话则跳登录页。
+ * `?personaId=` 仍然可用——**看别人的人格卡是产品功能**，但身份始终取自会话。
  */
 export default async function FindPage({
   searchParams,
@@ -22,18 +21,11 @@ export default async function FindPage({
   searchParams: Promise<{ personaId?: string }>;
 }) {
   const sp = await searchParams;
-  let personaId = sp.personaId;
 
-  if (!personaId) {
-    const demo = await prisma.user.findUnique({
-      where: { username: "demo" },
-      include: { persona: true },
-    });
-    personaId = demo?.persona?.id;
-  }
-  if (!personaId) redirect("/");
+  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
+  if (!me?.personaId) redirect("/");
 
-  const data = await buildDiscover(personaId);
+  const data = await buildDiscover(me.personaId);
 
-  return <DiscoverClient data={data} personaId={personaId} />;
+  return <DiscoverClient data={data} personaId={me.personaId} />;
 }
