@@ -2,16 +2,19 @@
 /* ============================================================================
    知遇 ZhiYu · 手绘纸感主题层（zhiyu-theme.css）
    ----------------------------------------------------------------------------
-   作用：把旧前端（冷调科技蓝 #0d64fd / #eef3fc）整体改写为新前端
-        （暖调手绘纸感 #348cff / 纸纹底）的视觉语言。
+   作用：把旧前端（冷调科技蓝 #0d64fd / #eef3fc）整体改写为
+        暖调手绘纸感（纸纹底 + 暖珊瑚主色 #e2664f）的视觉语言。
 
    原理：旧前端 185KB CSS 中【只有 7 个 hex 颜色，且全部只在 :root 定义】，
         其余 169 处 color-mix() / 170 处 oklch() 一律走 var() 引用。
         因此这里用 :root:root（特异性 0,2,0 > 0,1,0）覆盖 token 即可全站生效，
         无需 !important，也无需改写任何一条原有规则。
 
+   注意：仍有一批【绕过 token 的硬编码蓝色渐变】（#4f9dff→#2f7fe8 等），
+        必须逐条替换，换 token 覆盖不到它们。
+
    纪律：本文件【只改视觉，不改功能】。
-        - 不隐藏、不移除任何旧前端的控件
+        - 不隐藏、不移除任何旧前端的控件（除非该控件所在模块被明确要求合并）
         - 不新增旧前端没有的功能
         - 新前端的全局搜索栏等冗余控件一律不引入
         - 产品方案中的功能点（三维筛选 / 快速匹配 / 雷达图 / Agent 对话 /
@@ -26,7 +29,13 @@
   --fg:      #381508;
   --muted:   #8a6047;
   --border:  rgba(83, 42, 23, 0.22);
-  --accent:  #348cff;
+
+  /* 主色：由蓝改为暖珊瑚（手绘纸感的主色）。
+     蓝色只保留给知乎品牌入口（--zhihu-blue）与角色插画装饰，不作界面主色。 */
+  --accent:      #e2664f;
+  --accent-deep: #c9503a;
+  --accent-tint: #ffb4a0;
+  --zhihu-blue:  #0084ff;   /* 知乎官方品牌蓝，仅用于知乎授权入口 */
 
   /* 手绘描边与投影 */
   --line:       rgba(83, 42, 23, 0.52);
@@ -97,64 +106,40 @@ body::after {
 }
 .brand-tag { white-space: nowrap; margin-top: 4px; font-size: 11px; }
 
-/* 品牌标：一枚手写「知」，替代原来的蓝色 webp logo */
+/* 品牌标：illustration logo（双气泡 + 刘看山）
+   方案来自 gpt-image-2.5 生成，位图多档导出见 assets/logo/。
+   注意这是方形插画，用 object-fit: cover 让它填满手绘方框，避免上下留白。 */
 .brand-plate {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   flex: 0 0 auto;
   position: relative;
   border: 1.8px solid var(--line);
   border-radius: var(--r-hand);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 222, 0.9));
+  background: #f9f1df;                /* 与 logo 自带底色一致，避免出现色块边 */
   box-shadow: var(--shadow);
-  overflow: visible;
+  overflow: hidden;
 }
-.brand-plate img { display: none; }           /* 旧 webp logo 停用 */
+.brand-plate img { display: none; }            /* 旧 webp logo 停用 */
 
-/* "知"字品牌标：只给【侧边栏】那一枚，避免给登录页的 brand-plate-lg 也叠一层 */
-.sidebar .brand-plate::before {
-  content: "知";
-  font-family: var(--font-hand);
-  font-size: 28px;
-  font-weight: 900;
-  color: var(--fg);
-  line-height: 1;
-  transform: rotate(-3deg);
+/* 由注入脚本写入 <img class="brand-logo" src="./assets/logo/logo-104.png" srcset=…> */
+.brand-plate .brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;                  /* 方形插画填满方框 */
+  object-position: 50% 42%;           /* 略上移，让角色居中而非气泡居中被裁 */
 }
-.sidebar .brand-plate::after {
-  content: "✦";
-  position: absolute;
-  top: -10px;
-  right: -8px;
-  color: #ffbc28;
-  font-size: 16px;
-  transform: rotate(-14deg);
-}
-/* 登录页没有侧栏，它的 brand-plate 单独给一枚更大的品牌字 */
+/* 位图自带右上角气泡，不必再叠手绘金星，否则与气泡打架 */
+.brand-plate::after { content: none; }
+/* 登录页没有侧栏，它的 brand-plate 更大 */
 .brand-plate-lg {
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
   border-radius: 18px 13px 19px 14px;
   position: relative;
 }
-.brand-plate-lg::before {
-  content: "知";
-  font-family: var(--font-hand);
-  font-size: 42px;
-  font-weight: 900;
-  color: var(--fg);
-  line-height: 1;
-  transform: rotate(-3deg);
-}
-.brand-plate-lg::after {
-  content: "✦";
-  position: absolute;
-  top: -11px;
-  right: -9px;
-  color: #ffbc28;
-  font-size: 20px;
-  transform: rotate(-14deg);
-}
+.brand-plate-lg::after { content: none; }
 .brand-word { font-family: var(--font-hand); font-weight: 900; letter-spacing: 0.06em; }
 .brand-tag  { color: var(--muted); }
 
@@ -167,13 +152,37 @@ body::after {
 }
 .nav-item:hover { background: var(--fg-softer); }
 .nav-item.active {
-  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
   color: #fff;
-  box-shadow: 0 5px 14px rgba(52, 140, 255, 0.30);
+  box-shadow: 0 5px 14px rgba(201, 80, 58, 0.32);
 }
 .nav-item.active svg { color: #fff; }
 
-/* 侧栏底部：木牌插画 + 手写标语（对应新前端 .sidebar-story） */
+/* 「让 Agent 先聊聊」后不跳页，改在侧栏该项右上角点一个暖色小圆点，
+   提示后台有会话在进行（补偿"不跳页"缺失的进度线索）。 */
+.nav-item { position: relative; }
+.nav-running-dot {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fffdf6;
+  box-shadow: 0 0 0 1px var(--accent);
+  animation: nav-dot-pulse 1.8s ease-in-out infinite;
+}
+.nav-item.active .nav-running-dot { border-color: var(--accent-deep); background: #fff; box-shadow: 0 0 0 1px #fff; }
+@keyframes nav-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.28); opacity: 0.72; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-running-dot { animation: none; }
+}
+
+/* 侧栏底部木牌 + 手写标语（对应新前端 .sidebar-story） */
 .side-foot {
   margin-top: auto;
   padding-top: 14px;
@@ -207,6 +216,9 @@ body::after {
 }
 
 /* ── ④ 卡片 / 面板：手绘描边卡片 ────────────────────────────────────────── */
+/* 注意：只列【本来就是卡片】的类。
+   .stage-list 与 .run-req 原本是无内边距的纯列表，一旦被套上边框，
+   文字会直接贴边、底部压线（曾实际发生）。它们改用下面的"带内衬的盒子"规则。 */
 .panel,
 .card,
 .persona-card,
@@ -222,15 +234,28 @@ body::after {
 .flow-card,
 .how-card,
 .surface-card,
-.stage-list,
 .list,
-.pr-shell,
-.run-req {
+.pr-shell {
   border: 1.8px solid var(--line);
   border-radius: var(--r-hand-lg);
   background-color: rgba(255, 251, 239, 0.84);
   box-shadow: var(--shadow);
 }
+
+/* 蒸馏面板里的两个列表容器：加边框就【必须同时给内边距】，
+   否则内容会挤出边框（这是用户反馈"字都挤出模块外"的原因）。 */
+.stage-list,
+.run-req {
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background-color: rgba(255, 253, 246, 0.72);
+  box-shadow: none;
+  padding: 12px 16px;
+}
+.stage-list { padding: 10px 14px; }
+.stage-list li { padding: 10px 6px; }
+.run-req { align-items: center; }
+.run-req > .meta { flex: 0 0 auto; }
 
 /* 条纹填充：对应新前端 .striped-card，给次要卡片加纸纹层次 */
 .panel-eyebrow + .random-head,
@@ -247,31 +272,43 @@ body::after {
 .persona-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
 .persona-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(52, 140, 255, 0.55);
+  border-color: rgba(226, 102, 79, 0.55);
   box-shadow: var(--shadow-lg);
 }
 
-/* 条纹底（用在新前端同款副卡位置） */
+/* 匹配结果 / 匹配报告 的底色。
+   沿革：原用 stripes.png 条纹纹理（新前端 .striped-card 的做法）→ 太花，去掉；
+   改成 #FDF6E8 纯色后发现新问题 —— 弹窗本身是 #FFF9EB + 纸纹，
+   在这层纸上贴一块纯色会在 padding 区露出硬边色带，内容区反而参差，
+   看起来就像「容器到一半、文字在外面」。
+   最终做法：底色不再由容器自己承担，让所在面板的底色贯通即可，
+   视觉层次交给内容本身（维度进度条、报告文字、对话气泡）。 */
 .striped-surface,
 .dim-list,
 .rep-dims,
 .quick-result {
-  background-color: rgba(255, 252, 242, 0.9);
-  background-image: url("./assets/textures/stripes.png");
-  background-size: 430px 430px;
+  background-color: transparent;
+  background-image: none;
+}
+
+/* 独立成块的区域（快速匹配结果、独立报告卡）才需要自己的底色 */
+.quick-result,
+.mcard,
+.rep-row {
+  background-color: #fdf6e8;
 }
 
 /* ── ⑤ 按钮 ─────────────────────────────────────────────────────────────── */
 .btn { font-family: var(--font-hand); font-weight: 800; border-radius: var(--r-hand); }
 .btn-primary {
-  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
   border: 1.8px solid var(--accent);
   color: #fff;
-  box-shadow: 0 5px 12px rgba(52, 140, 255, 0.22);
+  box-shadow: 0 5px 12px rgba(201, 80, 58, 0.24);
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, #3f8ef5, #2268d0);
-  border-color: #2268d0;
+  background: linear-gradient(135deg, var(--accent-deep), #b04330);
+  border-color: #b04330;
   color: #fff;
 }
 .btn-secondary {
@@ -283,8 +320,8 @@ body::after {
 }
 .btn-secondary:hover {
   border-color: var(--accent);
-  background: linear-gradient(135deg, #fff, rgba(214, 237, 255, 0.9));
-  color: #1265cf;
+  background: linear-gradient(135deg, #fff, rgba(255, 226, 214, 0.92));
+  color: var(--accent-deep);
 }
 .btn-ghost { font-family: var(--font-hand); font-weight: 800; }
 .btn-ghost:hover { color: var(--accent); }
@@ -303,9 +340,9 @@ body::after {
   border-radius: 12px 9px 13px 10px;
 }
 .seg button.active {
-  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
   color: #fff;
-  box-shadow: 0 4px 10px rgba(52, 140, 255, 0.25);
+  box-shadow: 0 4px 10px rgba(201, 80, 58, 0.26);
 }
 
 /* 搜索框：手绘描边大圆角 */
@@ -350,7 +387,7 @@ body::after {
 }
 .p-tag { border-radius: 999px; color: var(--muted); }
 .p-pill, .head-chip { border-radius: 999px; }
-.badge.done, .state-pill.ok, .req-chip.ok { border-color: rgba(52, 140, 255, 0.5); background: var(--accent-faint); color: #1265cf; }
+.badge.done, .state-pill.ok, .req-chip.ok { border-color: rgba(226, 102, 79, 0.5); background: var(--accent-faint); color: var(--accent-deep); }
 
 /* ── ⑦ 进度条 / 评分 ────────────────────────────────────────────────────── */
 .track {
@@ -360,11 +397,68 @@ body::after {
   height: 9px;
 }
 .track i, .track > i {
-  background: linear-gradient(90deg, #83c4ff, #348cff);
+  background: linear-gradient(90deg, var(--accent-tint), var(--accent));
   border-radius: 999px;
 }
 .sim-top .num, .score-badge, .num { font-family: var(--font-hand); font-weight: 900; color: var(--fg); }
 .dim-item .dv, .dc-sim .num { font-family: var(--font-hand); font-weight: 900; color: var(--accent); }
+
+/* 五维分析 / 匹配报告的排版修正。
+   用户反馈「匹配报告的字要超出容器」，实测根因是**字距过大把标签撑宽**：
+     · .why-block .k  原本 letter-spacing: 0.1em → 「为什么推荐你认识 TA？」
+       在 11px 下多占 14px，文字几乎顶到容器右缘
+     · .panel-eyebrow 被主题层加了 0.06em → 「匹配报告 · 综合匹配度」多占 8px
+   另外这些标签用等宽字体、11px 配 1.5 行高时，墨迹会越过自身盒子底部约 4px。
+   修法：把字距收到 0.02em 以内，并给等宽小字显式行高与内边距。 */
+.why-block .k {
+  letter-spacing: 0.02em;         /* 原 0.1em，收掉 14px 多余宽度 */
+  line-height: 1.6;
+  padding-block: 1px;
+}
+/* 修复等宽小字普遍存在的「墨迹出盒」：行高拔到 1.5 以上 */
+.meta,
+.stage-list li .st-note,
+.m-foot .meta,
+.modal-radar text.mname {
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+/* 维度行：.dn / .dv 原有字距很小，保留；只补行高与内边距让墨迹不出盒 */
+.dim-item { padding-block: 2px; }
+.dim-item .dtop {
+  align-items: center;            /* baseline 在行高不足时更容易让字下沉 */
+  gap: 14px;
+  margin-bottom: 7px;
+}
+.dim-item .dn {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.8;               /* 让中文字形（含出入头）完全落在盒内 */
+  letter-spacing: 0.01em;
+  padding-block: 0;
+}
+.dim-item .dv {
+  font-style: normal;
+  font-size: 12.5px;
+  line-height: 1.8;
+  letter-spacing: 0.01em;
+  padding-block: 0;
+  color: var(--accent-deep);
+}
+.dim-item .dr {
+  line-height: 1.85;              /* 中文说明行距放宽，读起来也不挤 */
+  margin: 5px 0 0;
+}
+.dim-list { gap: 18px; }
+
+/* 报告弹窗里的引文与亮点行：同样放宽行高，避免墨迹贴边 */
+.rep-quote { line-height: 1.85; }
+.hl-list li { line-height: 1.8; }
+.hl-list .n, .hl-list .mini { line-height: 1.8; }
+/* 总分徽标：数字用了 42px 手写体，行高不足会向下溢出 */
+.score-badge { line-height: 1.4; padding-block: 0; }
+.score-badge .num, .score-badge .lbl { line-height: 1.4; }
 
 /* ── ⑧ 雷达图：新风格重绘（三种实现统一处理）────────────────────────────── */
 /* 8.1 人格卡弹窗雷达（.modal-radar，find / notify） */
@@ -500,12 +594,12 @@ body::after {
 }
 .msg.q, .chat-line.sys-note {
   background: var(--accent-faint);
-  border-color: rgba(52, 140, 255, 0.35);
+  border-color: rgba(226, 102, 79, 0.38);
   border-style: dashed;
   color: var(--muted);
 }
 .msg.a, .bubble.me { border-left: 4px solid var(--accent); }
-.msg.b, .bubble.ta { border-left: 4px solid #ff9a76; }
+.msg.b, .bubble.ta { border-left: 4px solid var(--accent-tint); }
 .duo, .mini-duo { font-family: var(--font-hand); font-weight: 800; }
 
 /* ── ⑫ 表格 / 列表行 ───────────────────────────────────────────────────── */
@@ -514,7 +608,7 @@ body::after {
 }
 .src-line:last-child, .s-row:last-child, .trait-row:last-child, .cand:last-child { border-bottom: none; }
 
-/* 通知卡片：手绘卡片 + 未读态用左侧蓝条区分，避免与面板底同色糊在一起 */
+/* 通知卡片：手绘卡片 + 未读态用左侧暖珊瑚条区分，避免与面板底同色糊在一起 */
 .n-card, .n-notice {
   border: 1.6px solid var(--line);
   border-radius: var(--r-hand);
@@ -526,12 +620,12 @@ body::after {
 .n-card + .n-card, .n-notice + .n-notice { margin-top: 12px; }
 .n-card:hover, .n-notice:hover {
   transform: translateY(-2px);
-  border-color: rgba(52, 140, 255, 0.5);
+  border-color: rgba(226, 102, 79, 0.5);
   box-shadow: var(--shadow);
 }
 .n-card.unread, .n-notice.unread {
   border-left: 5px solid var(--accent);
-  background: linear-gradient(100deg, rgba(214, 237, 255, 0.5), rgba(255, 253, 246, 0.94) 42%);
+  background: linear-gradient(100deg, rgba(255, 224, 212, 0.55), rgba(255, 253, 246, 0.94) 42%);
 }
 .n-card .n-title, .n-notice .n-title { font-weight: 700; }
 .n-card .n-kind, .n-notice .n-kind { font-family: var(--font-hand); font-weight: 800; }
@@ -551,15 +645,23 @@ body::after {
   background-color: rgba(255, 251, 239, 0.9);
   box-shadow: var(--shadow);
 }
+/* 知乎授权入口：品牌色不可改，保持知乎蓝实心 + 白字
+   （旧 CSS 里这个按钮就是深色实心 + 白字，此前的通用覆盖把文字色弄丢了） */
 .oauth-btn {
-  border: 1.8px solid var(--line);
+  border: 1.8px solid #0069cc;
   border-radius: var(--r-hand);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 226, 0.9));
+  background: linear-gradient(135deg, #2b9bff, var(--zhihu-blue));
+  color: #fff;
   font-family: var(--font-hand);
   font-weight: 800;
-  box-shadow: 0 3px 10px rgba(95, 55, 24, 0.10);
+  box-shadow: 0 6px 16px rgba(0, 132, 255, 0.28);
 }
-.oauth-btn:hover { border-color: var(--accent); background: linear-gradient(135deg, #fff, rgba(214, 237, 255, 0.9)); }
+.oauth-btn:hover {
+  border-color: #005aa8;
+  background: linear-gradient(135deg, var(--zhihu-blue), #0069cc);
+  color: #fff;
+}
+.oauth-btn .oauth-glyph, .oauth-btn svg { color: #fff; }
 .flow-node, .flow-arrow { font-family: var(--font-hand); font-weight: 800; }
 
 /* ── ⑭ 排版 ────────────────────────────────────────────────────────────── */
@@ -581,7 +683,10 @@ h2 { line-height: 1.34; }
 
 .panel-eyebrow, .meta {
   font-weight: 700;
-  letter-spacing: 0.06em;
+  /* 字距收到 0.02em：0.06em 会让「匹配报告 · 综合匹配度」这类标签多占 8px，
+     在窄容器里显得溢出。小字配大字距本来就伤可读性。 */
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--muted);
 }
 .lead, .section-lead { color: var(--muted); }
@@ -595,9 +700,416 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline-offset: 2px;
 }
 
+/* ── ⑯ 人格页：综合画像并入六源注入状态 ──────────────────────────────────── */
+/* 左栏（人格卡 · 综合画像）已移除，六源面板占满整宽；
+   蒸馏操作区（#ov-actions，由 paintOverview 渲染）落在六源列表下方。 */
+.card-grid.is-merged {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.card-grid.is-merged .card-side { width: 100%; }
+.card-grid.is-merged .cov-list { margin-top: 0; }
+.card-grid.is-merged .ov-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1.5px dashed var(--line-soft);
+  justify-content: flex-start;
+}
+/* 六源注入状态的标题行：与面板的 eyebrow 风格对齐 */
+.card-grid.is-merged .card-side > .panel-eyebrow { margin: 0 0 12px; }
+
+/* #ov-title 由 paintOverview() 写入，必须保留节点，但不参与排版。
+   旧版把它连同容器一起删掉会抛 TypeError 并中断整页 JS。 */
+.sr-only,
+.card-grid.is-merged #ov-title {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ── ⑮ 响应式兜底 ──────────────────────────────────────────────────────── */
 @media (max-width: 920px) {
   .sidebar { border-right: 0; border-bottom: 1.5px solid var(--line-soft); }
   .side-story { display: none; }
   body { background-attachment: scroll; }
+}
+
+/* ══ ⑯ 相遇雷达（zhiyu-radar.js）═══════════════════════════════════════════
+   以「我」为中心的关系雷达：半径 = 相似度，可拖拽平移、滚轮缩放。
+   参考 新前端 discover 页的「关系星图」。 */
+
+/* 结果区右上角：视图切换 + 重置 */
+.result-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.quick-result-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* 卡片 / 雷达 切换器 */
+.view-seg {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1.6px solid var(--line);
+  border-radius: 12px 9px 13px 10px;
+  background: rgba(255, 253, 246, 0.8);
+}
+.view-seg button {
+  min-height: 30px;
+  padding: 3px 11px;
+  border: 0;
+  border-radius: 9px 7px 10px 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-weight: 800;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.view-seg button:hover { color: var(--fg); }
+.view-seg button.active {
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep));
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(201, 80, 58, 0.24);
+}
+
+/* 舞台外框 */
+.radar-stage {
+  position: relative;
+  margin-top: 14px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: #fffdf6;
+  background-image: url("./assets/textures/paper.png");
+  background-size: 620px 620px;
+  overflow: hidden;
+  /* 细网格底纹，让拖拽有参照物 */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+/* 可拖拽视口 */
+.radar-viewport {
+  position: relative;
+  height: clamp(520px, 62vh, 680px);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;          /* 让 pointer 拖拽在触屏上生效 */
+  user-select: none;
+}
+.radar-viewport.is-dragging { cursor: grabbing; }
+
+/* 变换层：拖拽/缩放都作用在这里 */
+.radar-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.radar-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* 轨道环 */
+.radar-ring {
+  stroke: var(--line-soft);
+  stroke-width: 1.4;
+  stroke-dasharray: 7 7;
+}
+.radar-ring-inner {
+  stroke: rgba(226, 102, 79, 0.42);
+  stroke-width: 1.6;
+  stroke-dasharray: 10 6;
+}
+/* 中心到每个人的连线 */
+.radar-link {
+  stroke: url(#zy-radar-line);
+  stroke-width: 1.5;
+  opacity: 0.7;
+}
+
+/* 轨道环相似度标签 */
+.radar-ring-tag {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 9px;
+  border: 1.4px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.92);
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-weight: 800;
+  font-size: 11.5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 中心「我」 */
+.radar-me {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.radar-me-avatar {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--fg);
+  background: #fffdf6;
+  box-shadow: 0 8px 22px rgba(95, 55, 24, 0.22);
+}
+.radar-me-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 参考图里中心用一道彩色弧强调 */
+.radar-me-ring {
+  position: absolute;
+  inset: -13px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-bottom-color: rgba(52, 140, 255, 0.75);
+  transform: rotate(18deg);
+}
+.radar-me-label {
+  position: absolute;
+  bottom: -15px;
+  padding: 2px 13px;
+  border: 1.8px solid var(--fg);
+  border-radius: 999px;
+  background: #fffdf6;
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-weight: 900;
+  font-size: 14px;
+}
+
+/* 人物节点 */
+.radar-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.radar-node.side-left { flex-direction: row-reverse; }
+
+.radar-avatar {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  flex: 0 0 auto;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fffdf6;
+  box-shadow: 0 6px 16px rgba(95, 55, 24, 0.16);
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.radar-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.radar-avatar:hover {
+  transform: scale(1.07);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(201, 80, 58, 0.28);
+}
+.radar-avatar:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.radar-avatar.is-top { border-color: var(--accent); }
+.radar-top-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2.5px solid #fffdf6;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* 名字 + 人格倾向 标签卡 */
+.radar-card {
+  display: grid;
+  gap: 1px;
+  padding: 6px 11px;
+  border: 1.6px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.95);
+  box-shadow: 0 4px 12px rgba(95, 55, 24, 0.1);
+  white-space: nowrap;
+  text-align: left;
+}
+.radar-name {
+  font-family: var(--font-hand);
+  font-size: 14.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--fg);
+}
+/* 第二行：人格倾向 + 相似度并排，压缩标签宽度 */
+.radar-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  line-height: 1.25;
+}
+.radar-type {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.radar-sim {
+  font-style: normal;
+  font-family: var(--font-hand);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--accent-deep);
+}
+
+/* 右上角控件 */
+.radar-tools {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.radar-tools button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1.6px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.95);
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 3px 9px rgba(95, 55, 24, 0.1);
+}
+.radar-tools button:hover { border-color: var(--accent); color: var(--accent-deep); }
+.radar-tools button.wide { width: auto; padding: 0 12px; font-size: 13px; }
+.radar-hint {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-hand);
+}
+
+/* 左下角统计 */
+.radar-stats {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  display: flex;
+  gap: 14px;
+  padding: 6px 13px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.94);
+  color: var(--muted);
+  font-size: 12px;
+}
+.radar-stats b { font-family: var(--font-hand); font-size: 14px; color: var(--accent-deep); }
+
+/* 空态 */
+.radar-empty {
+  padding: 62px 22px;
+  text-align: center;
+  color: var(--muted);
+}
+.radar-empty .big {
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+.radar-empty p { margin: 0 auto; max-width: 42ch; font-size: 13.5px; line-height: 1.75; }
+
+@media (max-width: 920px) {
+  .radar-viewport { height: clamp(420px, 56vh, 560px); }
+  .radar-avatar { width: 68px; height: 68px; }
+  .radar-me-avatar { width: 72px; height: 72px; }
+  .radar-name { font-size: 13.5px; }
+  .radar-hint { display: none; }
+}
+
+/* ══ ⑰ 设置页：行控件与标题行对齐 ═════════════════════════════════════════
+   问题：.s-row 是 minmax(0,1fr) auto 的两列网格。左列是「标题 + 两行说明」
+   共约 79px 高，右列控件只有 26px；父级 align-items: center 会把两列
+   各自居中，于是控件中心落在整行中心，比**标题行**中心低 27~28px，
+   开关看起来就"掉"到说明文字旁边，像错位。
+   （「身份与数据源」那些行只有一行文字，两列高度接近，差异为 0，所以看不出。）
+
+   修法：控件列单独 align-self: start，让它与左列**顶部**对齐；
+   再给一点 padding-top 使开关中线与标题行中线齐平。
+   实测：标题行高 23px、控件高 26px → 中线差 1.5px，取 padding-top 2px。 */
+.s-row > .s-ctl {
+  align-self: start;
+  align-items: center;
+  /* 关键：把控件列在纵向上收成「标题行高度」。
+     子元素（开关 26px / 按钮 44px / 状态文字）会被居中到这个高度里，
+     于是无论它们原本多高，中线都与标题行齐平。
+     不收缩的话：26px 的开关与 44px 的按钮中心都不在标题行上，
+     开关差 27px、按钮差 11px。 */
+  height: 23px;
+  min-height: 0;
+  padding-top: 0;
+}
+/* 热区补偿：开关的 44px 触控区域由父级承担，视觉位置贴标题中线 */
+.s-row > .s-ctl .switch-wrap {
+  min-height: 0;
+  align-items: center;
+  padding-block: 9px;
+  margin-block: -9px;
+}
+.s-row > .s-ctl > .sw-t { line-height: 1.5; }
+
+/* 移动端为单列、控件另起一行，不需要这组补偿 */
+@media (max-width: 920px) {
+  .s-row > .s-ctl {
+    align-self: stretch;
+    height: auto;
+    min-height: 44px;
+  }
+  .s-row > .s-ctl .switch-wrap {
+    padding-block: 0;
+    margin-block: 0;
+    min-height: 44px;
+  }
 }

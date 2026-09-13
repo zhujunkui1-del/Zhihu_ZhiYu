@@ -467,14 +467,14 @@
     }
   </style>
   <link rel="stylesheet" href="./zhiyu-theme.css">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2258%22%20height%3D%2258%22%20rx%3D%2216%22%20fill%3D%22%23fff9eb%22%20stroke%3D%22%23381508%22%20stroke-width%3D%223.5%22%2F%3E%3Ctext%20x%3D%2232%22%20y%3D%2245%22%20font-size%3D%2238%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%20fill%3D%22%23381508%22%20font-family%3D%22Kaiti%20SC%2CSTKaiti%2CKaiTi%2Cserif%22%3E%E7%9F%A5%3C%2Ftext%3E%3C%2Fsvg%3E">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/logo/logo-32.png">
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" data-od-id="sidebar">
       <a class="side-brand" href="zhiyu-login.html" aria-label="知遇 Logo，返回登录页">
         <span class="brand-row">
-          <span class="brand-plate"><!-- 旧蓝色 logo 已由 zhiyu-theme.css 的手写体品牌字替代 --></span>
+          <span class="brand-plate"><img class="brand-logo" src="./assets/logo/logo-104.png" srcset="./assets/logo/logo-52.png 1x, ./assets/logo/logo-104.png 2x, ./assets/logo/logo-256.png 4x" width="104" height="104" alt=""></span>
           <span>
             <span class="brand-word">知遇</span>
             <span class="brand-tag meta">先认识，再相遇</span>
@@ -579,9 +579,20 @@
 
             <div class="result-meta">
               <span id="result-count">共 6 位结果</span>
-              <button class="reset-btn" type="button" id="reset-filters" data-od-id="search-reset">重置筛选</button>
+              <span class="result-meta-right">
+                <span class="view-seg" role="tablist" aria-label="结果展示方式" data-view-seg="search">
+                  <button class="active" type="button" role="tab" aria-selected="true" data-view="grid">卡片</button>
+                  <button type="button" role="tab" aria-selected="false" data-view="radar">相遇雷达</button>
+                </span>
+                <button class="reset-btn" type="button" id="reset-filters" data-od-id="search-reset">重置筛选</button>
+              </span>
             </div>
-            <div class="cand-grid" id="search-results" data-od-id="search-results"></div>
+            <div class="view-pane" data-view-pane="search">
+              <div class="cand-grid" id="search-results" data-od-id="search-results"></div>
+            </div>
+            <div class="view-pane" data-view-pane="radar-search" hidden>
+              <div class="radar-stage" id="radar-search" data-od-id="radar-search"></div>
+            </div>
             
           </div>
         </section>
@@ -592,8 +603,17 @@
             <p class="panel-eyebrow">随机推荐 · 随机抓取一位</p>
             <div class="random-head">
               <button class="btn btn-secondary" type="button" id="reroll-btn" data-od-id="random-reroll">换一批 · 随机人格</button>
+              <span class="view-seg" role="tablist" aria-label="结果展示方式" data-view-seg="random">
+                <button class="active" type="button" role="tab" aria-selected="true" data-view="grid">卡片</button>
+                <button type="button" role="tab" aria-selected="false" data-view="radar">相遇雷达</button>
+              </span>
             </div>
-            <div class="cand-grid" id="random-results" data-od-id="random-results"></div>
+            <div class="view-pane" data-view-pane="random">
+              <div class="cand-grid" id="random-results" data-od-id="random-results"></div>
+            </div>
+            <div class="view-pane" data-view-pane="radar-random" hidden>
+              <div class="radar-stage" id="radar-random" data-od-id="radar-random"></div>
+            </div>
             
           </div>
         </section>
@@ -610,8 +630,19 @@
               
             </div>
             <div class="quick-result" id="quick-result" data-od-id="quick-result" hidden="">
-              <h3>匹配结果</h3>
-              <div class="cand-grid" id="quick-results" style="margin-top: 16px;" data-od-id="quick-results"></div>
+              <div class="quick-result-head">
+                <h3>匹配结果</h3>
+                <span class="view-seg" role="tablist" aria-label="结果展示方式" data-view-seg="quick">
+                  <button class="active" type="button" role="tab" aria-selected="true" data-view="grid">卡片</button>
+                  <button type="button" role="tab" aria-selected="false" data-view="radar">相遇雷达</button>
+                </span>
+              </div>
+              <div class="view-pane" data-view-pane="quick">
+                <div class="cand-grid" id="quick-results" style="margin-top: 16px;" data-od-id="quick-results"></div>
+              </div>
+              <div class="view-pane" data-view-pane="radar-quick" hidden>
+                <div class="radar-stage" id="radar-quick" data-od-id="radar-quick"></div>
+              </div>
             </div>
           </div>
         </section>
@@ -684,7 +715,17 @@
         { id: 'demo-03', title: '演示人格 03', code: '03', prov: '上海', city: '上海', type: '温和共情型', tags: ['倾听型', '喜欢具体生活'], agent: false, sim: 76, radar: [0.58, 0.8, 0.56, 0.72, 0.88], desc: '对情绪和细节敏感，喜欢从真实生活出发的交流，慢节奏但很有耐心。' },
         { id: 'demo-04', title: '演示人格 04', code: '04', prov: '广东', city: '深圳', type: '理性辩手型', tags: ['观点碰撞', '先讲逻辑'], agent: true, sim: 79, radar: [0.92, 0.58, 0.7, 0.84, 0.52], desc: '享受观点被认真挑战的感觉；讨论时先立论再反驳，不喜欢含糊其辞。' },
         { id: 'demo-05', title: '演示人格 05', code: '05', prov: '北京', city: '北京', type: '深度思考型', tags: ['写作与阅读', '低社交需求'], agent: true, sim: 84, radar: [0.88, 0.5, 0.84, 0.8, 0.42], desc: '表达偏向书面与准确；在熟悉话题上话很多，陌生场合则保持观察。' },
-        { id: 'demo-06', title: '演示人格 06', code: '06', prov: '四川', city: '成都', type: '体验派', tags: ['行动派', '先试再说'], agent: false, sim: 71, radar: [0.66, 0.74, 0.6, 0.58, 0.9], desc: '更相信体验而不是标签；喜欢被邀请参与具体的事，而不是抽象的自我介绍。' }
+        { id: 'demo-06', title: '演示人格 06', code: '06', prov: '四川', city: '成都', type: '体验派', tags: ['行动派', '先试再说'], agent: false, sim: 71, radar: [0.66, 0.74, 0.6, 0.58, 0.9], desc: '更相信体验而不是标签；喜欢被邀请参与具体的事，而不是抽象的自我介绍。' },
+        { id: 'demo-07', title: '演示人格 07', code: '07', prov: '北京', city: '北京', type: '深度思考型', tags: ['哲学', '长文阅读'], agent: true, sim: 85, radar: [0.86, 0.52, 0.82, 0.7, 0.48], desc: '喜欢把一个问题拆到最底层再回答；不急着给结论，更在意推理过程是否站得住。' },
+        { id: 'demo-08', title: '演示人格 08', code: '08', prov: '浙江', city: '杭州', type: '好奇探索型', tags: ['硬件', '动手做'], agent: true, sim: 79, radar: [0.7, 0.86, 0.74, 0.64, 0.76], desc: '喜欢把想法做成能跑起来的东西；聊到实现细节时话会变多。' },
+        { id: 'demo-09', title: '演示人格 09', code: '09', prov: '广东', city: '广州', type: '温和共情型', tags: ['倾听', '人际关系'], agent: false, sim: 74, radar: [0.6, 0.78, 0.58, 0.8, 0.84], desc: '对关系的细微变化很敏感；更愿意先接住对方的情绪，再谈事情本身。' },
+        { id: 'demo-10', title: '演示人格 10', code: '10', prov: '陕西', city: '西安', type: '体验派', tags: ['旅行', '纪录片'], agent: true, sim: 88, radar: [0.82, 0.72, 0.84, 0.76, 0.7], desc: '习惯用亲历代替想象；喜欢把路上看到的片段记下来，慢慢攒成自己的判断。' },
+        { id: 'demo-11', title: '演示人格 11', code: '11', prov: '湖北', city: '武汉', type: '理性辩手型', tags: ['经济学', '辩论'], agent: true, sim: 81, radar: [0.78, 0.84, 0.7, 0.66, 0.58], desc: '享受被认真反驳；讨论时先明确概念边界，不接受含糊的表述。' },
+        { id: 'demo-12', title: '演示人格 12', code: '12', prov: '广东', city: '深圳', type: '务实执行型', tags: ['工程', '效率工具'], agent: true, sim: 83, radar: [0.76, 0.6, 0.72, 0.88, 0.62], desc: '先看能不能落地，再谈好不好看；讨厌把简单的事情流程化。' },
+        { id: 'demo-13', title: '演示人格 13', code: '13', prov: '江苏', city: '南京', type: '深度思考型', tags: ['历史', '写作'], agent: false, sim: 69, radar: [0.6, 0.5, 0.86, 0.74, 0.4], desc: '习惯把当下的问题放回更长的时间尺度里看；表达偏书面，追求准确。' },
+        { id: 'demo-14', title: '演示人格 14', code: '14', prov: '四川', city: '成都', type: '好奇探索型', tags: ['音乐', '播客'], agent: true, sim: 77, radar: [0.68, 0.8, 0.66, 0.7, 0.8], desc: '通过声音认识世界；喜欢把不同领域的表达方式放在一起比较。' },
+        { id: 'demo-15', title: '演示人格 15', code: '15', prov: '上海', city: '上海', type: '温和共情型', tags: ['教育', '亲子'], agent: true, sim: 80, radar: [0.72, 0.68, 0.74, 0.86, 0.72], desc: '更在意沟通里对方是否被听见；节奏偏慢，但一旦建立信任会很坦诚。' },
+        { id: 'demo-16', title: '演示人格 16', code: '16', prov: '福建', city: '厦门', type: '务实执行型', tags: ['设计', '手作'], agent: false, sim: 73, radar: [0.7, 0.62, 0.68, 0.78, 0.66], desc: '喜欢把想法落到具体的手感上；比起讨论概念，更愿意先做出一个样品。' }
       ];
 
       var REGIONS = [
@@ -746,17 +787,86 @@
           '</div></article>';
       }
 
+      /* 空态文案：卡片与雷达共用 */
+      function emptyStateHtml() {
+        return '<div class="empty-state" style="grid-column: 1 / -1;"><div class="big">没有符合条件的结果</div>' +
+          '<p>试试清空筛选，或换一个关键词——也可能是 TA 还没有开放 Agent 对话。</p></div>';
+      }
+
       function renderList(containerId, list, withSim) {
         var box = document.getElementById(containerId);
         if (!box) return;
-        if (!list.length) {
-          box.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><div class="big">没有符合条件的结果</div><p>试试清空筛选，或换一个关键词——也可能是 TA 还没有开放 Agent 对话。</p></div>';
-          return;
-        }
+        if (!list.length) { box.innerHTML = emptyStateHtml(); return; }
         box.innerHTML = list.map(function (p) { return cardHtml(p, withSim); }).join('');
       }
 
+      /* ── 结果展示方式：卡片 / 相遇雷达 ───────────────────────────────────
+         两种视图共用同一份筛选结果，切换时互不丢失。
+         view 状态按区域（search / random / quick）分别记忆。 */
+      var viewState = { search: 'grid', random: 'grid', quick: 'grid' };
+      var lastResult = { search: [], random: [], quick: [] };
+
+      function radarBoxId(area) { return 'radar-' + area; }
+      function gridBoxId(area) {
+        return area === 'search' ? 'search-results' : area === 'random' ? 'random-results' : 'quick-results';
+      }
+
+      /* 渲染指定区域：按当前视图画卡片或雷达 */
+      function paintResults(area, list, withSim) {
+        lastResult[area] = list;
+        var gridPane = document.querySelector('[data-view-pane="' + area + '"]');
+        var radarPane = document.querySelector('[data-view-pane="radar-' + area + '"]');
+        var wantRadar = viewState[area] === 'radar';
+
+        if (gridPane) gridPane.hidden = wantRadar;
+        if (radarPane) radarPane.hidden = !wantRadar;
+
+        if (wantRadar) {
+          if (window.ZhiyuRadar) {
+            window.ZhiyuRadar.render(document.getElementById(radarBoxId(area)), list, { area: area });
+          }
+        } else {
+          renderList(gridBoxId(area), list, withSim);
+        }
+      }
+
+      /* 切换区域视图 */
+      function setView(area, view) {
+        viewState[area] = view === 'radar' ? 'radar' : 'grid';
+        var seg = document.querySelector('[data-view-seg="' + area + '"]');
+        if (seg) {
+          Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+            var on = b.getAttribute('data-view') === viewState[area];
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+        }
+        var withSim = area !== 'search';
+        paintResults(area, lastResult[area] || [], withSim);
+      }
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-view-seg]'), function (seg) {
+        var area = seg.getAttribute('data-view-seg');
+        seg.addEventListener('click', function (e) {
+          var b = e.target.closest ? e.target.closest('[data-view]') : null;
+          if (!b) return;
+          setView(area, b.getAttribute('data-view'));
+        });
+      });
+
       function all() { return personas.slice(); }
+
+      /* 人物头像：知乎头像抓不到时，按 id 确定性映射到本地角色插画。
+         确定性很重要——否则同一人在雷达上与弹窗里会换成两张脸。 */
+      var AVATAR_POOL = ['linyue', 'chenyu', 'suqing', 'limeng', 'zhaoyi', 'zhouming', 'newfriend'];
+      function avatarFor(p) {
+        if (p.avatarUrl) return p.avatarUrl;
+        var key = String(p.id || p.code || p.title || '');
+        var h = 0;
+        for (var i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) % 100000;
+        return './assets/characters/' + AVATAR_POOL[h % AVATAR_POOL.length] + '.webp';
+      }
+
       function visiblePersona(id) {
         for (var i = 0; i < personas.length; i += 1) if (personas[i].id === id) return personas[i];
         return null;
@@ -821,7 +931,7 @@
           if (onlyAgent) ok = ok && p.agent;
           return ok;
         });
-        renderList('search-results', list, false);
+        paintResults('search', list, false);
         document.getElementById('result-count').textContent = '共 ' + list.length + ' 位结果';
       }
       document.getElementById('search-form').addEventListener('submit', applySearch);
@@ -832,6 +942,9 @@
       ['filter-city', 'filter-persona', 'filter-agent'].forEach(function (id) {
         document.getElementById(id).addEventListener('change', applySearch);
       });
+      /* radar-boot */
+      applySearch();
+
       document.getElementById('reset-filters').addEventListener('click', function () {
         searchQ.value = '';
         provSel.value = '';
@@ -841,14 +954,14 @@
         applySearch();
       });
 
-      /* 随机推荐：从六位里打乱取三位 */
+      /* 随机推荐：随机打乱后取 8 位（雷达图上人多一些才看得出分布） */
       function renderRandom() {
         var pool = all().slice();
         for (var i = pool.length - 1; i > 0; i -= 1) {
           var j = Math.floor(Math.random() * (i + 1));
           var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
         }
-        renderList('random-results', pool.slice(0, 3), true);
+        paintResults('random', pool.slice(0, 8), true);
       }
       document.getElementById('reroll-btn').addEventListener('click', renderRandom);
 
@@ -858,12 +971,12 @@
         quickRun.disabled = true;
         quickRun.textContent = '正在匹配…';
         setTimeout(function () {
-          var ranked = all().slice().sort(function (a, b) { return b.sim - a.sim; }).slice(0, 3);
-          renderList('quick-results', ranked, true);
+          var ranked = all().slice().sort(function (a, b) { return b.sim - a.sim; }).slice(0, 10);
+          paintResults('quick', ranked, true);
           document.getElementById('quick-result').hidden = false;
           quickRun.textContent = '重新匹配';
           quickRun.disabled = false;
-          showToast('匹配完成：已按相似度为你排序三位候选人。');
+          showToast('匹配完成：已按相似度为你排序十位候选人。');
         }, 1000);
       });
 
@@ -909,7 +1022,10 @@
         var p = visiblePersona(id);
         if (!p) return;
         activePersonaId = id;
-        document.getElementById('modal-avatar').textContent = p.code;
+        /* 头像：知乎头像抓不到时，按 id 确定性取本地角色插画 */
+        var av = avatarFor(p);
+        document.getElementById('modal-avatar').innerHTML =
+          '<img src="' + av + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">';
         document.getElementById('modal-title').textContent = p.title;
         document.getElementById('modal-desc').textContent = p.desc;
         document.getElementById('modal-city').textContent = locText(p);
@@ -927,6 +1043,8 @@
         document.body.style.overflow = 'hidden';
         modal.querySelector('.modal-close').focus();
       }
+      /* 供相遇雷达等外部组件调用 */
+      window.openProfile = openProfile;
       function closeModal() {
         modal.classList.remove('open');
         document.body.style.overflow = '';
@@ -942,13 +1060,32 @@
         else showToast('该人格暂未开放 Agent 对话，可先快速匹配。');
       });
 
-      /* 「让我的 Agent 认识 TA」：定位到 Agent 匹配页对应会话 */
+      /* 「让我的 Agent 先聊聊」：
+         两个 Agent 转到后台对话，**停留当前页**，只弹一条提示。
+         不跳转到 Agent 匹配页 —— 用户要留在原地继续浏览。
+         （早期实现在这里 window.location.href 跳页，已移除） */
       function startMeet(p) {
-        var sid = 'm' + p.code;
+        if (!p) return;
+        /* 记下这次发起，供 Agent 匹配页识别（后台会话的锚点） */
         try {
-          localStorage.setItem('zhiyu-match-focus', sid);
-        } catch (e) {}
-        window.location.href = 'zhiyu-agent-match.html';
+          localStorage.setItem('zhiyu-match-focus', 'm' + p.code);
+          localStorage.setItem('zhiyu-pending-meet', JSON.stringify({
+            id: p.id, title: p.title, code: p.code, at: Date.now(),
+          }));
+        } catch (e) { /* localStorage 不可用时忽略，不影响提示 */ }
+        showToast('你的 Agent 已在后台开始和 ' + p.title + ' 对话，有进展会通知你。');
+        markAgentRunning();
+      }
+
+      /* 侧栏「Agent 匹配」上加一个小圆点，提示后台有会话在进行。
+         这是"不跳页"的必要补偿：否则用户没有任何线索知道任务已启动。 */
+      function markAgentRunning() {
+        var nav = document.querySelector('[data-nav="Agent 匹配"]');
+        if (!nav || nav.querySelector('.nav-running-dot')) return;
+        var dot = document.createElement('span');
+        dot.className = 'nav-running-dot';
+        dot.setAttribute('aria-label', '后台有进行中的 Agent 对话');
+        nav.appendChild(dot);
       }
 
       document.addEventListener('click', function (e) {
@@ -959,7 +1096,7 @@
         var p = visiblePersona(id);
         if (btn.getAttribute('data-action') === 'profile' && p) openProfile(p.id);
         if (btn.getAttribute('data-action') === 'chat') {
-          if (p && p.agent) showToast('你的 Agent 已在后台开始和 TA 对话，有进展会通知你。');
+          if (p && p.agent) startMeet(p);
           else showToast('该人格暂未开放 Agent 对话，可先快速匹配。');
         }
       });
@@ -994,4 +1131,5 @@
 
 
   <script src="./zhiyu-avatar.js"></script>
+  <script src="./zhiyu-radar.js"></script>
 </body></html>
