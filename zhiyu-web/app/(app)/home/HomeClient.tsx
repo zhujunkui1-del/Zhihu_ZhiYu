@@ -62,16 +62,10 @@ export default function HomeClient({
       ? "数据已就位，等待一次蒸馏。"
       : "还没有人格数据，先接入一个来源。";
 
-  const axes = [
-    ["life", "生活私域"],
-    ["work", "职场"],
-    ["public", "公共"],
-    ["explicit", "显性"],
-    ["identity", "身份"],
-  ].map(([key, label]) => ({
-    label,
-    value: board.categories[key]?.covered ? 0.82 : 0.16,
-  }));
+  /* 五轴来自 SBTI 的 15 维聚合（见 lib/sbti/axes.ts）。未做 SBTI 时全为 null，
+     BoardRadar 会显示"等待蒸馏"而不是编造分数。 */
+  const axes = board.axes.map((a) => ({ label: a.label, value: a.value ?? 0 }));
+  const axesReady = board.axes.some((a) => a.value != null);
 
   return (
     <>
@@ -90,7 +84,7 @@ export default function HomeClient({
 
           <div className={styles.poBody}>
             <div className={styles.poVisual}>
-              <BoardRadar axes={axes} ready={hasData} emptyTip="等待蒸馏" />
+              <BoardRadar axes={axes} ready={axesReady} emptyTip="等待蒸馏" />
             </div>
 
             <div className={styles.poRight}>

@@ -57,17 +57,33 @@ export async function POST(req: NextRequest) {
     });
 
     /* 已有 persona 也要补全人设数据 —— 老库里可能是只有名字的空壳。
-       没有这步，已存在的 demo 用户永远拿不到六维分数。 */
-    const persona = await tx.persona.upsert({
-      where: { userId: user.id },
-      update: { ...DEMO_PERSONA, displayName },
-      create: {
-        userId: user.id,
-        kind: "human",
-        displayName,
-        ...DEMO_PERSONA,
-      },
-    });
+       没有这步，已存在的 demo 用户永远拿不到六维分数。
+
+       但**不覆盖已存在的 SBTI**：用户可能真的做过 30 题测试（那份结果比这里的
+       演示数据更真实）。只在从未测过时写入演示用的 SBTI。 */
+    const existing = await tx.persona.findUnique({ where: { userId: user.id } });
+    const existingSbti = (existing?.personality as { sbti?: { type?: string; dimensions?: unknown } } | null)
+      ?.sbti;
+    const hasRealSbti = Boolean(existingSbti?.type && existingSbti?.dimensions);
+
+    const personaData = hasRealSbti
+      ? {
+          interests: DEMO_PERSONA.interests,
+          topics: DEMO_PERSONA.topics,
+          communicationStyle: DEMO_PERSONA.communicationStyle,
+          values: DEMO_PERSONA.values as never,
+          completeness: DEMO_PERSONA.completeness,
+        }
+      : DEMO_PERSONA;
+
+    const persona = existing
+      ? await tx.persona.update({
+          where: { userId: user.id },
+          data: { ...personaData, displayName },
+        })
+      : await tx.persona.create({
+          data: { userId: user.id, kind: "human", displayName, ...DEMO_PERSONA },
+        });
 
     await tx.communicationPrefs.upsert({
       where: { userId: user.id },

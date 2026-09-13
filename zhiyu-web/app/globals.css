@@ -808,7 +808,85 @@ textarea:focus-visible {
   font-family: var(--font-hand);
 }
 
-/* ── ⑲ 响应式与动效偏好 ─────────────────────────────────────────────────── */
+/* ── ⑲ 综合画像雷达（PersonaRadar，人格卡页） ───────────────────────────── */
+/* 与 ⑱ 是同一族但语义不同：这里画的是「融合特征强度」，⑱ 画的是「来源覆盖度」。
+   类名由 components/PersonaRadar.tsx 写出，同样刻意不做成 CSS Module。 */
+.prShell {
+  position: relative;
+  max-width: 300px;
+  padding: 4px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.84);
+  box-shadow: var(--shadow);
+}
+/* 环状底衬：让雷达看起来像"刻度盘"而不是纯线条 */
+.prShell::before {
+  content: "";
+  position: absolute;
+  inset: 6% 20% 12%;
+  background: url("/assets/decor/rings.png") center / contain no-repeat;
+  opacity: 0.2;
+  pointer-events: none;
+}
+.prShell svg {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.prRing {
+  fill: none;
+  stroke: var(--line-soft);
+  stroke-width: 1;
+}
+.prRing2 {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 4;
+}
+.prAxis {
+  stroke: var(--line-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.prVal {
+  fill: color-mix(in oklch, var(--accent) 22%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.prDot {
+  fill: #fff9eb;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.prName {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-anchor: middle;
+}
+.prEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.prEmpty span {
+  padding: 5px 14px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.95);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+/* ── ⑳ 响应式与动效偏好 ─────────────────────────────────────────────────── */
 @media (max-width: 920px) {
   .panel {
     padding: 18px;

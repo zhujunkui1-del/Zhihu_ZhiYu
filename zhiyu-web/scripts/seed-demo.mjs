@@ -58,6 +58,26 @@ const DEMO_SELF = {
       typeTitle: "深度思考型",
       similarity: 100,
       fallback: false,
+      /* 15 个维度的原始分（每维 2 题 × 1~3 分 → 2~6）。
+         没有这一段，人格卡页的「综合画像」雷达只会显示"等待蒸馏"。
+         取值倾向：自我认知与观念偏高、社交主动性偏低 —— 与「深度思考型」自洽。 */
+      dimensions: {
+        S1: { score: 5, level: "H" },
+        S2: { score: 6, level: "H" },
+        S3: { score: 5, level: "H" },
+        E1: { score: 4, level: "M" },
+        E2: { score: 4, level: "M" },
+        E3: { score: 5, level: "H" },
+        A1: { score: 5, level: "H" },
+        A2: { score: 4, level: "M" },
+        A3: { score: 6, level: "H" },
+        Ac1: { score: 5, level: "H" },
+        Ac2: { score: 5, level: "H" },
+        Ac3: { score: 4, level: "M" },
+        So1: { score: 3, level: "L" },
+        So2: { score: 5, level: "H" },
+        So3: { score: 4, level: "M" },
+      },
     },
   },
   completeness: 60,

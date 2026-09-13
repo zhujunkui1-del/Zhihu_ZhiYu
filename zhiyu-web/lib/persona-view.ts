@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/db";
 import { computeCompleteness, type PersonaSourceType } from "@/lib/persona/completeness";
+import { axesFromDimensions, type Axis, type RawDimScore } from "@/lib/sbti/axes";
 
 /** 六个数据源与展示顺序（首页的「人格数据源」行、我的人格页都用它） */
 export const SOURCE_TYPES: PersonaSourceType[] = [
@@ -33,6 +34,8 @@ export interface SbtiView {
   typeTitle?: string;
   similarity?: number;
   fallback?: boolean;
+  /** 15 个维度的原始分（SBTI 提交时写入） */
+  dimensions?: Record<string, RawDimScore>;
 }
 
 export interface SourceChip {
@@ -58,6 +61,11 @@ export interface PersonaBoard {
   /** 六个数据源按固定顺序列出（缺的也列，显示为未注入） */
   sourceChips: SourceChip[];
   injectedCount: number;
+  /**
+   * 五轴画像（由 SBTI 的 15 维聚合而来）。
+   * 未做 SBTI 时各轴 value 为 null —— 调用方据此显示"等待蒸馏"。
+   */
+  axes: Axis[];
 }
 
 /**
@@ -112,5 +120,7 @@ export async function buildPersonaBoard(personaId: string): Promise<PersonaBoard
     sbti,
     sourceChips,
     injectedCount: injected.length,
+    /* 五轴来自 SBTI 的 15 维聚合 —— 这是真实数据，不是占位 */
+    axes: axesFromDimensions(sbti?.dimensions),
   };
 }

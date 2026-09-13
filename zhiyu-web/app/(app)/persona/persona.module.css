@@ -1,0 +1,528 @@
+/* 我的人格页样式（移植自原型 zhiyu-persona.html + 主题层手绘纸感覆盖） */
+
+.pageHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.pageHead h1 {
+  max-width: 22ch;
+}
+
+.doneBar {
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border: 1.5px solid rgba(226, 102, 79, 0.45);
+  border-radius: var(--r-hand);
+  background: var(--accent-faint);
+  color: var(--accent-deep);
+  font-size: 13.5px;
+}
+.doneBar b {
+  font-family: var(--font-hand);
+  font-weight: 900;
+}
+
+/* ── 页签 ───────────────────────────────────────────────────────────────── */
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.78);
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+.seg button {
+  min-height: 40px;
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 12px 9px 13px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 800;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg button:hover {
+  color: var(--fg);
+}
+.segActive {
+  background: linear-gradient(135deg, #ec7d64, var(--accent-deep)) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(201, 80, 58, 0.26);
+}
+
+/* ── 六源注入状态列表 ───────────────────────────────────────────────────── */
+.covList {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.covList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.86);
+  font-size: 13px;
+}
+.covMark {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.covMark svg {
+  width: 11px;
+  height: 11px;
+}
+.covOn {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.covOff {
+  background: var(--fg-soft);
+  color: var(--muted);
+}
+.covName {
+  flex: 1;
+  min-width: 0;
+}
+.covName small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.covState {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.covStateOn {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+/* ── 融合特征区 ─────────────────────────────────────────────────────────── */
+.featBlock {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+.featHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.featHead h3 {
+  font-size: 17px;
+}
+
+.fusionGrid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.prCol {
+  min-width: 0;
+}
+
+.typeBadge {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.typeName {
+  font-family: var(--font-hand);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--fg);
+}
+
+.hint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+
+.axisList {
+  display: grid;
+  gap: 9px;
+}
+.axisRow {
+  display: grid;
+  grid-template-columns: 44px 1fr 46px;
+  gap: 12px;
+  align-items: center;
+}
+.axisLabel {
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.axisVal {
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── 注入数据 ───────────────────────────────────────────────────────────── */
+.secIntro {
+  max-width: 66ch;
+  margin-bottom: 22px;
+}
+.secIntro h2 {
+  margin: 4px 0 0;
+}
+.secIntro p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.srcGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.srcCard {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.86);
+  box-shadow: var(--shadow);
+  transition: transform 0.18s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.srcCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(226, 102, 79, 0.5);
+  box-shadow: var(--shadow-lg);
+}
+.srcTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.srcMark {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+}
+.srcMark svg {
+  width: 20px;
+  height: 20px;
+}
+.srcTitle {
+  font-family: var(--font-hand);
+  font-size: 15.5px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.srcDim {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.srcNote {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.srcStats {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px dashed var(--line-soft);
+  display: grid;
+  gap: 4px;
+}
+.srcStats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.srcStats .num {
+  color: var(--fg);
+}
+.srcFoot {
+  margin-top: auto;
+  padding-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+.srcFoot button {
+  flex: 1;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+}
+
+/* ── Agent 蒸馏 ─────────────────────────────────────────────────────────── */
+.runGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+/* 这两个列表容器：加边框就必须同时给内边距，否则内容会挤出边框
+   （这是早些时候实际踩过的坑，原型主题层里也专门记录过） */
+.runReq {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.72);
+}
+.runReq:first-child {
+  margin-top: 0;
+}
+
+.stageList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  display: grid;
+  gap: 2px;
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.72);
+}
+.stageList li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.stageIc {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1.6px solid var(--line-soft);
+  border-radius: 50%;
+  color: transparent;
+}
+.stageIc svg {
+  width: 12px;
+  height: 12px;
+}
+.stName {
+  flex: 1;
+  min-width: 0;
+}
+.stNote {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.st_done {
+  color: var(--fg);
+}
+.st_done .stageIc {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+.st_doing {
+  color: var(--fg);
+  font-weight: 700;
+}
+.st_doing .stageIc {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.st_doing .stNote {
+  color: var(--accent-deep);
+}
+.st_todo {
+  color: var(--muted);
+}
+
+.runActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.agentFig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background: rgba(255, 253, 246, 0.86);
+}
+.agentFig img {
+  width: 148px;
+  height: 148px;
+  object-fit: contain;
+  object-position: 50% 20%;
+}
+.agentFig figcaption {
+  margin-top: 8px;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.agentCap {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* ── SBTI 测试弹窗 ──────────────────────────────────────────────────────── */
+.quizBackdrop {
+  /* 复用全局 .modalBackdrop，这里只补可点关闭 */
+  cursor: pointer;
+}
+.quizDialog {
+  width: min(720px, 100%);
+  cursor: default;
+}
+.quizHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-right: 40px;
+}
+.quizText {
+  margin: 0 0 18px;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.2vw, 22px);
+  line-height: 1.6;
+  color: var(--fg);
+}
+
+.optList {
+  display: grid;
+  gap: 9px;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.opt:hover {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+}
+.optSel {
+  border-color: var(--accent);
+  background: var(--accent-faint);
+  box-shadow: 0 0 0 3px var(--accent-faint);
+}
+.optKey {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 50%;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--muted);
+}
+
+.quizNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.quizProgress {
+  margin-left: auto;
+}
+
+.quizBusy {
+  padding: 40px 20px;
+  text-align: center;
+}
+.quizBusyBig {
+  margin: 0 0 10px;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--fg);
+}
+
+/* ── 窄屏 ───────────────────────────────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .fusionGrid,
+  .runGrid {
+    grid-template-columns: 1fr;
+  }
+  .srcGrid {
+    grid-template-columns: 1fr;
+  }
+}
