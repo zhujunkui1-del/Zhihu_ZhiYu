@@ -1,0 +1,603 @@
+@charset "UTF-8";
+/* ============================================================================
+   知遇 ZhiYu · 手绘纸感主题层（zhiyu-theme.css）
+   ----------------------------------------------------------------------------
+   作用：把旧前端（冷调科技蓝 #0d64fd / #eef3fc）整体改写为新前端
+        （暖调手绘纸感 #348cff / 纸纹底）的视觉语言。
+
+   原理：旧前端 185KB CSS 中【只有 7 个 hex 颜色，且全部只在 :root 定义】，
+        其余 169 处 color-mix() / 170 处 oklch() 一律走 var() 引用。
+        因此这里用 :root:root（特异性 0,2,0 > 0,1,0）覆盖 token 即可全站生效，
+        无需 !important，也无需改写任何一条原有规则。
+
+   纪律：本文件【只改视觉，不改功能】。
+        - 不隐藏、不移除任何旧前端的控件
+        - 不新增旧前端没有的功能
+        - 新前端的全局搜索栏等冗余控件一律不引入
+        - 产品方案中的功能点（三维筛选 / 快速匹配 / 雷达图 / Agent 对话 /
+          匹配报告 / 通知三分类 / 设置四区 / BYOK / 六源注入）全部保留
+   ========================================================================= */
+
+/* ── ① 设计 token 覆盖 ──────────────────────────────────────────────────── */
+:root:root {
+  /* 底色与墨色：冷蓝 → 暖纸 */
+  --bg:      #f8f0df;
+  --surface: #fff9eb;
+  --fg:      #381508;
+  --muted:   #8a6047;
+  --border:  rgba(83, 42, 23, 0.22);
+  --accent:  #348cff;
+
+  /* 手绘描边与投影 */
+  --line:       rgba(83, 42, 23, 0.52);
+  --line-soft:  rgba(83, 42, 23, 0.24);
+  --shadow:     0 8px 22px rgba(95, 55, 24, 0.10), 0 2px 4px rgba(78, 38, 18, 0.08);
+  --shadow-lg:  0 18px 48px rgba(95, 55, 24, 0.18), 0 4px 10px rgba(78, 38, 18, 0.10);
+
+  /* 派生色：必须在此重新混合，否则会沿用旧 --fg / --accent 的结果 */
+  --fg-soft:      color-mix(in oklch, var(--fg) 7%, transparent);
+  --fg-softer:    color-mix(in oklch, var(--fg) 4%, transparent);
+  --accent-soft:  color-mix(in oklch, var(--accent) 15%, transparent);
+  --accent-faint: color-mix(in oklch, var(--accent) 6%, transparent);
+  --danger:       #d8503f;
+
+  /* 手绘字体：只给品牌字与 UI 控件用。
+     注意：这里【不能】重定向 --font-display —— 旧 CSS 的 h1/h2/品牌字都引用它，
+     一旦重定向会让本应保持书卷气的标题也变成手写体。手写体单独用 --font-hand。 */
+  --font-hand: "Kaiti SC", STKaiti, KaiTi, "Noto Serif SC", "Source Han Serif SC", serif;
+  /* 手绘不规则圆角：上左 / 上右 / 下右 / 下左 */
+  --r-hand:      15px 11px 16px 12px;
+  --r-hand-lg:   22px 17px 24px 19px;
+  --r-hand-pill: 999px;
+}
+
+/* ── ② 全局纸感底 ───────────────────────────────────────────────────────── */
+body {
+  background-color: var(--bg);
+  background-image: url("./assets/textures/paper.png");
+  background-size: 620px 620px;
+  background-attachment: fixed;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* 细颗粒噪点：模拟纸张印刷质感（新前端 .page-noise 的做法） */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+  background-image: radial-gradient(rgba(70, 39, 20, 0.32) 0.45px, transparent 0.6px);
+  background-size: 4px 4px;
+}
+
+/* 让应用内容压在噪点层之上 */
+.app-shell { position: relative; z-index: 1; }
+
+/* ── ③ 侧边栏 ───────────────────────────────────────────────────────────── */
+.sidebar {
+  background: rgba(255, 251, 239, 0.74);
+  backdrop-filter: blur(8px);
+  border-right: 1.5px solid var(--line-soft);
+}
+
+/* 品牌区：旧 CSS 把 .brand-word 的可用宽度按 42px 的 logo 预留，
+   图片移除后 "知遇" 会被挤成两行、撑高盒子。这里取消收缩并恢复文本流。 */
+.side-brand { padding: 4px 6px 2px; }
+.brand-row { align-items: center; gap: 12px; }
+.brand-word {
+  white-space: nowrap;
+  font-family: var(--font-hand);
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: 0.10em;
+  line-height: 1.1;
+}
+.brand-tag { white-space: nowrap; margin-top: 4px; font-size: 11px; }
+
+/* 品牌标：一枚手写「知」，替代原来的蓝色 webp logo */
+.brand-plate {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  position: relative;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 222, 0.9));
+  box-shadow: var(--shadow);
+  overflow: visible;
+}
+.brand-plate img { display: none; }           /* 旧 webp logo 停用 */
+
+/* "知"字品牌标：只给【侧边栏】那一枚，避免给登录页的 brand-plate-lg 也叠一层 */
+.sidebar .brand-plate::before {
+  content: "知";
+  font-family: var(--font-hand);
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--fg);
+  line-height: 1;
+  transform: rotate(-3deg);
+}
+.sidebar .brand-plate::after {
+  content: "✦";
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  color: #ffbc28;
+  font-size: 16px;
+  transform: rotate(-14deg);
+}
+/* 登录页没有侧栏，它的 brand-plate 单独给一枚更大的品牌字 */
+.brand-plate-lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px 13px 19px 14px;
+  position: relative;
+}
+.brand-plate-lg::before {
+  content: "知";
+  font-family: var(--font-hand);
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--fg);
+  line-height: 1;
+  transform: rotate(-3deg);
+}
+.brand-plate-lg::after {
+  content: "✦";
+  position: absolute;
+  top: -11px;
+  right: -9px;
+  color: #ffbc28;
+  font-size: 20px;
+  transform: rotate(-14deg);
+}
+.brand-word { font-family: var(--font-hand); font-weight: 900; letter-spacing: 0.06em; }
+.brand-tag  { color: var(--muted); }
+
+/* 导航项：手写体 + 大圆角 + 选中态实心蓝 */
+.nav-item {
+  font-family: var(--font-hand);
+  font-weight: 800;
+  border-radius: var(--r-hand);
+  font-size: 15.5px;
+}
+.nav-item:hover { background: var(--fg-softer); }
+.nav-item.active {
+  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(52, 140, 255, 0.30);
+}
+.nav-item.active svg { color: #fff; }
+
+/* 侧栏底部：木牌插画 + 手写标语（对应新前端 .sidebar-story） */
+.side-foot {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1.5px dashed var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.side-foot .nav-item { flex: 0 0 auto; width: 100%; }
+.side-foot .zh-avatar { display: none; }       /* 头像已在品牌区/内容区体现，避免与木牌重叠 */
+.side-story {
+  position: relative;
+  text-align: center;
+  padding: 0 4px;
+}
+.side-story img {
+  width: 100%;
+  max-width: 168px;
+  height: 140px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+.side-story p {
+  margin: 0;
+  color: #805742;
+  font-family: var(--font-hand);
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+/* ── ④ 卡片 / 面板：手绘描边卡片 ────────────────────────────────────────── */
+.panel,
+.card,
+.persona-card,
+.src,
+.src-card,
+.s-card,
+.panel-card,
+.q-card,
+.mcard,
+.acard,
+.n-card,
+.go-card,
+.flow-card,
+.how-card,
+.surface-card,
+.stage-list,
+.list,
+.pr-shell,
+.run-req {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.84);
+  box-shadow: var(--shadow);
+}
+
+/* 条纹填充：对应新前端 .striped-card，给次要卡片加纸纹层次 */
+.panel-eyebrow + .random-head,
+.quick-result,
+.rep-dims,
+.dim-list,
+.pr-col,
+.src-stats,
+.ai-saved,
+.set-list {
+  border-radius: var(--r-hand);
+}
+
+.persona-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.persona-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(52, 140, 255, 0.55);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 条纹底（用在新前端同款副卡位置） */
+.striped-surface,
+.dim-list,
+.rep-dims,
+.quick-result {
+  background-color: rgba(255, 252, 242, 0.9);
+  background-image: url("./assets/textures/stripes.png");
+  background-size: 430px 430px;
+}
+
+/* ── ⑤ 按钮 ─────────────────────────────────────────────────────────────── */
+.btn { font-family: var(--font-hand); font-weight: 800; border-radius: var(--r-hand); }
+.btn-primary {
+  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  border: 1.8px solid var(--accent);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(52, 140, 255, 0.22);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #3f8ef5, #2268d0);
+  border-color: #2268d0;
+  color: #fff;
+}
+.btn-secondary {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 226, 0.9));
+  color: var(--fg);
+  box-shadow: 0 3px 9px rgba(95, 55, 24, 0.10);
+}
+.btn-secondary:hover {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, #fff, rgba(214, 237, 255, 0.9));
+  color: #1265cf;
+}
+.btn-ghost { font-family: var(--font-hand); font-weight: 800; }
+.btn-ghost:hover { color: var(--accent); }
+
+/* ── ⑥ 页签 / 筛选 / 开关 ───────────────────────────────────────────────── */
+/* 分段页签容器：手绘外框 + 不规则圆角 */
+.seg {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.78);
+  box-shadow: var(--shadow);
+}
+.seg button {
+  font-family: var(--font-hand);
+  font-weight: 800;
+  border-radius: 12px 9px 13px 10px;
+}
+.seg button.active {
+  background: linear-gradient(135deg, #4f9dff, #2f7fe8);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(52, 140, 255, 0.25);
+}
+
+/* 搜索框：手绘描边大圆角 */
+.search-input {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.9);
+  box-shadow: var(--shadow);
+}
+.search-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-faint), var(--shadow);
+}
+
+/* 下拉筛选 */
+.filter-field select {
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.94);
+  font-family: var(--font-body);
+  box-shadow: 0 3px 8px rgba(95, 55, 24, 0.08);
+}
+.filter-field select:focus { border-color: var(--accent); }
+.filter-field::after {
+  border-right-color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+.filter-field label { font-family: var(--font-hand); font-weight: 700; color: var(--fg); font-size: 13.5px; }
+
+/* 开关：新前端 .setting-switch 的暖灰底 + 蓝色开启态 */
+.switch i { background: #d8d5ce; border: 1.5px solid var(--line-soft); }
+.switch input:checked + i { background: var(--accent); border-color: var(--accent); }
+.switch i::after { background: #fff9eb; }
+.switch-wrap span { font-family: var(--font-hand); font-weight: 700; color: var(--fg); font-size: 13.5px; }
+
+/* 药丸标签 */
+.head-chip, .p-pill, .p-tag, .chip, .req-chip, .sp-pill, .badge, .am-pill, .state-pill {
+  border: 1.5px solid var(--line-soft);
+  background: rgba(255, 253, 246, 0.9);
+  font-family: var(--font-hand);
+  font-weight: 700;
+}
+.p-tag { border-radius: 999px; color: var(--muted); }
+.p-pill, .head-chip { border-radius: 999px; }
+.badge.done, .state-pill.ok, .req-chip.ok { border-color: rgba(52, 140, 255, 0.5); background: var(--accent-faint); color: #1265cf; }
+
+/* ── ⑦ 进度条 / 评分 ────────────────────────────────────────────────────── */
+.track {
+  background: var(--fg-softer);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  height: 9px;
+}
+.track i, .track > i {
+  background: linear-gradient(90deg, #83c4ff, #348cff);
+  border-radius: 999px;
+}
+.sim-top .num, .score-badge, .num { font-family: var(--font-hand); font-weight: 900; color: var(--fg); }
+.dim-item .dv, .dc-sim .num { font-family: var(--font-hand); font-weight: 900; color: var(--accent); }
+
+/* ── ⑧ 雷达图：新风格重绘（三种实现统一处理）────────────────────────────── */
+/* 8.1 人格卡弹窗雷达（.modal-radar，find / notify） */
+.modal-radar { position: relative; padding: 10px 0 4px; }
+.modal-radar::before {
+  content: "";
+  position: absolute;
+  inset: 6% 20% 14%;
+  background: url("./assets/decor/rings.png") center / contain no-repeat;
+  opacity: 0.20;
+  pointer-events: none;
+}
+.modal-radar svg { position: relative; }
+.modal-radar .mgrid  { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+.modal-radar .mgrid2 { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.modal-radar .maxis  { stroke: var(--line-soft); stroke-width: 1; stroke-dasharray: 3 4; }
+.modal-radar .mval  {
+  fill: color-mix(in oklch, var(--accent) 22%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.modal-radar .mdot  { fill: #fff9eb; stroke: var(--accent); stroke-width: 2; }
+.modal-radar text.mname {
+  fill: var(--fg);
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-anchor: middle;
+}
+
+/* 8.2 Agent 匹配页雷达（.radar-wrap） */
+.radar-wrap { position: relative; }
+.radar-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 4% 18% 10%;
+  background: url("./assets/decor/rings.png") center / contain no-repeat;
+  opacity: 0.18;
+  pointer-events: none;
+}
+.radar-wrap svg { position: relative; }
+.radar-wrap .mgrid  { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+.radar-wrap .mgrid2 { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.radar-wrap .maxis  { stroke: var(--line-soft); stroke-width: 1; stroke-dasharray: 3 4; }
+.radar-wrap .mval {
+  fill: color-mix(in oklch, var(--accent) 22%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.radar-wrap .mdot { fill: #fff9eb; stroke: var(--accent); stroke-width: 2; }
+.radar-wrap text.mname { fill: var(--fg); font-family: var(--font-hand); font-weight: 700; font-size: 11.5px; }
+
+/* 8.3 人格页雷达（.pr-shell） */
+.pr-shell { position: relative; background: rgba(255, 251, 239, 0.84); }
+.pr-shell::before {
+  content: "";
+  position: absolute;
+  inset: 6% 20% 12%;
+  background: url("./assets/decor/rings.png") center / contain no-repeat;
+  opacity: 0.20;
+  pointer-events: none;
+}
+.pr-shell svg { position: relative; }
+.pr-shell .pr-ring   { fill: none; stroke: var(--line-soft); stroke-width: 1; }
+.pr-shell .pr-ring2  { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.pr-shell .pr-axis   { stroke: var(--line-soft); stroke-width: 1; stroke-dasharray: 3 4; }
+.pr-shell .pr-val {
+  fill: color-mix(in oklch, var(--accent) 22%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.pr-shell .pr-dot { fill: #fff9eb; stroke: var(--accent); stroke-width: 2; }
+.pr-shell text.pr-name { fill: var(--fg); font-family: var(--font-hand); font-weight: 700; }
+
+/* ── ⑨ 头像：接入新前端 fox 角色插画 ────────────────────────────────────── */
+/* 素材是 512×512 全身像，头部约占画面上半部中央。
+   直接 cover 会让角色在圆形头像里显得过小，这里放大并上移取景，
+   让头部落在圆内可视区，同时保留描边质感。 */
+.p-avatar,
+.zh-avatar,
+.ava,
+.dc-ava,
+.avatar,
+.po-ava,
+.modal-avatar {
+  overflow: hidden;
+  background-color: #fff9ec;
+  background-size: 250%;
+  background-position: 50% 20%;
+  background-repeat: no-repeat;
+  border: 1.8px solid var(--line);
+  border-radius: 50%;
+  font-family: var(--font-hand);
+  font-weight: 900;
+  color: var(--fg);
+}
+/* 有角色图时隐藏文字首字，避免与插画重叠（图由 JS 以 data-avatar 标注） */
+[data-avatar] { color: transparent !important; }
+
+/* ── ⑩ 弹窗 / Toast ────────────────────────────────────────────────────── */
+.modal-backdrop { background: color-mix(in oklch, var(--fg) 42%, transparent); backdrop-filter: blur(4px); }
+.modal-dialog {
+  border: 2px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: #fff9eb;
+  background-image: url("./assets/textures/paper.png");
+  background-size: 620px 620px;
+  box-shadow: var(--shadow-lg);
+}
+.modal-close { border-radius: 50%; }
+.modal-close:hover { background: var(--fg-softer); }
+.profile-title h3, .m-title, .modal-dialog h3 { font-family: var(--font-hand); font-weight: 900; }
+
+.toast {
+  border: 2px solid var(--fg);
+  border-radius: var(--r-hand);
+  background: #fff8e4;
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-weight: 800;
+  box-shadow: 0 12px 36px rgba(58, 26, 10, 0.22);
+}
+
+/* ── ⑪ Agent 对话气泡：手绘气泡 ─────────────────────────────────────────── */
+.msg, .bubble, .chat-line {
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.94);
+  font-size: 14px;
+}
+.msg.q, .chat-line.sys-note {
+  background: var(--accent-faint);
+  border-color: rgba(52, 140, 255, 0.35);
+  border-style: dashed;
+  color: var(--muted);
+}
+.msg.a, .bubble.me { border-left: 4px solid var(--accent); }
+.msg.b, .bubble.ta { border-left: 4px solid #ff9a76; }
+.duo, .mini-duo { font-family: var(--font-hand); font-weight: 800; }
+
+/* ── ⑫ 表格 / 列表行 ───────────────────────────────────────────────────── */
+.cand, .nt-row, .s-row, .src-line, .trait-row, .ai-item {
+  border-bottom: 1px dashed var(--line-soft);
+}
+.src-line:last-child, .s-row:last-child, .trait-row:last-child, .cand:last-child { border-bottom: none; }
+
+/* 通知卡片：手绘卡片 + 未读态用左侧蓝条区分，避免与面板底同色糊在一起 */
+.n-card, .n-notice {
+  border: 1.6px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.92);
+  box-shadow: 0 4px 12px rgba(95, 55, 24, 0.07);
+  padding: 16px 18px;
+  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+.n-card + .n-card, .n-notice + .n-notice { margin-top: 12px; }
+.n-card:hover, .n-notice:hover {
+  transform: translateY(-2px);
+  border-color: rgba(52, 140, 255, 0.5);
+  box-shadow: var(--shadow);
+}
+.n-card.unread, .n-notice.unread {
+  border-left: 5px solid var(--accent);
+  background: linear-gradient(100deg, rgba(214, 237, 255, 0.5), rgba(255, 253, 246, 0.94) 42%);
+}
+.n-card .n-title, .n-notice .n-title { font-weight: 700; }
+.n-card .n-kind, .n-notice .n-kind { font-family: var(--font-hand); font-weight: 800; }
+.n-card .n-time, .n-notice .n-time { color: var(--muted); font-size: 12.5px; }
+.unread-dot, .kdot { background: var(--accent); }
+
+/* ── ⑬ 登录页 ───────────────────────────────────────────────────────────── */
+.login-hero, .pagefoot { position: relative; }
+.orb {
+  background: radial-gradient(circle at 35% 30%, rgba(131, 196, 255, 0.85), rgba(255, 212, 93, 0.35) 70%, transparent);
+  filter: blur(8px);
+  opacity: 0.55;
+}
+.auth-card, .surface-card, .flow-card, .how-card, .quote-wrap, .cta-shell {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: rgba(255, 251, 239, 0.9);
+  box-shadow: var(--shadow);
+}
+.oauth-btn {
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 246, 226, 0.9));
+  font-family: var(--font-hand);
+  font-weight: 800;
+  box-shadow: 0 3px 10px rgba(95, 55, 24, 0.10);
+}
+.oauth-btn:hover { border-color: var(--accent); background: linear-gradient(135deg, #fff, rgba(214, 237, 255, 0.9)); }
+.flow-node, .flow-arrow { font-family: var(--font-hand); font-weight: 800; }
+
+/* ── ⑭ 排版 ────────────────────────────────────────────────────────────── */
+/* 标题保持页面自带的书卷气衬线体（旧 CSS 里的 --font-display），
+   手写体只用于品牌字与 UI 控件，避免整页失去阅读秩序。 */
+h1, h2 { letter-spacing: 0.015em; }
+h2 { line-height: 1.34; }
+/* 页面主标题避免被压成过窄的多行，保持与新前端一致的舒展标题节奏 */
+.find-head h1, .head h1, .main h1, .main-inner > h1 { max-width: 22ch; }
+
+/* 手写体施加在"UI 外壳"上，而非正文 */
+.btn, .seg button, .nav-item, .filter-field label, .switch-wrap span,
+.head-chip, .p-pill, .p-tag, .chip, .req-chip, .sp-pill, .badge,
+.track + .meta, .sim-top .num, .score-badge,
+.brand-word, .side-story p, .toast, .panel-eyebrow,
+.oauth-btn, .flow-node, .duo, .mini-duo {
+  font-family: var(--font-hand);
+}
+
+.panel-eyebrow, .meta {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.lead, .section-lead { color: var(--muted); }
+
+/* 段落留白（新前端风格：更松的行距） */
+p { line-height: 1.72; }
+
+/* 焦点环 */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── ⑮ 响应式兜底 ──────────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .sidebar { border-right: 0; border-bottom: 1.5px solid var(--line-soft); }
+  .side-story { display: none; }
+  body { background-attachment: scroll; }
+}
