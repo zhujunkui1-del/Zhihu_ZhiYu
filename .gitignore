@@ -3,6 +3,7 @@ neon环境变量.md
 开源项目/
 素材/
 *.txt
-!add36feb1a6280bbd6b17d8324be60e5.txt
+# 微信/第三方站点验证文件必须能通过网址访问，不能忽略（放在 zhiyu-web/public/ 下）
+!zhiyu-web/public/*.txt
 RECON/
 zhiyu-site/
