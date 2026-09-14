@@ -25,6 +25,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { fetchPublicPerson } from "../lib/zhihu/public-profile.ts";
+import { facetFromContents } from "../lib/persona/fusion.ts";
 
 const APPLY = process.argv.includes("--apply");
 const ONLY = (() => {
@@ -183,6 +184,7 @@ if (!APPLY) {
 console.log("\n开始写库…");
 let written = 0;
 let evidenceTotal = 0;
+let facetCount = 0;
 
 for (const r of rows) {
   const { persona, profile, pins, interests, values } = r;
@@ -194,18 +196,43 @@ for (const r of rows) {
       where: { personaId: persona.id, source: "zhihu" },
     });
     for (const pin of pins) {
+      /* ⚠️ note 必须存**正文**，不能存标题。
+         原先写的是 `pin.title || pin.text`，而实测这条 pin 的 title 就是正文前
+         20 字（知乎把正文截断当标题返回），于是库里 604 条证据平均只有 20 字、
+         0 条 ≥120 字。后果是"分源解析"拿标题长度当表达密度用，
+         所有人的 learning/creation 变成常数、判型全部挤在一型。
+         现在正文优先，标题只在没有正文时兜底。 */
+      const body = (pin.text || "").trim();
+      const title = (pin.title || "").trim();
+      const note = body.length >= title.length ? body : title;
       await tx.personaEvidence.create({
         data: {
           personaId: persona.id,
           source: "zhihu",
           trait: "想法",
           value: pin.likeCount,
-          note: (pin.title || pin.text).slice(0, 200),
+          note: note.slice(0, 2000),
           url: pin.url || null,
         },
       });
     }
     evidenceTotal += pins.length;
+
+    /* ①c 分源解析结果**在这里算并存下来**。
+           此刻手上有完整正文与真实热度（note 会被截断，之后再也算不准），
+           所以 facet 必须在写入时算 —— 见 lib/persona/source-facets.ts 的说明。 */
+    const facet = facetFromContents("zhihu", "知乎 · 公共表达", pins.map((p) => ({
+      text: `${p.title || ""}\n${p.text || ""}`.trim(),
+      heat: p.likeCount,
+    })));
+    if (facet) {
+      await tx.personaFeature.upsert({
+        where: { personaId_key: { personaId: persona.id, key: "facets:zhihu" } },
+        update: { value: facet },
+        create: { personaId: persona.id, key: "facets:zhihu", value: facet },
+      });
+      facetCount += 1;
+    }
 
     /* ①b 资料本身也是一条证据（自我描述 / 一句话介绍）。
            没有它的话，"零想法"的几位用户会一条证据都没有，
@@ -284,7 +311,7 @@ for (const r of rows) {
   written += 1;
 }
 
-console.log(`\n完成：写入 ${written} 位，共 ${evidenceTotal} 条证据`);
+console.log(`\n完成：写入 ${written} 位，共 ${evidenceTotal} 条证据，${facetCount} 份分源解析`);
 console.log(`总耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
 await prisma.$disconnect();

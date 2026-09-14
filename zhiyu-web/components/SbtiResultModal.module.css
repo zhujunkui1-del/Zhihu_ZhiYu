@@ -1,0 +1,269 @@
+/* SBTI 测试结果弹窗。
+   参考 sbti.unun.dev 的结果页信息编排，但用站内的手绘纸感风格
+   （边框、圆角、字体、纸纹都复用 --line / --r-hand / --font-hand 等既有变量）。 */
+
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--fg) 46%, transparent);
+  backdrop-filter: blur(4px);
+}
+.dialog {
+  position: relative;
+  width: min(1000px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 2px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: #fff9eb;
+  background-image: url("/assets/textures/paper.png");
+  background-size: 620px 620px;
+  box-shadow: var(--shadow-lg);
+  padding: 26px;
+}
+.close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  z-index: 2;
+}
+.close:hover {
+  background: var(--fg-softer);
+  color: var(--fg);
+}
+
+/* ── 结果主视觉 ────────────────────────────────────────────────────────── */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.heroLeft {
+  text-align: center;
+  padding: 20px 18px 24px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background: rgba(255, 253, 246, 0.9);
+}
+.heroEyebrow {
+  margin: 0 0 12px;
+  font-family: var(--font-hand);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.avatar {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+.heroTitle {
+  margin: 14px 0 2px;
+  font-family: var(--font-hand);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--fg);
+}
+.heroCode {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent-deep);
+}
+.heroGreeting {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1.5px dashed var(--line-soft);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.heroRight {
+  min-width: 0;
+}
+.sideLabel {
+  margin: 6px 0 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sideCode {
+  margin: 0 0 14px;
+  font-family: var(--font-hand);
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--fg);
+}
+.simBadge {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 6px 14px;
+  border: 1.5px solid rgba(226, 102, 79, 0.4);
+  border-radius: 999px;
+  background: var(--accent-faint);
+  color: var(--accent-deep);
+  font-size: 13px;
+}
+.simBadge b {
+  font-family: var(--font-mono);
+}
+.simDivider {
+  margin: 0 7px;
+  opacity: 0.6;
+}
+.dimIntro {
+  margin: 0 0 20px;
+  max-width: 60ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.dimTitle {
+  margin: 0 0 10px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.dimGrid {
+  display: grid;
+  gap: 8px;
+}
+.dimGroup {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.dimGroupName {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.dimChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dimChip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg);
+}
+.dimChip i {
+  font-family: var(--font-body);
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+/* 等级配色：高=强调色、中=中性、低=淡 */
+.lvH {
+  border-color: rgba(226, 102, 79, 0.5);
+  background: var(--accent-faint);
+}
+.lvH i {
+  color: var(--accent-deep);
+}
+.lvL {
+  opacity: 0.62;
+}
+.codeLine {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.codeLine code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--fg);
+}
+
+/* ── 完整解读 ──────────────────────────────────────────────────────────── */
+.reading {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand-lg);
+  background: rgba(255, 253, 246, 0.86);
+}
+.readingTitle {
+  margin: 0 0 10px;
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.readingBody {
+  margin: 0;
+  color: var(--fg);
+  font-size: 13.5px;
+  line-height: 1.95;
+  white-space: pre-wrap;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* ── 窄屏 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .wrap {
+    padding: 0;
+  }
+  .dialog {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    border-width: 0;
+    padding: 18px 16px;
+  }
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .avatar {
+    width: 120px;
+    height: 120px;
+  }
+  .heroTitle {
+    font-size: 28px;
+  }
+  .sideCode {
+    font-size: 32px;
+  }
+}

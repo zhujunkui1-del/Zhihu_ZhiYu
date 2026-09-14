@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
 import { PROVINCES } from "@/lib/regions";
+import { matchPersonaType } from "@/lib/persona/fusion";
 
 /** 发现页需要展示的候选视图 */
 export interface DiscoverCandidate {
@@ -65,11 +66,33 @@ function stringArray(v: unknown): string[] {
   return v.filter((x): x is string => typeof x === "string");
 }
 
-/** 从 personality JSON 里取人格倾向名与 SBTI 类型 */
-function personaType(personality: unknown): string | null {
+/**
+ * 取一个人格的**倾向型**（发现页「人格倾向」筛选与卡片上显示的那个）。
+ *
+ * ⚠️ 优先用**综合画像**（多源融合判定的六型倾向），而不是 SBTI 自评结果。
+ * 原因：
+ *   · 产品上「人格倾向」是综合画像的一部分，答的是"这个人整体是什么样"
+ *   · 真实知乎创作者根本没有 SBTI，若只看 sbti 则他们**永远没有倾向型**，
+ *     发现页的「人格倾向」筛选对他们完全筛不出东西（实测就是这样）
+ *   · 反过来，做过 SBTI 的人也不该让一份自评问卷盖过所有观察数据
+ *
+ * 兼容：老的演示数据把倾向型预置在 `personality.type` / `sbti.typeTitle` 里，
+ * 所以融合判定不出来时回退到它 —— 这样演示人格的行为不变。
+ */
+function personaType(values: unknown, personality: unknown): string | null {
+  /* ① 综合画像：由六维（多源融合的产物）判定倾向型 */
+  const fusedMatch = matchPersonaType(
+    values && typeof values === "object" ? (values as Record<string, unknown>) : null,
+  );
+  if (fusedMatch) return fusedMatch.type;
+
+  /* ② 回退：演示数据里预置的倾向型 / SBTI 结果 */
   const p = (personality ?? {}) as Record<string, unknown>;
   const sbti = p.sbti as { type?: string; typeTitle?: string } | undefined;
-  return sbti?.typeTitle ?? sbti?.type ?? null;
+  const preset = p.type;
+  return (
+    (typeof preset === "string" ? preset : null) ?? sbti?.typeTitle ?? sbti?.type ?? null
+  );
 }
 
 /**
@@ -152,7 +175,7 @@ export async function buildDiscover(
       bio: p.bio ?? null,
       province: p.province ?? null,
       city: p.city ?? null,
-      type: personaType(p.personality),
+      type: personaType(p.values, p.personality),
       /* 标签取兴趣前 3 项；不够时用 topics 补 */
       tags: [...interests, ...stringArray(p.topics)].slice(0, 4),
       agentOpen: p.agentOpen,

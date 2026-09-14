@@ -85,5 +85,10 @@ export async function POST(req: NextRequest) {
     similarity: result.similarity,
     fallback: result.fallback,
     dimensions: result.dimensionScores,
+    /* 结果弹窗要展示"完整解读"：点睛短句 + 长文。
+       人格库本来就带着这两段（greeting / description），
+       以前没往外传，前端只能显示一行「刚完成 SBTI：死者」。 */
+    greeting: result.type.greeting ?? null,
+    description: result.type.description ?? null,
   });
 }

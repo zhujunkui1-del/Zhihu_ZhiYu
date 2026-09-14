@@ -1,0 +1,326 @@
+/**
+ * 「综合画像」——把多源数据融合后的结论。
+ *
+ * ── 必须区分的两个概念（这里曾经做错过）──────────────────────────────
+ *   ① **SBTI 结果**：本人做 30 题自评得到的沙雕人格（如「僧人 MONK」）。
+ *      它是**自评**，只是六源之一，**不是**综合画像。
+ *   ② **综合画像**：把知乎/微信/QQ/飞书/钉钉等**观察到的**数据蒸馏融合后，
+ *      判定这个人属于哪一种**人格倾向**。
+ *
+ * 之前的实现把 ① 直接当成 ② —— 页面上「综合画像 · 融合特征」里显示的
+ * 类型徽章其实是 SBTI 的自评结果。后果：
+ *   · 用户明明有知乎数据，综合画像却只反映一份自评问卷
+ *   · 发现页的「人格倾向」筛选对真实用户几乎筛不出东西
+ *
+ * ── 六种人格倾向 ──────────────────────────────────────────────────────
+ * 与发现页搜索栏的「人格倾向」筛选项**完全一致**（同一份定义，不要各写一份）：
+ *   深度思考型 / 好奇探索型 / 温和共情型 / 理性辩手型 / 体验派 / 务实执行型
+ *
+ * 每一种都由一组「六维价值观原型」定义（learning/creation/career/social/
+ * stability/autonomy）。判定方式 = 找与本人六维向量**最接近**的原型。
+ * 这组原型值原先只存在于 `scripts/seed-demo.mjs`（给 16 个演示人格用的），
+ * 现在提到这里作为**唯一来源**，演示数据与真实用户判定共用同一套基准。
+ */
+
+/** 六维价值观的键（顺序固定，便于展示与比较） */
+export const VALUE_KEYS = [
+  "learning",
+  "creation",
+  "career",
+  "social",
+  "stability",
+  "autonomy",
+] as const;
+
+export type ValueKey = (typeof VALUE_KEYS)[number];
+
+/** 六维价值观的中文名 */
+export const VALUE_LABEL: Record<string, string> = {
+  learning: "学习成长",
+  creation: "创造表达",
+  career: "事业成就",
+  social: "社交连接",
+  stability: "稳定安全",
+  autonomy: "独立自主",
+};
+
+export type PersonaType =
+  | "深度思考型"
+  | "好奇探索型"
+  | "温和共情型"
+  | "理性辩手型"
+  | "体验派"
+  | "务实执行型";
+
+/** 每种倾向的原型六维（0~1）+ 一句话说明 */
+export interface TypeArchetype {
+  type: PersonaType;
+  /** 该倾向的典型六维取值 */
+  values: Record<ValueKey, number>;
+  /** 一句话特征，用于卡片与提示 */
+  blurb: string;
+}
+
+/**
+ * 六型原型。数值即 `seed-demo.mjs` 里一直在用的那组，
+ * 搬过来是为了让"演示人格"和"真实用户判定"用同一套基准 ——
+ * 否则演示数据自洽、真实用户却按另一套标准判型，两边没法比。
+ */
+export const TYPE_ARCHETYPES: TypeArchetype[] = [
+  {
+    type: "深度思考型",
+    values: { learning: 0.92, creation: 0.7, career: 0.5, social: 0.32, stability: 0.55, autonomy: 0.82 },
+    blurb: "习惯先把事情想清楚再开口，重推理过程而非结论",
+  },
+  {
+    type: "好奇探索型",
+    values: { learning: 0.9, creation: 0.78, career: 0.52, social: 0.62, stability: 0.34, autonomy: 0.74 },
+    blurb: "随时在收集新问题，喜欢把不同领域放在一起聊",
+  },
+  {
+    type: "温和共情型",
+    values: { learning: 0.6, creation: 0.52, career: 0.44, social: 0.9, stability: 0.7, autonomy: 0.42 },
+    blurb: "对情绪与细节敏感，更愿意先接住对方再谈事",
+  },
+  {
+    type: "理性辩手型",
+    values: { learning: 0.8, creation: 0.58, career: 0.66, social: 0.5, stability: 0.46, autonomy: 0.78 },
+    blurb: "享受观点被认真挑战，讨论时先立论再反驳",
+  },
+  {
+    type: "体验派",
+    values: { learning: 0.66, creation: 0.72, career: 0.48, social: 0.74, stability: 0.3, autonomy: 0.8 },
+    blurb: "更相信亲历而不是想象，先做再说",
+  },
+  {
+    type: "务实执行型",
+    values: { learning: 0.56, creation: 0.6, career: 0.86, social: 0.46, stability: 0.8, autonomy: 0.6 },
+    blurb: "先看能不能落地，讨厌把简单的事流程化",
+  },
+];
+
+/** 供下拉/筛选用（顺序即展示顺序） */
+export const PERSONA_TYPES: PersonaType[] = TYPE_ARCHETYPES.map((a) => a.type);
+
+/** 判断一个字符串是不是合法的倾向型（用于校验外部输入） */
+export function isPersonaType(v: unknown): v is PersonaType {
+  return typeof v === "string" && (PERSONA_TYPES as string[]).includes(v);
+}
+
+export interface TypeMatch {
+  type: PersonaType;
+  /** 0~100，越接近该原型越高 */
+  similarity: number;
+  /** 该倾向的一句话特征 */
+  blurb: string;
+  /** 排名前几的候选，便于展示"为什么是这一型" */
+  runnerUp: { type: PersonaType; similarity: number }[];
+}
+
+/**
+ * 由六维价值观判定人格倾向。
+ *
+ * 距离用**归一化欧氏距离**：六个维度各差值的平方和开根，再除以最大可能距离
+ * （六个维度全 0 vs 全 1 时为 √6），把结果压到 0~1，相似度 = (1 - 距离) × 100。
+ *
+ * 为什么不用"各维取最大"之类的简单规则：六个原型在个别维度上会交叉
+ * （比如 深度思考型 与 理性辩手型 的 learning 都偏高），只有整体距离
+ * 才能区分开。
+ *
+ * @param values 融合后的六维；缺失维度按 0.5（中性）处理 —— 不因缺数据就偏向某一型
+ * @returns 最接近的倾向；**没有任何有效维度时返回 null**（不硬猜）
+ */
+export function matchPersonaType(
+  values: Record<string, unknown> | null | undefined,
+): TypeMatch | null {
+  const src = (values ?? {}) as Record<string, unknown>;
+  const nums = VALUE_KEYS.map((k) => {
+    const v = src[k];
+    return typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : null;
+  });
+
+  /* 一个有效维度都没有 → 明确返回 null，让界面显示"暂无数据"而不是编一个型 */
+  if (nums.every((n) => n === null)) return null;
+
+  const effective = nums.map((n) => n ?? 0.5);
+
+  const scored = TYPE_ARCHETYPES.map((a) => {
+    const sq = VALUE_KEYS.reduce((sum, k, i) => {
+      const d = effective[i] - a.values[k];
+      return sum + d * d;
+    }, 0);
+    const dist = Math.sqrt(sq) / Math.sqrt(VALUE_KEYS.length);
+    return { type: a.type, arch: a, similarity: Math.round((1 - dist) * 100) };
+  }).sort((x, y) => y.similarity - x.similarity);
+
+  const best = scored[0];
+  return {
+    type: best.type,
+    similarity: best.similarity,
+    blurb: best.arch.blurb,
+    runnerUp: scored.slice(1, 3).map((s) => ({ type: s.type, similarity: s.similarity })),
+  };
+}
+
+/* ── 分源解析 ──────────────────────────────────────────────────────────── */
+
+/**
+ * 哪些源属于**观察到的**数据（可用于融合出综合画像）。
+ *
+ * SBTI 被**排除**在外，这点很关键：它是本人自评问卷，
+ * 只能说明"他希望自己是什么样"，不能证明"他实际是什么样"。
+ * 综合画像的职责是把**观察到的行为**融成结论，所以自评不参与融合，
+ * 而是单独作为一个面（facet）展示，与观察结论并列。
+ */
+export const OBSERVED_SOURCES = ["zhihu", "wechat", "qq", "feishu", "dingtalk"] as const;
+
+export type ObservedSource = (typeof OBSERVED_SOURCES)[number];
+
+export function isObservedSource(s: string): s is ObservedSource {
+  return (OBSERVED_SOURCES as readonly string[]).includes(s);
+}
+
+/** 单个源解析出的结果 */
+export interface SourceFacet {
+  source: string;
+  /** 该源的展示名 */
+  label: string;
+  /** 该源推断出的六维（只含算得出来的维度） */
+  values: Partial<Record<ValueKey, number>>;
+  /** 该源贡献了几条内容（展示"依据多少数据"） */
+  itemCount: number;
+  /** 该源的一句话结论 */
+  summary: string;
+}
+
+/** 某个源的一条内容（正文 + 互动量），用于按源解析 */
+export interface SourceContent {
+  text: string;
+  /** 点赞等热度，用于估算连接强度 */
+  heat?: number;
+}
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
+
+/**
+ * 领域词典：命中即认为与该领域相关（与 `scripts/backfill-real-zhihu.mjs`、
+ * `distill-real-people.mjs` 用的是同一套，改这里要三处一起改，
+ * 否则"按源解析"与"回填脚本"算出的兴趣会不一致）。
+ */
+export const DOMAIN_LEXICON: Record<string, string[]> = {
+  人工智能: ["AI", "人工智能", "大模型", "模型", "算法", "智能体", "agent", "Agent", "机器学习"],
+  产品设计: ["产品", "体验", "交互", "设计", "用户反馈", "功能", "界面"],
+  编程开发: ["代码", "编程", "开发", "程序员", "开源", "写代码", "架构", "调试"],
+  创业商业: ["创业", "商业", "增长", "运营", "市场", "融资", "变现"],
+  职场成长: ["职场", "工作", "效率", "成长", "管理", "协作"],
+  知识科普: ["科普", "原理", "为什么", "解释", "研究", "论文", "科学"],
+  人文历史: ["历史", "文化", "文学", "哲学", "思想", "社会"],
+  生活日常: ["生活", "日常", "周末", "吃饭", "旅行", "开心", "心情"],
+};
+
+/** 命中词典的兴趣方向（按命中次数降序） */
+export function interestsFromTexts(texts: string[]): string[] {
+  const hits = new Map<string, number>();
+  for (const t of texts) {
+    for (const [domain, words] of Object.entries(DOMAIN_LEXICON)) {
+      if (words.some((w) => t.includes(w))) hits.set(domain, (hits.get(domain) ?? 0) + 1);
+    }
+  }
+  return [...hits.entries()].sort((a, b) => b[1] - a[1]).map(([d]) => d);
+}
+
+/** `interestsFromTexts` 的别名：调用处读作"从这批内容里取兴趣"更顺 */
+export const interestFromContents = interestsFromTexts;
+
+/**
+ * 从**一批内容**按源解析出该源的六维与结论。
+ *
+ * 每一维都由可观测信号推断，不是打分拍的：
+ *   learning   ← 平均字数（表达密度）
+ *   creation   ← 长文比例（原创长文 vs 转发短评）
+ *   social     ← 平均互动（与人连接的强度）
+ *   stability  ← **内容一致性**（篇幅是否稳定），见下方说明
+ *   autonomy   ← 领域集中度（聚焦 vs 泛化）
+ *   career     ← 不推断（公开内容看不出职业取向），留空由别的源补
+ *
+ * ⚠️ `stability` 曾经写成"条数 / 20"，实测**严重饱和**：26 个真实用户里
+ * 22 个都拿到 1.00（因为抓取上限就是 30 条，人人一样），这一维等于没有信息，
+ * 还把判定结果整体推向原型里 stability 最高的「务实执行型」。
+ * 改成量**内容一致性**：篇幅忽长忽短的用 1 个标准差衡量。
+ * 它才是"稳定输出"的可观测代理，而且不随抓取条数上限变化。
+ *
+ * @param contents 该源的内容；条数为 0 时返回 null（**不编造**）
+ */
+export function facetFromContents(
+  source: string,
+  label: string,
+  contents: SourceContent[],
+): SourceFacet | null {
+  if (contents.length === 0) return null;
+
+  const lens = contents.map((c) => c.text.length);
+  const n = lens.length;
+  const avgChars = lens.reduce((s, x) => s + x, 0) / n;
+  const shortRatio = lens.filter((x) => x < 120).length / n;
+  const heat = contents.map((c) => c.heat ?? 0);
+  const avgHeat = heat.reduce((s, x) => s + x, 0) / n;
+  const domains = interestsFromTexts(contents.map((c) => c.text));
+
+  /* 内容一致性：变异系数 CV = 标准差 / 均值。
+     CV 越小（篇幅越齐）→ 越稳定。CV≥1 视为很不稳定。
+     样本只有 1 条时无从谈波动，给中性 0.5（不假装知道）。 */
+  let stability: number;
+  if (n < 2 || avgChars <= 0) {
+    stability = 0.5;
+  } else {
+    const variance = lens.reduce((s, x) => s + (x - avgChars) ** 2, 0) / n;
+    const cv = Math.sqrt(variance) / avgChars;
+    stability = clamp01(1 - Math.min(cv, 1));
+  }
+
+  const values: Partial<Record<ValueKey, number>> = {
+    learning: clamp01(avgChars / 600),
+    creation: clamp01(1 - shortRatio),
+    social: clamp01(avgHeat / 300),
+    stability,
+    autonomy: clamp01(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+  };
+
+  const top = domains.slice(0, 3);
+  const summary =
+    `${n} 条内容，平均 ${Math.round(avgChars)} 字（${(shortRatio * 100).toFixed(0)}% 为短内容）；` +
+    `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
+
+  return { source, label, values, itemCount: n, summary };
+}
+
+/**
+ * 把多个源的解析结果**融合**成综合画像的六维。
+ *
+ * 融合方式：每个维度取**有该维度数据的源**的算术平均。
+ * 为什么是平均而不是加权求和：各源地位平等（都是同一批观察数据），
+ * 加权需要先验可信度，而我们没有可靠依据去定"知乎比微信更可信"这种事 ——
+ * 与其编一个权重，不如老实用等权平均，并在返回里如实给出 `usedSources`，
+ * 让界面能说明"这份结论由哪几个源支撑"。
+ *
+ * @returns fused 六维（只含至少一个源提供的维度）；usedSources 参与的源
+ */
+export function fuseSourceFacets(facets: SourceFacet[]): {
+  fused: Partial<Record<ValueKey, number>>;
+  usedSources: string[];
+} {
+  const usedSources = facets.map((f) => f.source);
+  const fused: Partial<Record<ValueKey, number>> = {};
+
+  for (const key of VALUE_KEYS) {
+    const vals = facets
+      .map((f) => f.values[key])
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    if (vals.length) {
+      fused[key] = clamp01(vals.reduce((s, n) => s + n, 0) / vals.length);
+    }
+  }
+
+  return { fused, usedSources };
+}
+

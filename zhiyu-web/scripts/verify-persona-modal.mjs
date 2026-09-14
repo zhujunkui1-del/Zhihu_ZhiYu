@@ -138,20 +138,38 @@ errs.length = 0; // 只关心进入测试页之后的报错
 await installNavCounter();
 
 const homeBefore = await page.evaluate(() => `${location.pathname}${location.search}`);
+/**
+ * 优先点**真实知乎用户**的卡片。
+ *
+ * 为什么要挑：首页预览是随机取样的，可能抽到内置演示人格
+ * （`演示人格 NN`）。演示人格**本来就没有证据行**，用它去断言
+ * "有结论溯源"必然失败 —— 那是数据的正常状态，不是 bug（踩过）。
+ * 真人才是"什么数据都没有"这个投诉的对象。
+ */
 const homeTarget = await page.evaluate(() => {
-  const b = document.querySelector('[data-open-persona]');
+  const all = [...document.querySelectorAll("[data-open-persona]")];
+  const real = all.find((b) => b.getAttribute("data-open-persona").startsWith("zhihu-"));
+  const b = real ?? all[0];
   if (!b) return null;
-  return { id: b.getAttribute("data-open-persona"), label: b.textContent.trim().slice(0, 40) };
+  return {
+    id: b.getAttribute("data-open-persona"),
+    isReal: Boolean(real),
+    label: b.textContent.trim().slice(0, 40),
+  };
 });
 rec(
   "首页存在可就地打开人格卡的按钮",
   Boolean(homeTarget),
-  homeTarget ? `目标 ${homeTarget.id}（等了 ${homeReady ? "已就绪" : "超时"}）` : "未找到 [data-open-persona]",
+  homeTarget
+    ? `目标 ${homeTarget.id}（${homeTarget.isReal ? "真实用户" : "演示人格"}；等了 ${homeReady ? "已就绪" : "超时"}）`
+    : "未找到 [data-open-persona]",
 );
 
 if (homeTarget) {
   await page.evaluate(() => {
-    document.querySelector('[data-open-persona]').click();
+    const all = [...document.querySelectorAll("[data-open-persona]")];
+    const real = all.find((b) => b.getAttribute("data-open-persona").startsWith("zhihu-"));
+    (real ?? all[0]).click();
   });
   const waitedMs = await waitForCard();
 
@@ -240,14 +258,25 @@ await waitForOpenButton();
 errs.length = 0;
 
 const findBefore = await page.evaluate(() => `${location.pathname}${location.search}`);
+/* 同样优先选真实用户：演示人格没有证据与五维，"非空壳"的断言对它们不成立 */
 const findTarget = await page.evaluate(() => {
-  const b = document.querySelector('[data-open-persona]');
+  const all = [...document.querySelectorAll("[data-open-persona]")];
+  const real = all.find((b) => b.getAttribute("data-open-persona").startsWith("zhihu-"));
+  const b = real ?? all[0];
   return b ? b.getAttribute("data-open-persona") : null;
 });
-rec("发现页存在就地打开按钮", Boolean(findTarget), findTarget ?? "未找到");
+rec(
+  "发现页存在就地打开按钮",
+  Boolean(findTarget),
+  findTarget ? `${findTarget}（${findTarget.startsWith("zhihu-") ? "真实用户" : "演示人格"}）` : "未找到",
+);
 
 if (findTarget) {
-  await page.evaluate(() => document.querySelector('[data-open-persona]').click());
+  await page.evaluate(() => {
+    const all = [...document.querySelectorAll("[data-open-persona]")];
+    const real = all.find((b) => b.getAttribute("data-open-persona").startsWith("zhihu-"));
+    (real ?? all[0]).click();
+  });
   const waited2 = await waitForCard();
   const m2 = await modalState();
   const findAfter = await page.evaluate(() => `${location.pathname}${location.search}`);

@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import type { Persona, PersonaSource } from "@prisma/client";
 import { computeCompleteness, type PersonaSourceType } from "@/lib/persona/completeness";
 import { axesFromDimensions, axesFromObservedValues, axesHaveValue, type Axis, type RawDimScore } from "@/lib/sbti/axes";
+import { buildPersonaFacets } from "@/lib/persona/source-facets";
 
 /** 六个数据源与展示顺序（首页的「人格数据源」行、我的人格页都用它） */
 export const SOURCE_TYPES: PersonaSourceType[] = [
@@ -76,6 +77,44 @@ export interface PersonaBoard {
    * 两者含义不同，混着展示等于骗人。
    */
   axesSource: "self-report" | "observed" | "none";
+  /**
+   * **综合画像**：把观察到的多源数据融合后判定的人格倾向。
+   *
+   * 与 `sbti` 是两件事，别混：
+   *   · `sbti` 是本人自评问卷的结果（"僧人 MONK"）
+   *   · `fused` 是多源观察融合出的倾向（"深度思考型"）
+   * 之前页面把前者当成了综合画像，属于概念性错误。
+   * 数据不足时为 null（不硬猜），界面显示"暂无数据"。
+   */
+  fused: {
+    type: string;
+    similarity: number;
+    blurb: string;
+    runnerUp: { type: string; similarity: number }[];
+    /** 融合用了哪几个源 */
+    usedSources: string[];
+  } | null;
+  /**
+   * **分源解析**：每个数据源各自解析出的特征与结论。
+   *
+   * 产品要求："拿到某个源的数据后就该能解析出这个源里的人是什么样的"，
+   * 并在「我的人格」页分别展示。facet 在**写入时**按完整原文算好并持久化
+   * （见 lib/persona/source-facets.ts 的说明），这里只是取出来展示。
+   */
+  sourceFacets: {
+    source: string;
+    label: string;
+    summary: string;
+    itemCount: number;
+    values: Record<string, number>;
+  }[];
+  /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
+  selfReport: {
+    type: string | null;
+    typeTitle: string | null;
+    codes: string | null;
+    blurb: string | null;
+  } | null;
 }
 
 /**
@@ -128,19 +167,36 @@ export async function buildPersonaBoard(
   const personality = (persona.personality ?? {}) as Record<string, unknown>;
   const sbti = (personality.sbti ?? null) as SbtiView | null;
 
-  /* 五轴优先用 SBTI 自评（15 维聚合）。
-     公开创作者没有 SBTI，若就此返回空，他们的雷达永远是空的 ——
-     改为回退到**由公开内容观察**出的六维价值观（真实统计，可溯源）。
-     两者含义不同，所以同时给出 `axesSource` 让界面如实标注。 */
+  /* SBTI 自评的 15 维 → 五轴。它只作为**没有观察数据时**的画像来源，
+     优先级低于多源融合（见下方 fusedAxes）。 */
   const axesFromSbti = axesFromDimensions(sbti?.dimensions);
-  const useObserved = !axesHaveValue(axesFromSbti);
-  const observedValues =
-    persona.values && typeof persona.values === "object"
-      ? (persona.values as Record<string, unknown>)
-      : null;
-  const axes = useObserved ? axesFromObservedValues(observedValues) : axesFromSbti;
+
+  /* 综合画像：由**观察到的**多源证据融合后判定人格倾向。
+     注意这里刻意不用 sbti —— 自评问卷不参与"融合"，它是独立的一面。 */
+  const facets = await buildPersonaFacets(persona.id);
+  const fused = facets?.type
+    ? {
+        type: facets.type.type,
+        similarity: facets.type.similarity,
+        blurb: facets.type.blurb,
+        runnerUp: facets.type.runnerUp.map((r) => ({ type: r.type, similarity: r.similarity })),
+        usedSources: facets.usedSources,
+      }
+    : null;
+
+  /**
+   * 雷达画的就是**这一份融合值**，与右边那行六维、与「综合画像」的判定
+   * 用的是同一组数字 —— 一张卡里三处显示必须同源，否则用户会看到
+   * "文字说 56%、图却画另一套"的矛盾。
+   *
+   * 注意不能退回用 `persona.values`：那是**蒸馏输出的六维**，
+   * 而蒸馏的证据包里包含了 SBTI 自评（见 lib/persona/distill.ts 的 collectEvidence），
+   * 也就是说它并非纯观察值。融合值里不含自评，才是这里要的。
+   */
+  const fusedAxes = facets?.fused ? axesFromObservedValues(facets.fused) : [];
+  const axes = axesHaveValue(fusedAxes) ? fusedAxes : axesFromSbti;
   const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
-    ? useObserved
+    ? axesHaveValue(fusedAxes)
       ? "observed"
       : "self-report"
     : "none";
@@ -160,5 +216,16 @@ export async function buildPersonaBoard(
     /* 五轴来自 SBTI 自评，或回退到公开内容的观察值 —— 都是真实数据，不是占位 */
     axes,
     axesSource,
+    fused,
+    sourceFacets: (facets?.observed ?? []).map((f) => ({
+      source: f.source,
+      label: f.label,
+      summary: f.summary,
+      itemCount: f.itemCount,
+      values: Object.fromEntries(
+        Object.entries(f.values).filter(([, v]) => typeof v === "number") as [string, number][],
+      ),
+    })),
+    selfReport: facets?.selfReport ?? null,
   };
 }

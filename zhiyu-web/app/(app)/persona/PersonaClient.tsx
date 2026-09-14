@@ -8,6 +8,9 @@ import PersonaRadar from "@/components/PersonaRadar";
 import type { PersonaBoard, SourceChip } from "@/lib/persona-view";
 import { formatDate } from "@/lib/datetime";
 import { reportError } from "@/lib/client/error-bus";
+import SbtiResultModal, { type SbtiResultData } from "@/components/SbtiResultModal";
+import SourceFacets from "@/components/SourceFacets";
+import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
 import styles from "./persona.module.css";
 
 type Tab = "card" | "sources" | "distill";
@@ -110,6 +113,35 @@ export default function PersonaClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [justDone, setJustDone] = useState<{ type: string; codes: string } | null>(null);
+  /** SBTI 完整结果；null = 没测过 */
+  const [sbtiResult, setSbtiResult] = useState<SbtiResultData | null>(null);
+  /** 弹窗是否展开。与 sbtiResult 分开存，这样关掉后还能再打开，不必重测 */
+  const [sbtiResultOpen, setSbtiResultOpen] = useState(false);
+
+  /**
+   * 用**已存在库里**的 SBTI 数据打开结果弹窗（页面刷新后也能看）。
+   *
+   * 说明：`greeting` / `description` 那两段解读只在刚提交时由接口返回，
+   * 库里只存了 codes/type/similarity/dimensions。所以这里从 `sbtiBlurb`
+   * 的同一份人格库按代码现取 —— 两条路径都能看到完整解读。
+   */
+  const openStoredSbtiResult = useCallback(() => {
+    const s = board.sbti;
+    if (!s?.type) return;
+    setSbtiResult({
+      code: s.type,
+      title: s.typeTitle ?? s.type,
+      /* 解读从人格库按代码现取 —— 与刚测完那条路径看到的内容一致 */
+      greeting: sbtiGreetingOf(s.type),
+      description: sbtiDescriptionOf(s.type),
+      similarity: Number(s.similarity ?? 0),
+      fallback: Boolean(s.fallback),
+      codesFormatted: s.codes ?? "",
+      dimensions:
+        (s.dimensions as unknown as Record<string, { score: number; level: string }>) ?? {},
+    });
+    setSbtiResultOpen(true);
+  }, [board.sbti]);
 
   const sbti = board.sbti;
   const injectedSet = useMemo(
@@ -145,6 +177,21 @@ export default function PersonaClient({
         const typeLabel = typeof t === "string" ? t : (t?.title ?? t?.name ?? "");
         setJustDone({ type: typeLabel, codes: String(resp.codes ?? "") });
         setQuizOpen(false);
+        /* 弹完整结果。
+           需求：测完要有「SBTI 测试结果」弹窗（参考 sbti.unun.dev 的结果页），
+           而不是只在顶部留一行「刚完成 SBTI：死者」。 */
+        setSbtiResult({
+          code: typeof t === "string" ? t : (t?.name ?? ""),
+          title: typeLabel,
+          greeting: (resp.greeting as string | null) ?? null,
+          description: (resp.description as string | null) ?? null,
+          similarity: Number(resp.similarity ?? 0),
+          fallback: Boolean(resp.fallback),
+          codesFormatted: String(resp.codes ?? ""),
+          dimensions:
+            (resp.dimensions as Record<string, { score: number; level: string }>) ?? {},
+        });
+        setSbtiResultOpen(true);
         /* 重新拉服务端数据，让完整度与五轴一并刷新 */
         router.refresh();
       } catch (e) {
@@ -320,6 +367,17 @@ export default function PersonaClient({
       {justDone ? (
         <div className={styles.doneBar}>
           刚完成 SBTI：<b>{justDone.type}</b> · {justDone.codes}
+          {/* 结果弹窗关掉后还能再打开，不用重测一遍 */}
+          {sbtiResult ? (
+            <button
+              type="button"
+              className="btn btnGhost btnSm"
+              style={{ marginLeft: 12 }}
+              onClick={() => setSbtiResultOpen(true)}
+            >
+              查看完整结果
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -378,32 +436,66 @@ export default function PersonaClient({
           <div className={styles.featBlock}>
             <div className={styles.featHead}>
               <h3>综合画像 · 融合特征</h3>
-              {sbti?.codes ? <span className="meta">SBTI {sbti.codes}</span> : null}
+              {/* 这里以前显示的是 SBTI 的等级码 —— 那是**自评结果**，
+                  不是综合画像。综合画像应是多源融合的产物，标记改为来源说明。 */}
+              {board.fused ? (
+                <span className="meta">
+                  由 {board.fused.usedSources.join(" + ") || "已有数据"} 融合
+                </span>
+              ) : null}
             </div>
 
             <div className={styles.fusionGrid}>
               <PersonaRadar axes={radarAxes} emptyTip="等待蒸馏" />
 
               <div className={styles.prCol}>
-                {sbti?.type ? (
+                {/* ① 综合画像判定的**人格倾向**（六型之一）——
+                    不是 SBTI 的沙雕人格，两者含义不同。 */}
+                {board.fused ? (
                   <>
                     <div className={styles.typeBadge}>
-                      <span className={styles.typeName}>{sbti.typeTitle ?? sbti.type}</span>
-                      {typeof sbti.similarity === "number" && sbti.similarity > 0 ? (
-                        <span className="meta">匹配度 {Math.round(sbti.similarity)}%</span>
-                      ) : null}
+                      <span className={styles.typeName} data-fused-type="1">
+                        {board.fused.type}
+                      </span>
+                      <span className="meta">匹配度 {board.fused.similarity}%</span>
                     </div>
-                    {sbti.fallback ? (
-                      <p className="meta" style={{ marginTop: 8 }}>
-                        未精确命中类型库，已回退到最接近的一种。
+                    <p className={styles.hint} style={{ marginTop: 8 }}>
+                      {board.fused.blurb}
+                    </p>
+                    {board.fused.runnerUp.length ? (
+                      <p className="meta" style={{ marginTop: 6 }}>
+                        次接近：
+                        {board.fused.runnerUp
+                          .map((r) => `${r.type} ${r.similarity}%`)
+                          .join("、")}
                       </p>
                     ) : null}
                   </>
                 ) : (
                   <p className={styles.hint}>
-                    还没有人格数据。做一次 SBTI（30 题，约 3 分钟）就能生成「你眼中的自己」这一面。
+                    还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉）后，
+                    这里会给出由多源融合判定的人格倾向。
                   </p>
                 )}
+
+                {/* ② SBTI 自评单独一行 —— 与上面的综合画像并列，不混为一谈 */}
+                {sbti?.type ? (
+                  <p className={styles.sbtiLine} data-sbti-self="1">
+                    <span className={styles.sbtiTag}>SBTI 自评</span>
+                    <b>
+                      {sbti.typeTitle ?? sbti.type}
+                      {sbti.type ? `（${sbti.type}）` : ""}
+                    </b>
+                    <span className="meta"> · {sbti.codes}</span>
+                    <button
+                      type="button"
+                      className={styles.sbtiMore}
+                      onClick={openStoredSbtiResult}
+                    >
+                      查看
+                    </button>
+                  </p>
+                ) : null}
 
                 <div className={styles.axisList}>
                   {board.axes.map((a) => (
@@ -434,6 +526,16 @@ export default function PersonaClient({
                 ) : null}
               </div>
             </div>
+          </div>
+
+          {/* 分源解析：每个源各自解析出的特征。
+              需求：拿到某个源的数据后就该能看出"这个源里的我是什么样的"，
+              并在这里分别列出（此前这一块完全缺失）。 */}
+          <div className={styles.featBlock} data-facets-block="1">
+            <div className={styles.featHead}>
+              <h3>分源解析 · 每个数据源各自的结论</h3>
+            </div>
+            <SourceFacets facets={board.sourceFacets} />
           </div>
         </section>
       ) : null}
@@ -869,6 +971,12 @@ export default function PersonaClient({
           </div>
         </div>
       ) : null}
+
+      {/* SBTI 完整结果弹窗：测完自动弹出，关掉后可用「查看完整结果」再打开 */}
+      <SbtiResultModal
+        result={sbtiResultOpen ? sbtiResult : null}
+        onClose={() => setSbtiResultOpen(false)}
+      />
     </>
   );
 }

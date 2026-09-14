@@ -47,3 +47,24 @@ export async function resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 }
 
+/**
+ * 加载钩子：让 `import x from "./data/x.json"` 在纯 Node 下也能跑。
+ *
+ * 源码里写的是 `import pJson from "./data/personalities.json"`（打包器接受），
+ * 但 Node 的 ESM 要求 JSON 必须带 `with { type: "json" }` 属性，否则报
+ * ERR_IMPORT_ATTRIBUTE_MISSING。给测试去改生产代码的 import 写法不划算，
+ * 这里直接把 .json 读成模块。
+ */
+export async function load(url, context, nextLoad) {
+  if (url.endsWith(".json")) {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(fileURLToPath(url), "utf8");
+    return {
+      format: "json",
+      source,
+      shortCircuit: true,
+    };
+  }
+  return nextLoad(url, context);
+}
+
