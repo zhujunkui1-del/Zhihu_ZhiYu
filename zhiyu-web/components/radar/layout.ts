@@ -32,7 +32,22 @@ export const SPACING = 235;
 /** 黄金角 */
 export const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 
-export const K_MIN = 0.3;
+/**
+ * 缩放下限。
+ *
+ * ★ 为什么必须够小：决定「全览」能不能真的看全 ★
+ * 全览时要 k=(视口−16)/画幅，而画幅随人数增长：
+ *   16 人 → 画幅 ≈ 1330，视口 1000 时需 k≈0.74
+ *   43 人 → 画幅 ≈ 3786，需 k≈0.25
+ *   100 人 → 画幅 ≈ 5560，需 k≈0.17
+ * 曾取 0.3，结果 43 人时全览被夹在 0.3，屏幕外还有 10 个人
+ * ——**「全览」名不副实**。取 0.12 给到 150 人左右的余量。
+ *
+ * 降到这么小不会"看不清"：分层渲染会在 k<0.45 时自动切成圆点，
+ * 那时本来就只该看分布，不该看细节。
+ */
+export const K_MIN = 0.12;
+/** 放大上限：再大只是像素放大，看不出更多信息 */
 export const K_MAX = 2.4;
 /** 位移超过该值才认定为拖拽，否则视为点击 */
 export const DRAG_THRESHOLD = 5;
@@ -282,4 +297,74 @@ export function zoomAt(view: View, factor: number, px: number, py: number): View
   const wx = (px - view.x) / view.k;
   const wy = (py - view.y) / view.k;
   return { k: next, x: px - wx * next, y: py - wy * next };
+}
+
+/* ── 按缩放级别分层渲染 ────────────────────────────────────────────────────
+ *
+ * 问题：候选池会随真实用户接入而变大（实测 16 → 43 人）。
+ * 每个人都渲染「头像 + 名字 + 倾向 + 相似度」的话，DOM 节点数随人数线性增长，
+ * 而缩到远景时这些细节**根本看不清**（k=0.3 时 84px 头像只剩 25px），
+ * 等于花了渲染成本却看不到内容。
+ *
+ * 做法：按当前缩放 k 决定每个节点渲染到哪一层：
+ *   · dot    —— 只画一个小圆（远景：看得见分布，认不出人）
+ *   · avatar —— 头像（中景：认得出人，标签仍看不清）
+ *   · full   —— 头像 + 名字 + 倾向 + 相似度（近景：完全可读）
+ *
+ * 这不是"限制人数"——**所有节点始终存在且可点**，只是细节按需渲染。
+ * 所以「一次看到几十个人的位置关系」这个核心体验没有被牺牲。
+ */
+
+/** 低于此缩放 → 只画点 */
+export const DETAIL_AVATAR_AT = 0.45;
+/** 高于此缩放 → 画完整标签 */
+export const DETAIL_FULL_AT = 0.72;
+
+export type DetailLevel = "dot" | "avatar" | "full";
+
+/** 当前缩放对应的渲染层级 */
+export function detailLevel(k: number): DetailLevel {
+  if (k < DETAIL_AVATAR_AT) return "dot";
+  if (k < DETAIL_FULL_AT) return "avatar";
+  return "full";
+}
+
+/**
+ * 视口裁剪：只渲染落在视口内（含余量）的节点。
+ *
+ * 为什么要它：43 人铺开需要约 3800px 画幅，而视口通常只有 1000px，
+ * 远景下大部分节点在屏幕外。给屏幕外的节点也渲染 DOM 是纯浪费。
+ *
+ * ★ 余量取「画幅的 5%」★
+ * 试过两种固定值都失败：
+ *   · 固定 260 **世界**像素 → k=0.3 时屏幕上只有 78px，全览丢 8 个人（35/43）
+ *   · 固定 480 **屏幕**像素（≈2.5 屏）→ 裁剪几乎失效，120 人全渲染
+ * 与画幅成比例才对：全览时视口≈画幅，5% 画幅在屏幕上是足够的安全边界；
+ * 近景时画幅相对视口很小，5% 也不会大到让裁剪失效。
+ *
+ * 注意：**裁剪只影响渲染，不影响数据**。拖回来就能看到，不会"丢人"。
+ */
+export function visibleNodes(
+  layout: Layout,
+  view: View,
+  vw: number,
+  vh: number,
+  marginPx?: number,
+): PlacedNode[] {
+  /* 默认余量 = 画幅的 5% */
+  const margin = marginPx ?? layout.stageW * 0.05;
+
+  /* 世界坐标下视口的可见范围：screen = world · k + view */
+  const x0 = (0 - view.x) / view.k - margin;
+  const x1 = (vw - view.x) / view.k + margin;
+  const y0 = (0 - view.y) / view.k - margin;
+  const y1 = (vh - view.y) / view.k + margin;
+
+  const cx = layout.centre.x;
+  const cy = layout.centre.y;
+  return layout.nodes.filter((n) => {
+    const wx = cx + n.x;
+    const wy = cy + n.y;
+    return wx >= x0 && wx <= x1 && wy >= y0 && wy <= y1;
+  });
 }

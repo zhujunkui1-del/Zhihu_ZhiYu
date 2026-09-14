@@ -31,19 +31,20 @@ const HEADERS = {
 
 /** 采集间隔：串行且留间隔，避免压力 */
 const DELAY_MS = 600;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** 把知乎的 content（数组 + HTML）还原成纯文本 */
-export function contentToText(content) {
+export function contentToText(content: unknown): string {
   if (typeof content === "string") return stripTags(content);
   if (!Array.isArray(content)) return "";
   return content
-    .map((seg) => {
+    .map((seg: unknown) => {
       if (typeof seg === "string") return stripTags(seg);
       if (seg && typeof seg === "object") {
-        if (typeof seg.content === "string") return stripTags(seg.content);
+        const o = seg as Record<string, unknown>;
+        if (typeof o.content === "string") return stripTags(o.content);
         /* 图片/视频类段落：用类型占位，保留"这条内容是图/视频"的信号 */
-        if (seg.type) return `[${seg.type}]`;
+        if (typeof o.type === "string") return `[${o.type}]`;
       }
       return "";
     })
@@ -52,7 +53,7 @@ export function contentToText(content) {
     .trim();
 }
 
-function stripTags(html) {
+function stripTags(html: unknown): string {
   return String(html)
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")

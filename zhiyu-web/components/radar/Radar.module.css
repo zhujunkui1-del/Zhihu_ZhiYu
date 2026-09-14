@@ -328,3 +328,45 @@
     display: none;
   }
 }
+
+/* ── 远景层级：只画圆点 ────────────────────────────────────────────────────
+   缩到远景（k < 0.45）时头像只剩二十几像素、标签完全读不出，
+   再渲染「头像 + 名字 + 倾向 + 相似度」就是白花渲染成本。
+   这里改成一个小圆点：**看得见分布**这个核心体验保住了，
+   而且它仍是 <button data-action="profile">，所以**照样可点**。
+
+   尺寸用世界坐标（会被 canvas 的 scale(k) 一起缩放），
+   所以 k=0.3 时视觉上约 8px —— 不糊，也不至于看不见。 */
+.dotNode {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2.5px solid rgba(255, 253, 246, 0.92);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0937c, var(--accent-deep));
+  box-shadow: 0 2px 8px rgba(95, 55, 24, 0.22);
+  /* 与 .node 一致：以坐标为圆心 */
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.dotNode:hover {
+  transform: translate(-50%, -50%) scale(1.35);
+  box-shadow: 0 0 0 6px rgba(226, 102, 79, 0.18);
+}
+
+/* 相似度最高的人：更大的点 + 更亮的边，一眼能认出来 */
+.dotNodeTop {
+  width: 34px;
+  height: 34px;
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), #b23f2c);
+  box-shadow: 0 0 0 5px rgba(226, 102, 79, 0.22), 0 3px 10px rgba(95, 55, 24, 0.26);
+}
+
+.dotNode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

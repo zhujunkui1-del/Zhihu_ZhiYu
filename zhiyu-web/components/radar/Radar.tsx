@@ -5,9 +5,13 @@ import {
   computeLayout,
   computeView,
   zoomAt,
+  detailLevel,
+  visibleNodes,
   DRAG_THRESHOLD,
   K_MIN,
   K_MAX,
+  type DetailLevel,
+  type PlacedNode,
   type RadarPerson,
   type View,
 } from "./layout";
@@ -49,6 +53,57 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
 
   const [avatarErrors, setAvatarErrors] = useState<Record<string, true>>({});
 
+  /* ── 按缩放级别分层渲染 ────────────────────────────────────────────────
+   *
+   * 视图本身仍存在 ref 里（拖拽时直接改 DOM transform，不触发 React 渲染，
+   * 这是雷达能保持流畅的原因）。但"渲染到哪一层"必须进 React 状态。
+   *
+   * 关键：**只在层级跨档时 setState**。若每帧都 setState，
+   * 拖拽会因为整树重渲染而掉帧 —— 那正是原实现刻意避开的事。
+   * 所以这里用 ref 记住当前档位，只有变了才提交。
+   */
+  const [detail, setDetail] = useState<DetailLevel>("full");
+  const detailRef = useRef<DetailLevel>("full");
+  const [visible, setVisible] = useState<PlacedNode[]>([]);
+  /** 拖动时同步可见集合的节流时间戳 */
+  const lastSyncRef = useRef(0);
+
+  /**
+   * 同步渲染相关的状态（层级 + 视口内节点）。
+   *
+   * @param force 视口尺寸变化 / 数据变化时强制同步（否则可能停在旧结果）
+   */
+  const syncRenderState = useCallback(
+    (force = false) => {
+      if (!layout) return;
+      const vp = viewportRef.current;
+      const v = viewRef.current;
+      const vw = vp?.clientWidth || 900;
+      const vh = vp?.clientHeight || 620;
+
+      /* ① 层级：只有跨档才提交 */
+      const next = detailLevel(v.k);
+      if (force || next !== detailRef.current) {
+        detailRef.current = next;
+        setDetail(next);
+      }
+
+      /* ② 视口内节点：远景下屏幕外占多数，裁掉能省大量 DOM。
+            这个每次都要更新（拖动会改变可见集合），但它只是数组过滤，
+            且触发的是同一棵树的重渲染 —— 相比之下不渲染屏幕外节点省得更多。
+            为控制频率，拖动过程中调用方会做节流。 */
+      const vis = visibleNodes(layout, v, vw, vh);
+      setVisible((prev) => {
+        /* 集合没变就不换引用，避免无意义重渲染 */
+        if (prev.length === vis.length && prev.every((p, i) => p.person.id === vis[i].person.id)) {
+          return prev;
+        }
+        return vis;
+      });
+    },
+    [layout],
+  );
+
   const applyView = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -67,8 +122,10 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
       const vh = vp.clientHeight || 620;
       viewRef.current = computeView(mode, layout, vw, vh);
       applyView();
+      /* 取景变了，层级与可见集合都要跟着更新 */
+      syncRenderState(true);
     },
-    [layout, applyView],
+    [layout, applyView, syncRenderState],
   );
 
   /* 首次取景用「自适应」：尽可能多装人，同时保证头像读得清。
@@ -78,6 +135,13 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
     const raf = requestAnimationFrame(() => centreView("auto"));
     return () => cancelAnimationFrame(raf);
   }, [layout, centreView]);
+
+  /* 布局变化时同步一次（新数据进来），并保证首次渲染就有节点 */
+  useEffect(() => {
+    if (!layout) return;
+    const raf = requestAnimationFrame(() => syncRenderState(true));
+    return () => cancelAnimationFrame(raf);
+  }, [layout, syncRenderState]);
 
   /* 视口尺寸变化时重新取景（仅当尺寸真正变化） */
   useEffect(() => {
@@ -142,8 +206,16 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
         y: startViewRef.current.y + dy,
       };
       applyView();
+
+      /* 缩放级别没变时（纯平移）也要更新"哪些节点在视口内"，
+         否则拖到新区域会看到空白。按 120ms 节流，避免每帧重渲染。 */
+      const now = Date.now();
+      if (now - lastSyncRef.current > 120) {
+        lastSyncRef.current = now;
+        syncRenderState();
+      }
     },
-    [applyView],
+    [applyView, syncRenderState],
   );
 
   const endDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -178,10 +250,13 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
         e.clientY - rect.top,
       );
       applyView();
+      /* 缩放会改变层级（远景↔近景）与可见集合，必须同步。
+         滚轮事件本身就是低频的，这里不必再节流。 */
+      syncRenderState();
     };
     vp.addEventListener("wheel", onWheel, { passive: false });
     return () => vp.removeEventListener("wheel", onWheel);
-  }, [applyView]);
+  }, [applyView, syncRenderState]);
 
   /* 点头像打开人格卡。
      拖拽确实会捕获指针（click.target 会变成 viewport），
@@ -338,18 +413,42 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
             <span className={styles.meLabel}>我</span>
           </div>
 
-          {/* 人物节点：螺旋布局已保证互不重叠，直接落位 */}
-          {nodes.map((n) => {
+          {/* 人物节点：螺旋布局已保证互不重叠，直接落位。
+              按 `visible`（视口裁剪）与 `detail`（缩放分层）渲染：
+                dot    —— 远景，只画小圆点，看得见分布
+                avatar —— 中景，画头像，认得出人
+                full   —— 近景，头像 + 名字 + 倾向 + 相似度
+              **所有节点始终存在且可点**，只是细节按需渲染。 */}
+          {visible.map((n) => {
             const remoteFailed = avatarErrors[n.person.id];
             const url = remoteFailed
               ? undefined
               : n.person.avatarUrl?.trim() || undefined;
+
+            /* 远景：一个圆点足够表达"这里有人" */
+            if (detail === "dot") {
+              return (
+                <button
+                  key={n.person.id}
+                  type="button"
+                  data-action="profile"
+                  data-id={n.person.id}
+                  data-detail="dot"
+                  className={`${styles.dotNode} ${n.isTop ? styles.dotNodeTop : ""}`}
+                  style={{ left: centre.x + n.x, top: centre.y + n.y }}
+                  aria-label={`查看 ${n.person.title} 的人格卡（相似度 ${n.sim}%）`}
+                  title={`${n.person.title} · ${n.sim}%`}
+                />
+              );
+            }
+
             return (
               <div
                 key={n.person.id}
                 className={`${styles.node} ${n.right ? styles.sideRight : styles.sideLeft}`}
                 style={{ left: centre.x + n.x, top: centre.y + n.y }}
                 data-id={n.person.id}
+                data-detail={detail}
               >
                 <button
                   type="button"
@@ -373,13 +472,17 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
                     </span>
                   ) : null}
                 </button>
-                <span className={styles.card}>
-                  <b className={styles.name}>{n.person.title}</b>
-                  <span className={styles.sub}>
-                    <em className={styles.type}>{n.person.type ?? ""}</em>
-                    <em className={styles.sim}>{n.sim}%</em>
+                {/* 中景不渲染标签：那个缩放下字号已经小到读不出，
+                    渲染它只是白占 DOM 与排版开销 */}
+                {detail === "full" ? (
+                  <span className={styles.card}>
+                    <b className={styles.name}>{n.person.title}</b>
+                    <span className={styles.sub}>
+                      <em className={styles.type}>{n.person.type ?? ""}</em>
+                      <em className={styles.sim}>{n.sim}%</em>
+                    </span>
                   </span>
-                </span>
+                ) : null}
               </div>
             );
           })}
