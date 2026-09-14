@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
@@ -215,10 +215,83 @@ export default function PersonaClient({
     }
   }, [board.id, router]);
 
-  /* 蒸馏阶段状态：已注入就能走到第 2 步，「开始蒸馏」尚未实现后端 */
+  /* ── Agent 蒸馏 ─────────────────────────────────────────────────────────
+   * 之前这里只有展示：按钮 disabled + 标着"蒸馏服务尚未接入（演示占位）"。
+   * 现在接上了真实后端（POST /api/persona/distill）：把已注入的证据
+   * 交给大模型归纳成结构化人格，并返回每一条结论的溯源。
+   */
+  interface DistillResponse {
+    ok: boolean;
+    method: "llm" | "rules";
+    usedSources: string[];
+    evidenceCount: number;
+    llmError?: string;
+    distilled: {
+      bio: string;
+      interests: string[];
+      topics: string[];
+      communicationStyle: string[];
+      values: Record<string, number>;
+      summary: string;
+      groundedIn: { claim: string; from: string[] }[];
+    };
+  }
+  const [distilling, setDistilling] = useState(false);
+  const [distillResult, setDistillResult] = useState<DistillResponse | null>(null);
+  const [distillReady, setDistillReady] = useState<{
+    canUseLlm: boolean;
+    platformLlm: boolean;
+    byokCount: number;
+  } | null>(null);
+
+  /* 查是否具备蒸馏条件，用于给按钮一个诚实的提示文案 */
+  const loadDistillReady = useCallback(async () => {
+    try {
+      const r = await fetch("/api/persona/distill").then((x) => x.json());
+      if (r.ok) {
+        setDistillReady({
+          canUseLlm: r.canUseLlm === true,
+          platformLlm: r.platformLlm === true,
+          byokCount: r.byokCount ?? 0,
+        });
+      }
+    } catch {
+      /* 查不到就不提示，不影响主流程 */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "distill") void loadDistillReady();
+  }, [tab, loadDistillReady]);
+
+  const runDistill = useCallback(async () => {
+    setDistilling(true);
+    setDistillResult(null);
+    try {
+      const r = (await fetch("/api/persona/distill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personaId: board.id }),
+      }).then((x) => x.json())) as DistillResponse & { error?: string };
+
+      if (!r.ok) throw new Error(r.error ?? "蒸馏失败");
+      setDistillResult(r);
+      /* 蒸馏会写回 interests/topics/communicationStyle，刷新服务端数据 */
+      router.refresh();
+    } catch (e) {
+      setDistillResult(null);
+      alert(`蒸馏失败：${(e as Error).message}`);
+    } finally {
+      setDistilling(false);
+    }
+  }, [board.id, router]);
+
+  /* 蒸馏五阶段：有证据就能走到归纳，归纳完成后才算写完索引 */
   const stageState = (i: number): "done" | "doing" | "todo" => {
     if (board.injectedCount === 0) return "todo";
     if (i === 0) return "done";
+    if (distilling) return i === 1 || i === 2 ? "doing" : "todo";
+    if (distillResult?.ok) return "done";
     if (i === 1) return "done";
     return "todo";
   };
@@ -571,21 +644,106 @@ export default function PersonaClient({
                 <button
                   type="button"
                   className="btn btnPrimary"
-                  disabled={board.injectedCount === 0}
+                  disabled={board.injectedCount === 0 || distilling}
+                  onClick={() => void runDistill()}
                   title={
                     board.injectedCount === 0
                       ? "先注入至少一个数据源"
-                      : "蒸馏服务尚未接入，当前为演示占位"
+                      : "让大模型把已注入的证据归纳成结构化人格"
                   }
                 >
-                  开始蒸馏
+                  {distilling ? "蒸馏中…（约 5~15 秒）" : "开始蒸馏"}
                 </button>
                 <span className="meta">
                   {board.injectedCount === 0
                     ? "先注入至少一个数据源"
-                    : "蒸馏服务尚未接入（演示占位）"}
+                    : distilling
+                      ? "正在调用大模型归纳证据…"
+                      : distillReady?.canUseLlm
+                        ? "由大模型归纳；结论都能溯源到具体证据"
+                        : "未接入大模型，将退化为规则归并（结果会标注）"}
                 </span>
               </div>
+
+              {/* 蒸馏结果：逐项展示，并给出溯源 */}
+              {distillResult ? (
+                <div className={styles.distillBox} data-distill-result="1">
+                  <p className={styles.distillHead}>
+                    {distillResult.method === "llm" ? "大模型归纳完成" : "规则归并完成"}
+                    <span className="meta">
+                      　用了 {distillResult.evidenceCount} 条证据 · 源：
+                      {distillResult.usedSources.join("、")}
+                    </span>
+                  </p>
+
+                  {distillResult.method === "rules" ? (
+                    <p className={styles.distillWarn}>
+                      本次<b>没有调用大模型</b>
+                      {distillResult.llmError ? `（${distillResult.llmError}）` : ""}
+                      ，只把已有标签做了归并。结果不代表模型对你的判断。
+                    </p>
+                  ) : null}
+
+                  <dl className={styles.distillList}>
+                    <div>
+                      <dt>画像</dt>
+                      <dd>{distillResult.distilled.bio || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>兴趣</dt>
+                      <dd>
+                        {distillResult.distilled.interests.length
+                          ? distillResult.distilled.interests.map((x) => (
+                              <span key={x} className="badge">
+                                {x}
+                              </span>
+                            ))
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>话题</dt>
+                      <dd>
+                        {distillResult.distilled.topics.length
+                          ? distillResult.distilled.topics.map((x) => (
+                              <span key={x} className="badge">
+                                {x}
+                              </span>
+                            ))
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>表达习惯</dt>
+                      <dd>
+                        {distillResult.distilled.communicationStyle.length
+                          ? distillResult.distilled.communicationStyle.map((x) => (
+                              <span key={x} className="badge">
+                                {x}
+                              </span>
+                            ))
+                          : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <p className={styles.distillSummary}>{distillResult.distilled.summary}</p>
+
+                  {distillResult.distilled.groundedIn.length ? (
+                    <div className={styles.distillGround}>
+                      <p className="meta">结论溯源（凭什么这么判断）</p>
+                      <ul>
+                        {distillResult.distilled.groundedIn.map((g, i) => (
+                          <li key={i}>
+                            <b>{g.claim}</b>
+                            <span className="meta">← 证据 {g.from.join(", ")}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <figure className={styles.agentFig}>

@@ -612,6 +612,100 @@
   line-height: 1.75;
 }
 
+/* ── Agent 蒸馏结果 ─────────────────────────────────────────────────────── */
+.distillBox {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1.8px solid rgba(226, 102, 79, 0.4);
+  border-radius: var(--r-hand-lg);
+  background: linear-gradient(180deg, var(--accent-faint), rgba(255, 251, 239, 0.86));
+}
+
+.distillHead {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--accent-deep);
+}
+
+.distillWarn {
+  margin: 10px 0 0;
+  padding: 9px 13px;
+  border: 1.5px solid rgba(226, 102, 79, 0.35);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.distillWarn b {
+  color: var(--accent-deep);
+}
+
+.distillList {
+  margin: 14px 0 0;
+  display: grid;
+  gap: 10px;
+}
+.distillList > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.distillList dt {
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.distillList dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: var(--fg);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.distillSummary {
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-left: 4px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.distillGround {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-soft);
+}
+.distillGround ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.distillGround li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+.distillGround li b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
 /* ── 窄屏 ───────────────────────────────────────────────────────────────── */
 @media (max-width: 1080px) {
   .fusionGrid,
