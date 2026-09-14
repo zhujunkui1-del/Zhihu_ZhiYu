@@ -6,12 +6,16 @@
  * OAuth 会话早就实现了（`lib/auth/session.ts`），只是页面没用它。
  *
  * 本模块把它们统一成一条链：
- *   ① 读 HttpOnly 会话 Cookie → 有则用真实登录用户（生产唯一合法来源）
- *   ② 没有会话时，**仅在非生产环境**回退到演示用户（保证本地与演示可用）
+ *   ① 读 HttpOnly 会话 Cookie → 有则用真实登录用户（**唯一**合法身份来源）
+ *   ② 没有会话时，仅在非生产环境回退到演示用户（保证本地开箱可用）
  *   ③ 生产环境没有会话 → 返回 null，由调用方跳登录页
  *
- * 关于 `?userId=`：保留但**只在非生产环境生效**，仅用于本地调试与自动化验证。
- * 生产环境忽略该参数（否则等于任意用户可冒充他人）。
+ * ⚠️ **不接受任何来自 URL 的身份**（已移除 `?userId=` 支持）。
+ *    原因：那是水平越权——换个 id 就能读别人数据。
+ *    生产与开发行为一致，避免"本地能跑、线上 401"这类环境差异带来的误判。
+ *
+ * `?personaId=` / `?id=` 仍然可用：那是「**看哪个人格卡**」，
+ * 而看他人人格卡是产品功能（发现页/雷达点进去），不涉及身份冒用。
  */
 
 import { cookies } from "next/headers";
@@ -22,7 +26,7 @@ export interface CurrentIdentity {
   userId: string;
   personaId: string | null;
   /** 身份来源，便于页面提示与排查 */
-  source: "session" | "demo" | "query-dev";
+  source: "session" | "demo";
   displayName: string | null;
   /** 是否已通过知乎 OAuth 授权 */
   zhihuAuthorized: boolean;
@@ -49,14 +53,12 @@ async function demoIdentity(): Promise<CurrentIdentity | null> {
 /**
  * 解析当前身份。
  *
- * @param opts.queryUserId 仅在非生产环境生效的调试用 userId
- * @param opts.queryPersonaId 选择要看哪个人设（查看他人人格卡是正常功能）
+ * @param opts.queryPersonaId 选择要看哪个人设（**不是**身份）
  */
 export async function resolveIdentity(opts?: {
-  queryUserId?: string | null;
   queryPersonaId?: string | null;
 }): Promise<CurrentIdentity | null> {
-  /* ① 真实会话优先 —— 生产环境唯一合法来源 */
+  /* ① 真实会话 —— 唯一合法身份来源 */
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) {
@@ -68,8 +70,6 @@ export async function resolveIdentity(opts?: {
       });
       return {
         userId: s.userId,
-        /* 允许看别人的 persona（查看他人人格卡是产品功能），
-           但身份仍然是会话里的那个人 */
         personaId: opts?.queryPersonaId ?? persona?.id ?? null,
         source: "session",
         displayName: s.displayName,
@@ -78,24 +78,7 @@ export async function resolveIdentity(opts?: {
     }
   }
 
-  /* ② 非生产环境：允许 ?userId= 调试（自动化验证需要） */
-  if (!isProd() && opts?.queryUserId) {
-    const u = await prisma.user.findUnique({
-      where: { id: opts.queryUserId },
-      include: { persona: { select: { id: true } } },
-    });
-    if (u) {
-      return {
-        userId: u.id,
-        personaId: opts?.queryPersonaId ?? u.persona?.id ?? null,
-        source: "query-dev",
-        displayName: u.displayName,
-        zhihuAuthorized: u.zhihuAuthorized,
-      };
-    }
-  }
-
-  /* ③ 非生产环境：回退演示用户，保证本地开箱可用 */
+  /* ② 非生产环境：回退演示用户，保证本地开箱可用 */
   if (!isProd()) {
     const demo = await demoIdentity();
     if (demo) {
@@ -103,12 +86,12 @@ export async function resolveIdentity(opts?: {
     }
   }
 
-  /* ④ 生产环境且无会话 → 未登录 */
+  /* ③ 生产环境且无会话 → 未登录 */
   return null;
 }
 
 /** API 路由用：解析身份，未登录时直接给出 401 响应体 */
-export async function requireIdentity(opts?: { queryUserId?: string | null }) {
+export async function requireIdentity(opts?: { queryPersonaId?: string | null }) {
   const id = await resolveIdentity(opts);
   if (!id) {
     return {

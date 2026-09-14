@@ -8,20 +8,18 @@ export const dynamic = "force-dynamic";
 /**
  * 通知中心。
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话，
- * 生产环境无会话则跳登录页（不再接受 `?userId=`，避免冒用他人身份）。
+ * 身份**只**来自 `resolveIdentity()`（HttpOnly 会话；非生产环境可回退演示用户）。
+ * 不接受 `?userId=` —— 那是水平越权（换 id 就能读别人通知）。
+ * `?personaId=` 仍保留，它只决定"看哪个人格卡"，不涉及身份。
  */
 export default async function NotifyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ userId?: string; personaId?: string }>;
+  searchParams: Promise<{ personaId?: string }>;
 }) {
   const sp = await searchParams;
 
-  const me = await resolveIdentity({
-    queryUserId: sp.userId ?? null,
-    queryPersonaId: sp.personaId ?? null,
-  });
+  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
   if (!me) redirect("/");
 
   const data = await buildNotify(me.userId);

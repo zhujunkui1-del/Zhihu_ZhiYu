@@ -130,13 +130,14 @@ export default function SettingsClient({
 
   const loadLlm = useCallback(async () => {
     try {
-      const r = await fetch(`/api/settings/llm?userId=${userId}`).then((x) => x.json());
+      /* 身份由服务端从 HttpOnly 会话解析，不再通过 URL 传 userId */
+      const r = await fetch("/api/settings/llm").then((x) => x.json());
       if (r.ok) setSaved(r.items as SavedLlm[]);
       else setLoadErr(r.error ?? "读取失败");
     } catch (e) {
       setLoadErr((e as Error).message);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     void loadLlm();
@@ -216,7 +217,7 @@ export default function SettingsClient({
   };
 
   const removeLlm = async (id: string) => {
-    const r = await fetch(`/api/settings/llm?id=${id}&userId=${userId}`, {
+    const r = await fetch(`/api/settings/llm?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     }).then((x) => x.json());
     if (r.ok) {

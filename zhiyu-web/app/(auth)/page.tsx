@@ -59,15 +59,33 @@ export default function LoginPage() {
   /**
    * 登录。
    *
-   * 知乎 OAuth 的代码路径按官方参考实现准备（见 app/api/auth/zhihu/*），
-   * 但它需要两个前置：① 赛事页面领取的 App ID / App Key
-   * ② 已部署并登记的公网 HTTPS 回调地址（自有域名）。
-   * 两者未就位前，此按钮走服务端演示登录，保证全站闭环可跑、演示不翻车。
+   * 关键：**不要写死走哪条路**。先问服务端「知乎 OAuth 配置好了没有」：
+   *   ① 配好了 → 跳到 `/api/auth/zhihu`，由服务端生成 state 并 302 到知乎授权页
+   *   ② 没配好 → 非生产环境回退演示登录（本地开箱可用）
+   *              生产环境则报错提示，**不静默降级**（否则演示数据会被当成真实登录）
+   *
+   * 之前这里写死调 `/api/auth/demo`，导致即便配好了 OAuth 也永远跳不到知乎授权页。
    */
   const startLogin = useCallback(async () => {
     setBusy(true);
     setError("");
     try {
+      /* ① 先看服务端配置状态 */
+      let oauthConfigured = false;
+      try {
+        const s = await fetch("/api/auth/session").then((r) => r.json());
+        oauthConfigured = s?.oauthConfigured === true;
+      } catch {
+        /* 查不到就按未配置处理，走下面的兜底 */
+      }
+
+      if (oauthConfigured) {
+        /* ② 走真实知乎授权（服务端会 302 到 openapi.zhihu.com/authorize） */
+        window.location.href = `/api/auth/zhihu?returnTo=${encodeURIComponent("/home")}`;
+        return;
+      }
+
+      /* ③ 未配置：本地/预发用演示登录；生产环境明确报错，不静默降级 */
       const resp = await fetch("/api/auth/demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,8 +93,14 @@ export default function LoginPage() {
       });
       const data = (await resp.json()) as
         | { ok: true; userId: string; personaId: string }
-        | { ok: false; error?: string };
-      if (!data.ok) throw new Error(data.error ?? "登录失败");
+        | { ok: false; error?: string; code?: string };
+      if (!data.ok) {
+        throw new Error(
+          data.code === "DEMO_DISABLED"
+            ? "知乎授权尚未配置完成，暂时无法登录。"
+            : (data.error ?? "登录失败"),
+        );
+      }
       try {
         localStorage.setItem(
           STORAGE_KEY,

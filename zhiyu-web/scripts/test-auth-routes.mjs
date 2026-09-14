@@ -125,23 +125,43 @@ try {
     rec("服务端会话记录已删除", gone === null);
   }
 
-  /* ── ⑥ 未配置 OAuth 时的行为 ────────────────────────────────────────── */
+  /* ── ⑥ /api/auth/zhihu 的两种状态 ───────────────────────────────────── */
   {
+    /* 这个端点的行为**取决于服务端是否配好 OAuth**，所以两种都要覆盖：
+       · 配好了 → 302/307 到知乎授权页（这一条才是真实上线后的行为）
+       · 没配好 → 回登录页并带 oauth=unconfigured 标记（保证站点仍可用）
+       之前只断言后者，OAuth 一配上就误报失败。 */
     const r = await fetch(`${BASE}/api/auth/zhihu`, { redirect: "manual" });
     const loc = r.headers.get("location") || "";
-    rec("未配置 App ID/Key 时 /api/auth/zhihu 不 500，而是重定向回登录页",
+
+    rec("/api/auth/zhihu 返回重定向（不 500）",
       r.status >= 300 && r.status < 400 && loc.length > 0,
       `HTTP ${r.status} → ${loc.slice(0, 70)}`);
-    rec("重定向带上 unconfigured 标记（便于登录页给出提示）",
-      loc.includes("oauth=unconfigured"), loc.slice(0, 90));
+
+    const toZhihu = loc.startsWith("https://openapi.zhihu.com/authorize");
+    const toLogin = loc.includes("oauth=unconfigured");
+
+    rec("已配置 OAuth 时跳知乎授权页；未配置时回登录页并标记",
+      toZhihu || toLogin,
+      toZhihu ? `→ 知乎授权页（已配置）` : toLogin ? `→ 登录页标记（未配置）` : loc.slice(0, 90));
+
+    if (toZhihu) {
+      const u = new URL(loc);
+      rec("授权 URL 带 app_id / response_type / state 三项",
+        Boolean(u.searchParams.get("app_id")) &&
+          u.searchParams.get("response_type") === "code" &&
+          (u.searchParams.get("state") ?? "").length >= 32,
+        `app_id=${u.searchParams.get("app_id")} state长度=${(u.searchParams.get("state") ?? "").length}`);
+    }
   }
 
-  /* ── ⑦ 回调缺 code 时的处理 ─────────────────────────────────────────── */
+  /* ── ⑦ 回调的兜底处理 ──────────────────────────────────────────────── */
   {
-    /* 未配置时回调应直接回登录页并标记 unconfigured */
+    /* 不带 code / state 直接打回调：无论 OAuth 是否配置，都必须**返回重定向**
+       而不是 500（否则用户从知乎回来会看到白页）。 */
     const r = await fetch(`${BASE}/api/auth/zhihu/callback`, { redirect: "manual" });
     const loc = r.headers.get("location") || "";
-    rec("回调在未配置时重定向回登录页",
+    rec("回调缺参数时不 500，而是重定向回登录页",
       r.status >= 300 && r.status < 400 && loc.includes("oauth="),
       `HTTP ${r.status} → ${loc.slice(0, 80)}`);
   }

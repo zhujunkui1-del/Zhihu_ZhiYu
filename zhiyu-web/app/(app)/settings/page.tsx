@@ -19,14 +19,12 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ userId?: string; personaId?: string }>;
+  searchParams: Promise<{ personaId?: string }>;
 }) {
   const sp = await searchParams;
 
-  const me = await resolveIdentity({
-    queryUserId: sp.userId ?? null,
-    queryPersonaId: sp.personaId ?? null,
-  });
+  /* 身份只来自会话（不接受 ?userId=，那是水平越权） */
+  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
   if (!me) redirect("/");
 
   const [user, board, prefsRow, llmCount] = await Promise.all([

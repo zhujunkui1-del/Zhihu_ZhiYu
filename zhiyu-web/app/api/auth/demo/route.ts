@@ -40,6 +40,21 @@ const DEMO_PERSONA = {
 };
 
 export async function POST(req: NextRequest) {
+  /* 生产环境**不允许**用演示账号登录。
+     否则任何人都能拿演示身份进来，而演示身份下还有数据可读；
+     更糟的是会掩盖「知乎 OAuth 没配好」这个问题。
+     本地/预发保留，保证开箱可用。 */
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "DEMO_DISABLED",
+        error: "生产环境不支持演示登录，请使用知乎账号登录",
+      },
+      { status: 403 },
+    );
+  }
+
   let displayName = "演示用户";
   try {
     const body = (await req.json()) as { displayName?: string };
@@ -117,7 +132,9 @@ export async function POST(req: NextRequest) {
     name: SESSION_COOKIE,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    /* 走到这里必然是非生产环境（生产已在入口拦截），
+       所以不加 Secure —— 本地是 http，加了浏览器不会写 Cookie。 */
+    secure: false,
     sameSite: "lax",
     path: "/",
     maxAge: 30 * 24 * 60 * 60,

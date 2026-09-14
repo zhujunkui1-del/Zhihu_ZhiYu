@@ -1,42 +1,28 @@
-// 用户 BYOK API Key 加密：AES-256-GCM，密钥来自 USER_LLM_KEY_ENC（32 字节 base64）
-import {
-  createCipheriv,
-  createDecipheriv,
-  randomBytes,
-} from "node:crypto";
+/**
+ * 用户 BYOK API Key 的加密。
+ *
+ * 这是**兼容层**：真正的实现统一在 `lib/crypto-box.ts`
+ * （按用途派生独立密钥域，主密钥回落 `USER_LLM_KEY_ENC` → `AUTH_ENC_KEY`）。
+ *
+ * 为什么改：本文件原来硬依赖 `USER_LLM_KEY_ENC`，而生产只配了 `AUTH_ENC_KEY`，
+ * 于是「保存模型」在生产会直接报错，且与 `crypto-box` 的回落逻辑不一致。
+ * 现在两者走同一条路径，配任意一个都能用。
+ *
+ * 历史密文说明：旧实现用 `USER_LLM_KEY_ENC` 直接作 AES 密钥（无 HKDF 派生），
+ * 与现在的派生密钥不同。切换时已确认库中 `LlmProviderConfig` 为 0 行，
+ * 因此无需保留旧格式的解密兼容。
+ */
 
-function key(): Buffer {
-  const raw = process.env.USER_LLM_KEY_ENC;
-  if (!raw) {
-    throw new Error("USER_LLM_KEY_ENC 未配置");
-  }
-  const buf = Buffer.from(raw, "base64");
-  if (buf.length !== 32) {
-    throw new Error("USER_LLM_KEY_ENC 必须是 32 字节的 base64");
-  }
-  return buf;
-}
+import { decryptFor, encryptFor, maskSecret } from "@/lib/crypto-box";
 
 export function encryptSecret(plain: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
-  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString("base64");
+  return encryptFor("llm-key", plain);
 }
 
 export function decryptSecret(payload: string): string {
-  const raw = Buffer.from(payload, "base64");
-  if (raw.length < 28) throw new Error("密文格式错误");
-  const iv = raw.subarray(0, 12);
-  const tag = raw.subarray(12, 28);
-  const data = raw.subarray(28);
-  const decipher = createDecipheriv("aes-256-gcm", key(), iv);
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  return decryptFor("llm-key", payload);
 }
 
 export function keyMask(plain: string): string {
-  const t = plain.trim();
-  return t.length <= 4 ? "****" : `****${t.slice(-4)}`;
+  return maskSecret(plain);
 }

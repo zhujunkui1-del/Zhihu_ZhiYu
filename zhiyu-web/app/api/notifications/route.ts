@@ -7,14 +7,12 @@ export const dynamic = "force-dynamic";
 /**
  * 通知列表 / 全部标为已读。
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话。
- * `?userId=` 只在非生产环境生效（本地调试与自动化验证用），
- * 生产环境忽略——否则带上别人的 userId 就能读别人的通知。
+ * 身份**只**来自 `resolveIdentity()`（HttpOnly 会话）。
+ * **不接受 `?userId=` 或 body 里的 userId** —— 那是水平越权：
+ * 带上别人的 id 就能读别人的通知、把别人的消息标成已读。
  */
-export async function GET(req: NextRequest) {
-  const me = await resolveIdentity({
-    queryUserId: req.nextUrl.searchParams.get("userId"),
-  });
+export async function GET() {
+  const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(
       { ok: false, code: "UNAUTHENTICATED", error: "未登录或会话已过期" },
@@ -31,15 +29,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, items });
 }
 
-export async function POST(req: NextRequest) {
-  let body: { userId?: string } = {};
-  try {
-    body = (await req.json()) as { userId?: string };
-  } catch {
-    /* 允许空 body —— 身份以会话为准 */
-  }
-
-  const me = await resolveIdentity({ queryUserId: body.userId ?? null });
+export async function POST(_req: NextRequest) {
+  const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(
       { ok: false, code: "UNAUTHENTICATED", error: "未登录或会话已过期" },
