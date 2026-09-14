@@ -20,7 +20,7 @@
 
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { SESSION_COOKIE, getSession } from "@/lib/auth/session";
+import { SESSION_COOKIE, getSession, getZhihuToken } from "@/lib/auth/session";
 
 export interface CurrentIdentity {
   userId: string;
@@ -118,4 +118,26 @@ export async function requireIdentity(opts?: { queryPersonaId?: string | null })
     };
   }
   return { ok: true as const, identity: id };
+}
+
+/**
+ * 取当前会话里该用户的知乎 OAuth access_token（明文，仅供服务端使用）。
+ *
+ * 为什么需要它：开放平台的用户数据 API 用**双凭证**区分读谁的数据 ——
+ *   · 只带 Access Secret        → 读 **Access Secret 所属账号**（也就是项目所有者）的数据
+ *   · Access Secret + 该 token  → 读 **这位授权用户本人** 的数据
+ *
+ * 曾经同步接口里写死 `oauthToken: null`，后果很严重：
+ * 别人授权登录后点「同步」，读到的其实是**项目所有者**的创作，
+ * 并写进**这个用户的** Persona —— 既是数据污染，也是越权。
+ *
+ * 返回 null 表示：没有 OAuth 会话，或 token 已过期。
+ * 调用方**必须**据此决定"回退到读自己账号"还是"拒绝同步"，
+ * 不能静默降级（那正是上面那个 bug 的成因）。
+ */
+export async function currentZhihuToken(): Promise<string | null> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return getZhihuToken(token);
 }

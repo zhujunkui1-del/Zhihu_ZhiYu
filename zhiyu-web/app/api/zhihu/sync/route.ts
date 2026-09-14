@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { syncZhihuToPersona } from "@/lib/zhihu/sync";
+import { currentZhihuToken, resolveIdentity } from "@/lib/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -42,20 +43,54 @@ export async function POST(req: NextRequest) {
 
   const persona = await prisma.persona.findUnique({
     where: { id: personaId },
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   if (!persona) {
     return NextResponse.json({ ok: false, error: "Persona 不存在" }, { status: 404 });
+  }
+
+  /* 只允许同步**自己的** Persona —— 否则可以借接口把别人的资料改掉 */
+  const me = await resolveIdentity();
+  if (!me || me.ownPersonaId !== personaId) {
+    return NextResponse.json(
+      { ok: false, code: "FORBIDDEN", error: "只能同步自己的人格数据" },
+      { status: 403 },
+    );
+  }
+
+  /* ★ 关键：授权用户必须带**他自己的** OAuth token ★
+     开放平台的双凭证规则：
+       · 只带 Access Secret        → 读 Access Secret 所属账号（项目所有者）的数据
+       · Access Secret + 该 token  → 读这位授权用户本人的数据
+     这里若写死 null，别人授权后同步到的会是**项目所有者**的创作，
+     并写进他的 Persona —— 数据污染 + 越权。所以：
+       ① 有 token → 带上去读他自己的数据
+       ② 没 token 且他**已经**授权过（zhihuAuthorized）→ token 过期，明确拒绝
+       ③ 没 token 且从没授权 → 回退读 Access Secret 账号（本地/演示场景） */
+  const oauthToken = await currentZhihuToken();
+  const user = await prisma.user.findUnique({
+    where: { id: persona.userId ?? "" },
+    select: { zhihuAuthorized: true },
+  });
+
+  if (!oauthToken && user?.zhihuAuthorized) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "TOKEN_EXPIRED",
+        error: "知乎授权已过期，请重新登录后再同步",
+      },
+      { status: 401 },
+    );
   }
 
   try {
     const result = await syncZhihuToPersona({
       personaId,
       accessSecret,
-      /* 代表他人访问时才需要 X-OAuth-Token；本期演示走本人身份 */
-      oauthToken: null,
+      oauthToken,
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, identity: oauthToken ? "oauth-user" : "access-secret-owner" });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: (e as Error).message },

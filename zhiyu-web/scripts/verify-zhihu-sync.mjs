@@ -8,9 +8,10 @@
  *   · PersonaEvidence 写了出处（可解释性）
  *   · PersonaSource 被标记为已注入
  *   · **响应体里不含任何凭证**
+ *   · 只允许同步自己的 Persona
  *
- * 注意：这会**真的写入数据库**（合并标签、写证据）。跑完会把新增项列出来，
- * 但不会回滚 —— 合并本身是幂等的（并集），重复跑不会累积重复标签。
+ * 注意：这会**真的写入数据库**（合并标签、写证据）。
+ * 合并本身是幂等的（并集），重复跑不会累积重复标签。
  *
  * 用法：node --env-file=.env scripts/verify-zhihu-sync.mjs [BASE]
  */
@@ -34,13 +35,36 @@ console.log("知乎数据同步验证（真实接口）");
 console.log("=".repeat(80));
 
 try {
-  /* 用 demo 人设 */
-  const me = await prisma.persona.findFirst({ where: { kind: "human" } });
-  if (!me) throw new Error("找不到 human 人设");
+  /* 用 demo 人设。
+     同步接口会校验「只能同步自己的 Persona」，所以必须**先建立会话**，
+     否则 resolveIdentity() 认不出身份 → 403。
+     用 findUnique 取 demo 的人设，保证与接口解析出的身份一致。 */
+  const demoUser = await prisma.user.findUnique({
+    where: { username: "demo" },
+    include: { persona: true },
+  });
+  const me = demoUser?.persona;
+  if (!me) throw new Error("找不到 demo 用户的人设");
+
+  const loginResp = await fetch(`${BASE}/api/auth/demo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const setCookie = loginResp.headers.get("set-cookie") ?? "";
+  const sessionToken = (setCookie.match(/zhiyu_session=([^;]+)/) || [])[1] ?? "";
+  if (!sessionToken) throw new Error(`演示登录未返回会话：HTTP ${loginResp.status}`);
+  const authHeaders = { Cookie: `zhiyu_session=${sessionToken}` };
+  console.log(`会话已建立（personaId=${me.id.slice(0, 12)}…）\n`);
+
+  /* ① 状态查询 */
+  const status = await fetch(`${BASE}/api/zhihu/sync?personaId=${me.id}`, {
+    headers: authHeaders,
+  }).then((r) => r.json());
+  rec("GET /api/zhihu/sync 报告凭证已配置", status.configured === true, JSON.stringify(status));
 
   /* 固定初始状态：把标签收敛到一组基线。
-     否则重复跑时标签已经在库里，"新增"必然为空 —— 那是测试不可重复，
-     不是功能有问题（这类坑之前踩过）。 */
+     否则重复跑时标签已在库里，"新增"必然为空 —— 那是测试不可重复，不是功能问题。 */
   const BASE_INTERESTS = ["技术伦理", "长文阅读", "写作", "效率工具", "播客"];
   const BASE_TOPICS = ["自我成长", "长期主义", "系统思维"];
   await prisma.persona.update({
@@ -53,14 +77,10 @@ try {
     where: { personaId: me.id, source: "zhihu" },
   });
 
-  /* ① 状态查询：应报告凭证已配置 */
-  const status = await fetch(`${BASE}/api/zhihu/sync?personaId=${me.id}`).then((r) => r.json());
-  rec("GET /api/zhihu/sync 报告凭证已配置", status.configured === true, JSON.stringify(status));
-
   /* ② 触发同步 */
   const resp = await fetch(`${BASE}/api/zhihu/sync`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({ personaId: me.id }),
   });
   const raw = await resp.text();
@@ -68,15 +88,15 @@ try {
 
   rec("POST /api/zhihu/sync 返回 200", resp.status === 200, `HTTP ${resp.status}`);
   rec("同步成功", r.ok === true, r.error ?? "");
+  rec("响应标明用的是哪套身份", typeof r.identity === "string",
+    `identity=${r.identity}（access-secret-owner=读自己账号；oauth-user=读授权用户）`);
 
   /* 关键：响应里不能有凭证 */
   const secret = (process.env.ZHIHU_ACCESS_SECRET ?? "").trim();
   const appKey = (process.env.ZHIHU_OAUTH_APP_KEY ?? "").trim();
-  rec(
-    "响应体不含 Access Secret / App Key",
-    !raw.includes(secret) && (appKey ? !raw.includes(appKey) : true),
-    `响应长度 ${raw.length}`,
-  );
+  rec("响应体不含 Access Secret / App Key",
+    (secret ? !raw.includes(secret) : true) && (appKey ? !raw.includes(appKey) : true),
+    `响应长度 ${raw.length}`);
 
   /* ③ 取数结果 */
   const c = r.counts ?? {};
@@ -117,13 +137,12 @@ try {
   });
   rec("写入 PersonaEvidence 作为出处", evidenceAfter > evidenceBefore,
     `${evidenceBefore} → ${evidenceAfter} 条`);
-  /* 注意：PersonaEvidence 模型**没有 createdAt 字段**，
-     所以这里不能按时间排序。（这也是一个可以改进的点：
-     没有时间戳就无法按"最近读了什么"排序。） */
+  /* 注意：PersonaEvidence **没有 createdAt 字段**，所以不能按时间排序 */
   const sample = await prisma.personaEvidence.findFirst({
     where: { personaId: me.id, source: "zhihu" },
   });
-  rec("证据带 note 与 url", Boolean(sample?.note), `${sample?.note?.slice(0, 40)} / ${sample?.url?.slice(0, 40)}`);
+  rec("证据带 note 与 url", Boolean(sample?.note),
+    `${sample?.note?.slice(0, 40)} / ${sample?.url?.slice(0, 40)}`);
 
   /* ⑥ 源被标记已注入 */
   const src = await prisma.personaSource.findUnique({
@@ -136,7 +155,7 @@ try {
   const beforeSecond = afterInterests.length;
   const r2 = await fetch(`${BASE}/api/zhihu/sync`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({ personaId: me.id }),
   }).then((x) => x.json());
   const afterSecond = await prisma.persona.findUnique({ where: { id: me.id } });
@@ -145,13 +164,28 @@ try {
     interests2.length === beforeSecond && interests2.length === new Set(interests2).size,
     `${beforeSecond} → ${interests2.length}；第二次 addedInterests=${(r2.addedInterests ?? []).length}`);
 
-  /* ⑧ 缺 personaId 的入参校验 */
+  /* ⑧ 入参校验 */
   const bad = await fetch(`${BASE}/api/zhihu/sync`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify({}),
   });
   rec("缺 personaId 返回 400", bad.status === 400, `HTTP ${bad.status}`);
+
+  /* ⑨ 越权保护：不能同步别人的 Persona */
+  const otherPersona = await prisma.persona.findFirst({
+    where: { id: { startsWith: "zhihu-" } },
+    select: { id: true },
+  });
+  if (otherPersona) {
+    const forbidden = await fetch(`${BASE}/api/zhihu/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ personaId: otherPersona.id }),
+    });
+    rec("不能同步别人的 Persona（返回 403）", forbidden.status === 403,
+      `HTTP ${forbidden.status}`);
+  }
 } catch (e) {
   console.error("测试异常:", e.message);
   fail += 1;
