@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import Radar from "@/components/radar/Radar";
 import Avatar from "@/components/radar/Avatar";
 import PersonaCardModal from "@/components/PersonaCardModal";
+import AgentMeetButton from "@/components/AgentMeetButton";
 import { citiesOf, locText } from "@/lib/regions";
-import { reportSuccess } from "@/lib/client/error-bus";
+import { reportError, reportSuccess } from "@/lib/client/error-bus";
 import type { DiscoverCandidate, DiscoverResult } from "@/lib/discover";
 import styles from "./find.module.css";
 
@@ -104,21 +105,6 @@ export default function DiscoverClient({
 
   const setAreaView = (area: Area, v: View) => setView((s) => ({ ...s, [area]: v }));
 
-  /* 让我的 Agent 先聊聊：不跳页，弹提示。
-     与首页/人格卡一致 —— 侧栏的进度小圆点由 AppShell 负责。 */
-  const startMeet = (p: DiscoverCandidate) => {
-    try {
-      localStorage.setItem(
-        "zhiyu-pending-meet",
-        JSON.stringify({ id: p.id, title: p.displayName, at: Date.now() }),
-      );
-      localStorage.setItem("zhiyu-match-focus", p.id);
-    } catch {
-      /* 隐私模式下写入失败不影响本次交互 */
-    }
-    reportSuccess(`你的 Agent 已在后台开始和 ${p.displayName} 对话`, "有进展会在通知中心告诉你。");
-  };
-
   /* ── 卡片 ────────────────────────────────────────────────────────────── */
   const Card = ({ p, withSim }: { p: DiscoverCandidate; withSim: boolean }) => (
     <article className={styles.card} data-id={p.id}>
@@ -186,9 +172,7 @@ export default function DiscoverClient({
           查看人格卡
         </button>
         {p.agentOpen ? (
-          <button type="button" className="btn btnPrimary" onClick={() => startMeet(p)}>
-            让 Agent 先聊聊
-          </button>
+          <AgentMeetButton targetPersonaId={p.id} targetName={p.displayName} />
         ) : null}
       </div>
     </article>

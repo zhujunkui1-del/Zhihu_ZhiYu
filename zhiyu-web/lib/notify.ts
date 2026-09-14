@@ -50,14 +50,12 @@ function categoryOf(type: string): { category: NotifyCategory; label: string } {
   }
 }
 
-/**
- * overallScore 在库里是 0~1 的小数（如 0.52），页面要显示百分数。
- * 这里统一换算，避免各页面各写一遍。
- */
+/* overallScore 在库里是 0~1 的小数（如 0.52），页面要显示百分数。
+   换算逻辑统一在 lib/score.ts —— 原先这里自己抄了一份，散在多处迟早不一致。 */
+import { toPercent as scoreToPercent } from "@/lib/score";
+
 function toPercent(v: unknown): number | null {
-  if (typeof v !== "number" || !Number.isFinite(v)) return null;
-  const pct = v <= 1 ? v * 100 : v;
-  return Math.round(pct);
+  return scoreToPercent(typeof v === "number" ? v : null);
 }
 
 function str(v: unknown): string {

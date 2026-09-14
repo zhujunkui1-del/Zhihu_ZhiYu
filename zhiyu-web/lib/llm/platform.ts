@@ -136,7 +136,7 @@ export function platformAvailability(now: Date = new Date()): PlatformAvailabili
  * 特定区域、或为了数据不外流），没有理由让平台模型盖过它。
  *
  * @param prefs 用户的沟通偏好；`usePlatformLlm` 是设置页那个滑块
- * @param byok  用户已接入的模型（调用方从库里取第一条）
+ * @param byok  已解密好的用户模型；传 null 表示没有 BYOK
  */
 export function resolveLlmSource(
   prefs: { usePlatformLlm: boolean } | null,
@@ -154,6 +154,36 @@ export function resolveLlmSource(
   if (avail.usable) return { provider: platformProvider(), source: "platform" };
 
   return { provider: null, source: "none", reason: avail.reason };
+}
+
+/**
+ * 只需要知道"**会不会用上大模型**"时的轻量判定（不需要真的拿到 Key）。
+ *
+ * 为什么单独有这个：调用方常常只配了 `byokCount` 这个计数（比如列表页、
+ * 预检逻辑），手头没有解密后的 Key。原先的写法是硬造一个假 provider
+ * `{ baseUrl: "", apiKey: "x", model: "" }` 传进 `resolveLlmSource` ——
+ * 那是靠"对象非空"骗过判断，读代码的人无法分辨真假，也容易被误用。
+ * 这里把意图写清楚。
+ *
+ * @param hasByok 该用户是否已接入自己的模型（查 count 或 findFirst 都行）
+ */
+export function planLlmSource(
+  prefs: { usePlatformLlm: boolean } | null,
+  hasByok: boolean,
+): { source: "byok" | "platform" | "none"; reason?: string } {
+  if (hasByok) return { source: "byok" };
+
+  const wantsPlatform = prefs?.usePlatformLlm ?? true;
+  if (!wantsPlatform) {
+    return {
+      source: "none",
+      reason: "已关闭「使用知遇提供的大模型」，且未接入自己的模型",
+    };
+  }
+
+  const avail = platformAvailability();
+  if (avail.usable) return { source: "platform" };
+  return { source: "none", reason: avail.reason };
 }
 
 /**

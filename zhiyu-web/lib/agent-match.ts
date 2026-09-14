@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import { toPercent } from "@/lib/score";
 
 /** Judge 的五个维度（与 lib/agent/dialogue.ts 的 JudgeDimensions 一致） */
 export const JUDGE_DIMENSIONS: { key: string; label: string }[] = [
@@ -164,7 +165,7 @@ export async function buildAgentMatch(personaId: string): Promise<AgentMatchData
     const result = (m.report.result ?? {}) as Record<string, unknown>;
     reports.push({
       matchId: m.id,
-      overall: Math.round(m.report.overallScore <= 1 ? m.report.overallScore * 100 : m.report.overallScore),
+      overall: toPercent(m.report.overallScore) ?? 0,
       summary: m.report.summary ?? "",
       dimensions: toDimensions(result.dimensions),
       reasons: Array.isArray(result.reasons)

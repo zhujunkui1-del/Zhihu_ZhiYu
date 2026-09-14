@@ -217,17 +217,27 @@ export function runMockAgentDialogue(a: DialoguePersona, b: DialoguePersona): {
     (Object.values(dimensions).reduce((s, v) => s + v, 0) / 5) * 100,
   );
 
+  /* ⚠️ 量级说明（别被上面的中间变量名骗了）：
+     `dimensions` 的五个值都经过 `round1()` 归一，**是 0~1**；
+     而 `interest`/`values`/`communication` 这些中间变量是 0~100。
+     所以下面用 `>= 0.6` 判断、再 `Math.round(x * 100)` 显示百分比是**正确**的。
+
+     我曾误以为这里是 0~100 而"修"成先除 100，那会让阈值恒不成立、
+     理由全部消失（幸好被测试拦住）。改这段前先确认量级。 */
   const reasons: string[] = [];
   if (dimensions.interest >= 0.6) reasons.push(`兴趣同频 ${Math.round(dimensions.interest * 100)}%`);
   if (dimensions.thinking >= 0.6) reasons.push(`思维共振 ${Math.round(dimensions.thinking * 100)}%`);
   if (dimensions.values >= 0.6) reasons.push(`价值观适配 ${Math.round(dimensions.values * 100)}%`);
   if (dimensions.communication >= 0.6) reasons.push(`沟通适配 ${Math.round(dimensions.communication * 100)}%`);
-  if (dimensions.complementarity >= 0.6) reasons.push(`互补度 ${Math.round(dimensions.complementarity * 100)}%，可能产生思想碰撞`);
+  if (dimensions.complementarity >= 0.6) {
+    reasons.push(`互补度 ${Math.round(dimensions.complementarity * 100)}%，可能产生思想碰撞`);
+  }
   if (reasons.length === 0) reasons.push("信息有限，建议完善双方人格数据后再进行深度匹配");
 
   return {
     rounds,
     judge: {
+      /* 库里 overallScore 的约定是 0~1 —— 与 LLM 路径的 clamp01 一致 */
       overall: overall / 100,
       dimensions,
       summary: `综合匹配度 ${overall}%——${reasons.join("；")}。`,

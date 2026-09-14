@@ -21,14 +21,24 @@ const prisma = new PrismaClient({ adapter });
 /** 演示用的 Agent 问题文案由 dialogue.ts 决定，这里不重复定义 */
 
 try {
-  const me = await prisma.persona.findFirst({ where: { kind: "human" } });
+  /* ⚠️ 必须锁定**演示用户**（username=demo），不能只按 kind: "human" 找。
+     库里有两个 human 人设：演示用户 + 知乎 OAuth 登录的真实账号（食堂泼辣酱）。
+     findFirst 可能命中后者，把演示匹配挂到真实账号名下 ——
+     于是演示时「Agent 匹配」页空空如也（脚本报"已创建 6 条"，页面显示 0 条）。 */
+  const demoUser = await prisma.user.findUnique({
+    where: { username: "demo" },
+    include: { persona: true },
+  });
+  const me = demoUser?.persona;
   if (!me) {
-    console.error("找不到 human 人设，请先跑 scripts/seed-demo.mjs");
+    console.error("找不到演示用户的人设（username=demo），请先跑 scripts/seed-demo.mjs");
     process.exit(1);
   }
 
+  /* 候选只取**内置演示人格**（名字形如「演示人格 NN」）。
+     真实知乎创作者的 kind 也是 synthetic，混进来会让演示数据不稳定。 */
   const candidates = await prisma.persona.findMany({
-    where: { kind: "synthetic" },
+    where: { kind: "synthetic", displayName: { startsWith: "演示人格" } },
     orderBy: { displayName: "asc" },
     take: 8,
   });

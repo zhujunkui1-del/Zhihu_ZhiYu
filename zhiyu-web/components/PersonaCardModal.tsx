@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import PersonaCard from "./PersonaCard";
+import AgentMeetButton from "./AgentMeetButton";
 import { reportError } from "@/lib/client/error-bus";
 import type { PersonaCardData } from "@/lib/persona-card";
 import styles from "./PersonaCardModal.module.css";
@@ -97,6 +98,11 @@ export default function PersonaCardModal({
       role="dialog"
       aria-modal="true"
       aria-label={data ? `${data.displayName} 的人格卡` : "人格卡"}
+      /* ⚠️ 必须在**最外层**就掐断冒泡。
+         这张弹窗挂在页面组件树里，而首页的卡片是 `onClick={setViewPersona}`，
+         发现页的按钮同理 —— 若让事件继续冒泡，点弹窗背景关闭时会**再次触发**
+         打开逻辑，表现为"点了关不掉"。 */
+      onClick={stop}
     >
       {/* 点背景关闭 */}
       <div className={styles.backdrop} onClick={onClose} aria-hidden="true" />
@@ -130,6 +136,16 @@ export default function PersonaCardModal({
         </div>
 
         <footer className={styles.foot}>
+          {/* 别人的人格卡上要有「让 Agent 先聊聊」——
+              这是产品的核心动作，弹窗里缺了它，用户看完卡片无处可去。
+              自己的人格卡不显示（不能和自己的 Agent 聊）。 */}
+          {data && !isSelf ? (
+            <AgentMeetButton
+              targetPersonaId={data.id}
+              targetName={data.displayName}
+              className="btn btnPrimary"
+            />
+          ) : null}
           <button type="button" className="btn btnSecondary" onClick={onClose}>
             关闭
           </button>
