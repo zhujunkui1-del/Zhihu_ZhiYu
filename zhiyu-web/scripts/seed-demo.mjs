@@ -258,9 +258,24 @@ try {
     problems.slice(0, 12).forEach((p) => console.error("  - " + p));
     process.exitCode = 1;
   } else {
-    const deleted = await prisma.persona.deleteMany({ where: { kind: "synthetic" } });
+    /* ⚠️ 只清理**内置演示人格**，绝不能按 kind 全删。
+       真实知乎公开创作者的 kind 同样是 "synthetic"，早先这里写成
+       `deleteMany({ where: { kind: "synthetic" } })`，一跑就把 27 位真实
+       创作者连同回填的 600+ 条证据全部删掉 —— 实际踩过这个坑。
+
+       判据（已实测互斥，见 scripts/check-persona-discriminator.mjs）：
+         · 内置演示人格：名字匹配 `演示人格 NN`，且没有 publicRef
+         · 真实创作者：有 publicRef（知乎 urlToken）
+       这里要求"名字像演示人格"**且**"没有 publicRef"两个条件同时成立，
+       多一道保险：万一以后有真实用户被命名为类似格式，也不会被误删。 */
+    const demoWhere = {
+      kind: "synthetic",
+      displayName: { startsWith: "演示人格" },
+      publicRef: null,
+    };
+    const deleted = await prisma.persona.deleteMany({ where: demoWhere });
     const created = await prisma.persona.createMany({ data: rows });
-    console.log(`已清理旧 synthetic: ${deleted.count} 个`);
+    console.log(`已清理旧演示人格: ${deleted.count} 个（真实创作者不受影响）`);
     console.log(`已重建 AI 演示人格: ${created.count} 个`);
     const provs = [...new Set(rows.map((r) => r.province))];
     console.log(`覆盖省份 ${provs.length} 个：${provs.join("、")}`);

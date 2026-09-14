@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
 import BoardRadar from "@/components/BoardRadar";
+import PersonaCardModal from "@/components/PersonaCardModal";
 import { locText } from "@/lib/regions";
 import { formatDate } from "@/lib/datetime";
 import type { HomeData } from "@/lib/home";
@@ -25,14 +26,41 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "已中断",
 };
 
-/** Fisher–Yates 取 3 个（避免 sort(random) 的分布偏差） */
-function pick3(list: DiscoverCandidate[]): DiscoverCandidate[] {
+/** Fisher–Yates 取 n 个（避免 sort(random) 的分布偏差） */
+function pickN<T>(list: T[], n: number): T[] {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
-  return a.slice(0, 3);
+  return a.slice(0, n);
+}
+
+/** 内置演示人格的名字形如「演示人格 01」 */
+const isBuiltinPersona = (p: DiscoverCandidate) => /^演示人格\s*\d+$/.test(p.displayName);
+
+/**
+ * 首页「今日高匹配的 TA」取样。
+ *
+ * ⚠️ 不能从整个候选池里纯随机抽 3 个。
+ * 候选池是按相似度排序的，而**内置演示人格**（16 个）对演示用户算出来的
+ * 相似度天然偏高，长期霸占前 16 名；真实知乎用户（27 个）最高才第 17 名。
+ * 实测：纯随机抽 3 个几乎总是抽到演示人格，真实用户基本不出现
+ * —— 首页因此看不到"真人"的人格卡，而真人恰恰是这个产品最该展示的东西。
+ *
+ * 所以按**类别**取样：优先保证真人占多数，再用演示人格补位。
+ */
+function pickPreview(pool: DiscoverCandidate[]): DiscoverCandidate[] {
+  const real = pool.filter((p) => !isBuiltinPersona(p));
+  const builtin = pool.filter(isBuiltinPersona);
+
+  const chosen = [...pickN(real, 2), ...pickN(builtin, 1)];
+  /* 某一类不够时用另一类补满 3 个，保证卡片数量稳定 */
+  if (chosen.length < 3) {
+    const rest = pool.filter((p) => !chosen.some((c) => c.id === p.id));
+    chosen.push(...pickN(rest, 3 - chosen.length));
+  }
+  return chosen.slice(0, 3);
 }
 
 /**
@@ -53,6 +81,9 @@ export default function HomeClient({
   const router = useRouter();
   const { board } = data;
   const [preview, setPreview] = useState<DiscoverCandidate[]>(data.preview);
+  /* 弹窗人格卡：存"要看谁"，而不是复制一份数据 —— 内容由弹窗自己按 id 拉，
+     保证与人格页同源（否则两处会显示不一致）。 */
+  const [viewPersona, setViewPersona] = useState<string | null>(null);
 
   const sbti = board.sbti;
   const hasData = board.injectedCount > 0;
@@ -202,7 +233,7 @@ export default function HomeClient({
             <button
               type="button"
               className={styles.dcRoll}
-              onClick={() => setPreview(pick3(data.previewPool))}
+              onClick={() => setPreview(pickPreview(data.previewPool))}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -216,7 +247,17 @@ export default function HomeClient({
 
           <div className={styles.dcGrid}>
             {preview.map((p) => (
-              <Link key={p.id} className={styles.dcCard} href={`/persona?id=${p.id}`}>
+              /* 整卡改成按钮：点「去认识 TA」/「查看人格卡」时
+                 **就地弹窗打开对方的人格卡**，绝不跳转 /persona
+                 （产品要求，用户多次强调）。 */
+              <button
+                key={p.id}
+                type="button"
+                className={styles.dcCard}
+                onClick={() => setViewPersona(p.id)}
+                aria-label={`查看 ${p.displayName} 的人格卡`}
+                data-open-persona={p.id}
+              >
                 <span className={styles.dcHead}>
                   <span className={styles.dcAva}>
                     <Avatar avatarUrl={null} seed={p.id} width={42} height={42} />
@@ -248,13 +289,13 @@ export default function HomeClient({
                     与你的相似度 <b>{p.sim}%</b>
                   </span>
                   <span className={styles.dcGo}>
-                    去认识 TA
+                    查看人格卡
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                       <path d="M5 12h14M13 6l6 6-6 6" />
                     </svg>
                   </span>
                 </span>
-              </Link>
+              </button>
             ))}
           </div>
         </article>
@@ -300,6 +341,13 @@ export default function HomeClient({
           退出登录
         </button>
       </footer>
+
+      {/* 就地弹窗打开对方人格卡：**不跳页、不换路由** */}
+      <PersonaCardModal
+        personaId={viewPersona}
+        ownPersonaId={personaId}
+        onClose={() => setViewPersona(null)}
+      />
     </>
   );
 }

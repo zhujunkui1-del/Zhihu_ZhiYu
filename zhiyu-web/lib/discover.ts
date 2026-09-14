@@ -51,6 +51,13 @@ export interface DiscoverResult {
   meReady: boolean;
   /** 可用的省份列表（按候选池实际出现的省去重） */
   provinces: string[];
+  /**
+   * 当前用户自己的 persona id。
+   *
+   * 带上它是为了发现页能判断用户从雷达/卡片点开的是**别人**还是自己
+   * —— 弹窗人格卡的标题要区分"XX 的人格卡"与"我的人格"。
+   */
+  personaId: string;
 }
 
 function stringArray(v: unknown): string[] {
@@ -120,7 +127,7 @@ export async function buildDiscover(
   ]);
 
   if (!me) {
-    return { candidates: [], total: 0, meReady: false, provinces: [] };
+    return { candidates: [], total: 0, meReady: false, provinces: [], personaId };
   }
 
   const meReady = isMatchable(me);
@@ -170,5 +177,5 @@ export async function buildDiscover(
     candidates.some((c) => c.province === "海外") ? ["海外"] : [],
   );
 
-  return { candidates, total: candidates.length, meReady, provinces };
+  return { candidates, total: candidates.length, meReady, provinces, personaId };
 }

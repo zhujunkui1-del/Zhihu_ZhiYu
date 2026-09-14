@@ -304,6 +304,17 @@
   background-color: rgba(255, 251, 239, 0.86);
   box-shadow: var(--shadow);
   transition: transform 0.18s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  /* 这张卡现在是 <button>（点了就地弹窗，不跳页）：
+     按钮默认的外观/字体/对齐要清掉，否则与原来的 <a> 观感不一致。 */
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dcCard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .dcCard:hover {
   transform: translateY(-3px);

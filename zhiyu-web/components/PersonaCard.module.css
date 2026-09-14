@@ -1,0 +1,340 @@
+/* 人格卡内容样式（弹窗与人格页共用） */
+
+.card {
+  min-width: 0;
+}
+
+/* ── 身份行 ────────────────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.avatar,
+.avatarFallback {
+  flex: 0 0 auto;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  object-fit: cover;
+  background: var(--fg-softer);
+}
+.headText {
+  min-width: 0;
+}
+.name {
+  margin: 0 0 6px;
+  font-family: var(--font-hand);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.3;
+  color: var(--fg);
+}
+.metaLine {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.statLine {
+  margin: 0;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.statLine b {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+.dot {
+  margin: 0 7px;
+  color: var(--muted);
+}
+.bio {
+  margin: 0 0 18px;
+  padding: 12px 15px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-hand);
+  background: var(--accent-faint);
+  color: var(--fg);
+  font-size: 13.5px;
+  line-height: 1.85;
+}
+
+/* ── 分区标题 ──────────────────────────────────────────────────────────── */
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 22px 0 11px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.eyebrowNote {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* 五轴来源标注：Observed 与 Self-reported 含义不同，必须一眼看得出 */
+.sourceNote {
+  padding: 2px 10px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--fg-softer);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ── 六源 ──────────────────────────────────────────────────────────────── */
+.srcList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.srcList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.86);
+}
+.srcOn {
+  border-color: rgba(226, 102, 79, 0.45);
+}
+.srcName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.srcName small {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.srcState {
+  flex: 0 0 auto;
+  font-family: var(--font-hand);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.srcOn .srcState {
+  color: var(--accent-deep);
+}
+
+/* ── 融合特征 ──────────────────────────────────────────────────────────── */
+.fusion {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+.fusionCompact {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.fusionSide {
+  min-width: 0;
+}
+.typeBadge {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.typeName {
+  padding: 5px 13px;
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-faint);
+  color: var(--accent-deep);
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 900;
+}
+.axisList {
+  display: grid;
+  gap: 9px;
+}
+.axisRow {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+}
+.axisLabel {
+  font-size: 12.5px;
+  color: var(--fg);
+}
+.axisVal {
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+.hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+/* ── 结构化特征 ────────────────────────────────────────────────────────── */
+.traits {
+  display: grid;
+  gap: 10px;
+}
+.traitRow {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.traitLabel {
+  padding-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.tagWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag {
+  padding: 3px 10px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  font-size: 12.5px;
+  color: var(--fg);
+}
+.traitEmpty {
+  padding-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── 价值观 ────────────────────────────────────────────────────────────── */
+.valueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px 22px;
+}
+.valueRow {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+}
+.valueLabel {
+  font-size: 12.5px;
+  color: var(--fg);
+}
+.valueVal {
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── 证据 ──────────────────────────────────────────────────────────────── */
+.evidence {
+  display: grid;
+  gap: 14px;
+}
+.evGroup {
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.8);
+  padding: 12px 14px;
+}
+.evGroupHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 9px;
+  font-family: var(--font-hand);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.evCount {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--fg-softer);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.evList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.evItem {
+  display: grid;
+  grid-template-columns: minmax(0, 92px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.evTrait {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+.evNote {
+  min-width: 0;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.evLink {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.evLink:hover {
+  color: var(--accent-deep);
+}
+
+/* ── 窄屏 ──────────────────────────────────────────────────────────────── */
+@media (max-width: 920px) {
+  .fusion,
+  .fusionCompact {
+    grid-template-columns: 1fr;
+  }
+  .traitRow,
+  .evItem {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .head {
+    gap: 12px;
+  }
+  .avatar,
+  .avatarFallback {
+    width: 54px;
+    height: 54px;
+  }
+}

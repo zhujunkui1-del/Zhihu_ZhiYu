@@ -77,3 +77,62 @@ export function axesFromDimensions(
     return { key: g.prefix, label: g.label, value, parts: parts.sort((a, b) => a.key.localeCompare(b.key)) };
   });
 }
+
+/**
+ * 公开创作者的五轴来源：由**内容观察**到的六维价值观聚合。
+ *
+ * ── 为什么需要它 ──────────────────────────────────────────────────────
+ * 上面那个函数只吃 `personality.sbti.dimensions`（15 维自评题）。
+ * 但知乎公开创作者**根本没有知遇账号、也不可能做 SBTI**，
+ * 于是他们的雷达永远是空的 —— 用户点开别人的卡只会看到"等待蒸馏"，
+ * 观感就是"对方什么数据都没有"。实测 27 位真实用户全部为空。
+ *
+ * 而他们其实**有**数据：`Persona.values` 的六维是由公开内容真实统计出来的
+ * （learning ← 平均字数、creation ← 长文比例、social ← 平均互动、
+ *  stability ← 发布量、autonomy ← 领域集中度），完全可溯源。
+ * 这里把这六维按语义映射到雷达的五轴，让公开创作者也有画像。
+ *
+ * ⚠️ **必须在界面上区分来源**：这是 Observed（观察推断），
+ * 不是 Self-reported（本人自评）。两者含义不同，混在一起展示等于骗人。
+ *
+ * 映射（每一轴都取自语义相近的观察维度，不做无依据的加权）：
+ *   自我 ← 独立自主（autonomy）
+ *   情感 ← 社交连接（social）
+ *   观念 ← 学习成长（learning）
+ *   行动 ← 创造表达（creation）
+ *   社交 ← 稳定输出（stability）
+ */
+const OBSERVED_AXIS_MAP: { key: string; label: string; from: string }[] = [
+  { key: "S", label: "自我", from: "autonomy" },
+  { key: "E", label: "情感", from: "social" },
+  { key: "A", label: "观念", from: "learning" },
+  { key: "Ac", label: "行动", from: "creation" },
+  { key: "So", label: "社交", from: "stability" },
+];
+
+/**
+ * 由观察到的六维价值观聚合出五轴。
+ *
+ * @param values `Persona.values`，形如 `{ learning: 0.9, creation: 0.7, ... }`
+ * @returns 五轴；某轴对应的观察维度缺失时该轴 `value` 为 null（不编造中位值）
+ */
+export function axesFromObservedValues(
+  values: Record<string, unknown> | null | undefined,
+): Axis[] {
+  const src = (values ?? {}) as Record<string, unknown>;
+  return OBSERVED_AXIS_MAP.map((m) => {
+    const raw = src[m.from];
+    const num = typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+    return {
+      key: m.key,
+      label: m.label,
+      value: num,
+      parts: num == null ? [] : [{ key: m.from, normalized: num }],
+    };
+  });
+}
+
+/** 这个五轴集合里有没有可用值 */
+export function axesHaveValue(axes: Axis[]): boolean {
+  return axes.some((a) => a.value != null);
+}

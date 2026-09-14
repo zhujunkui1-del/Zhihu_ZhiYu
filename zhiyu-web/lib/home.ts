@@ -118,10 +118,33 @@ export async function buildHome(personaId: string, userId: string): Promise<Home
 
   const pool = [...discover.candidates].sort((a, b) => b.sim - a.sim);
 
+  /**
+   * 首次进入时展示的 3 位。
+   *
+   * ⚠️ 不能直接取相似度前 3。内置演示人格（16 个）对演示用户算出的相似度
+   * 天然偏高，长期占满前 16 名，真实知乎用户（27 个）最高才第 17 名 ——
+   * 直接取前 3 会让首页**永远只显示演示人格**，看不到真人。
+   * 这里按类别取：2 位真人 + 1 位演示人格（真人不够时自动降级）。
+   */
+  const isBuiltin = (p: DiscoverCandidate) => /^演示人格\s*\d+$/.test(p.displayName);
+  const realCandidates = pool.filter((p) => !isBuiltin(p));
+  const builtinCandidates = pool.filter(isBuiltin);
+  const previewSeed = [
+    ...realCandidates.slice(0, 2),
+    ...builtinCandidates.slice(0, 1),
+  ];
+  /* 某一类为空时用另一类补满，保证始终 3 张卡 */
+  if (previewSeed.length < 3) {
+    for (const p of pool) {
+      if (previewSeed.length >= 3) break;
+      if (!previewSeed.some((x) => x.id === p.id)) previewSeed.push(p);
+    }
+  }
+
   return {
     board,
     running,
-    preview: pool.slice(0, 3),
+    preview: previewSeed.slice(0, 3),
     previewPool: pool,
     notify: notify.slice(0, 4),
     unread: notify.filter((n) => !n.read).length,

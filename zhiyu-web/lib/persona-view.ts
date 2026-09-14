@@ -8,7 +8,7 @@
 import { prisma } from "@/lib/db";
 import type { Persona, PersonaSource } from "@prisma/client";
 import { computeCompleteness, type PersonaSourceType } from "@/lib/persona/completeness";
-import { axesFromDimensions, type Axis, type RawDimScore } from "@/lib/sbti/axes";
+import { axesFromDimensions, axesFromObservedValues, axesHaveValue, type Axis, type RawDimScore } from "@/lib/sbti/axes";
 
 /** 六个数据源与展示顺序（首页的「人格数据源」行、我的人格页都用它） */
 export const SOURCE_TYPES: PersonaSourceType[] = [
@@ -63,10 +63,19 @@ export interface PersonaBoard {
   sourceChips: SourceChip[];
   injectedCount: number;
   /**
-   * 五轴画像（由 SBTI 的 15 维聚合而来）。
-   * 未做 SBTI 时各轴 value 为 null —— 调用方据此显示"等待蒸馏"。
+   * 五轴画像。
+   * 来自 SBTI 自评（15 维聚合），没有 SBTI 时回退到公开内容的观察值。
+   * 未做 SBTI 且没有观察数据时各轴 value 为 null —— 调用方据此显示"等待蒸馏"。
    */
   axes: Axis[];
+  /**
+   * 五轴的来源，**必须如实展示**：
+   *   self-report = 本人做 SBTI 自评（"你眼中的自己"）
+   *   observed    = 由公开内容观察推断（"公开内容里的你"）
+   *   none        = 没有依据，不画
+   * 两者含义不同，混着展示等于骗人。
+   */
+  axesSource: "self-report" | "observed" | "none";
 }
 
 /**
@@ -119,6 +128,23 @@ export async function buildPersonaBoard(
   const personality = (persona.personality ?? {}) as Record<string, unknown>;
   const sbti = (personality.sbti ?? null) as SbtiView | null;
 
+  /* 五轴优先用 SBTI 自评（15 维聚合）。
+     公开创作者没有 SBTI，若就此返回空，他们的雷达永远是空的 ——
+     改为回退到**由公开内容观察**出的六维价值观（真实统计，可溯源）。
+     两者含义不同，所以同时给出 `axesSource` 让界面如实标注。 */
+  const axesFromSbti = axesFromDimensions(sbti?.dimensions);
+  const useObserved = !axesHaveValue(axesFromSbti);
+  const observedValues =
+    persona.values && typeof persona.values === "object"
+      ? (persona.values as Record<string, unknown>)
+      : null;
+  const axes = useObserved ? axesFromObservedValues(observedValues) : axesFromSbti;
+  const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
+    ? useObserved
+      ? "observed"
+      : "self-report"
+    : "none";
+
   return {
     id: persona.id,
     displayName: persona.displayName,
@@ -131,7 +157,8 @@ export async function buildPersonaBoard(
     sbti,
     sourceChips,
     injectedCount: injected.length,
-    /* 五轴来自 SBTI 的 15 维聚合 —— 这是真实数据，不是占位 */
-    axes: axesFromDimensions(sbti?.dimensions),
+    /* 五轴来自 SBTI 自评，或回退到公开内容的观察值 —— 都是真实数据，不是占位 */
+    axes,
+    axesSource,
   };
 }

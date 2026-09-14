@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Radar from "@/components/radar/Radar";
 import Avatar from "@/components/radar/Avatar";
+import PersonaCardModal from "@/components/PersonaCardModal";
 import { citiesOf, locText } from "@/lib/regions";
 import { reportSuccess } from "@/lib/client/error-bus";
 import type { DiscoverCandidate, DiscoverResult } from "@/lib/discover";
@@ -69,6 +70,9 @@ export default function DiscoverClient({
 
   /* 快速匹配：点击后才出结果 */
   const [quickList, setQuickList] = useState<DiscoverCandidate[] | null>(null);
+
+  /* 弹窗人格卡：存"要看谁"，内容由弹窗按 id 自己拉（与人格页同源） */
+  const [viewPersona, setViewPersona] = useState<string | null>(null);
 
   /* ── 筛选 ────────────────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
@@ -175,7 +179,9 @@ export default function DiscoverClient({
         <button
           type="button"
           className="btn btnGhost btnArrow"
-          onClick={() => router.push(`/persona?id=${p.id}`)}
+          /* 就地弹窗打开对方人格卡，**不跳转 /persona**（产品要求） */
+          onClick={() => setViewPersona(p.id)}
+          data-open-persona={p.id}
         >
           查看人格卡
         </button>
@@ -240,7 +246,7 @@ export default function DiscoverClient({
             sim: p.sim,
             avatarUrl: null,
           }))}
-          onOpenProfile={(id) => router.push(`/persona?id=${id}`)}
+          onOpenProfile={(id) => setViewPersona(id)}
         />
       </div>
     ) : (
@@ -427,6 +433,12 @@ export default function DiscoverClient({
         </section>
       ) : null}
 
+      {/* 就地弹窗打开对方人格卡（卡片与雷达都走这里），**不跳页** */}
+      <PersonaCardModal
+        personaId={viewPersona}
+        ownPersonaId={data.personaId}
+        onClose={() => setViewPersona(null)}
+      />
     </>
   );
 }

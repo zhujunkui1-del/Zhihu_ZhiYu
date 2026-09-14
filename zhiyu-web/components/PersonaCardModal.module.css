@@ -1,0 +1,110 @@
+/* 弹窗人格卡：定位与外壳。
+   卡片内容本身的样式在 PersonaCard.module.css（与人格页共用）。 */
+
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--fg) 46%, transparent);
+  backdrop-filter: blur(4px);
+}
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(980px, 100%);
+  /* 关键：内容可能很长，弹窗自己滚，页面不滚 */
+  max-height: calc(100vh - 48px);
+  border: 2px solid var(--line);
+  border-radius: var(--r-hand-lg);
+  background-color: #fff9eb;
+  background-image: url("/assets/textures/paper.png");
+  background-size: 620px 620px;
+  box-shadow: var(--shadow-lg);
+}
+.close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  z-index: 2;
+}
+.close:hover {
+  background: var(--fg-softer);
+  color: var(--fg);
+}
+.head {
+  padding: 22px 60px 12px 24px;
+  border-bottom: 1.5px dashed var(--line-soft);
+}
+.eyebrow {
+  margin: 0 0 6px;
+  font-family: var(--font-hand);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.title {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.35;
+  color: var(--fg);
+}
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 24px 8px;
+}
+.state,
+.stateError {
+  margin: 0;
+  padding: 34px 4px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.stateError {
+  color: var(--accent-deep);
+}
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px 20px;
+  border-top: 1.5px dashed var(--line-soft);
+}
+
+@media (max-width: 920px) {
+  .wrap {
+    padding: 0;
+  }
+  .dialog {
+    width: 100%;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+    border-width: 0;
+  }
+  .head {
+    padding-right: 54px;
+  }
+  .body {
+    padding-inline: 16px;
+  }
+}
