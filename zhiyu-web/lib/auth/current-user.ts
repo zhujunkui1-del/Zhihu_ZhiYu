@@ -24,7 +24,17 @@ import { SESSION_COOKIE, getSession } from "@/lib/auth/session";
 
 export interface CurrentIdentity {
   userId: string;
-  personaId: string | null;
+  /**
+   * **登录者自己**的 persona id。永远是自己那一份，不受 URL 影响。
+   *
+   * 为什么必须与 viewPersonaId 分开：曾经把两者合成一个字段，
+   * 结果 `?id=<别人>` 时 `me.personaId` 也变成了别人，
+   * 页面的 `isSelf = viewId === me.personaId` 恒为 true
+   * —— 看任何人的人格卡都被当成"我的人格"。这是实际发生过的 bug。
+   */
+  ownPersonaId: string | null;
+  /** 本次要**查看**的 persona（默认等于 ownPersonaId；看别人时是对方） */
+  viewPersonaId: string | null;
   /** 身份来源，便于页面提示与排查 */
   source: "session" | "demo";
   displayName: string | null;
@@ -35,7 +45,7 @@ export interface CurrentIdentity {
 const isProd = () => process.env.NODE_ENV === "production";
 
 /** 演示用户（本地与预发用；生产不会走到） */
-async function demoIdentity(): Promise<CurrentIdentity | null> {
+async function demoIdentity(): Promise<Omit<CurrentIdentity, "viewPersonaId"> | null> {
   const demo = await prisma.user.findUnique({
     where: { username: "demo" },
     include: { persona: { select: { id: true } } },
@@ -43,7 +53,7 @@ async function demoIdentity(): Promise<CurrentIdentity | null> {
   if (!demo) return null;
   return {
     userId: demo.id,
-    personaId: demo.persona?.id ?? null,
+    ownPersonaId: demo.persona?.id ?? null,
     source: "demo",
     displayName: demo.displayName,
     zhihuAuthorized: demo.zhihuAuthorized,
@@ -53,7 +63,8 @@ async function demoIdentity(): Promise<CurrentIdentity | null> {
 /**
  * 解析当前身份。
  *
- * @param opts.queryPersonaId 选择要看哪个人设（**不是**身份）
+ * @param opts.queryPersonaId 想查看哪个人设（**不是**身份）。
+ *   看他人人格卡是产品功能（发现页/雷达点进去），但身份始终是会话里的那个人。
  */
 export async function resolveIdentity(opts?: {
   queryPersonaId?: string | null;
@@ -68,9 +79,12 @@ export async function resolveIdentity(opts?: {
         where: { userId: s.userId },
         select: { id: true },
       });
+      const own = persona?.id ?? null;
       return {
         userId: s.userId,
-        personaId: opts?.queryPersonaId ?? persona?.id ?? null,
+        ownPersonaId: own,
+        /* 只有传了 queryPersonaId 才是"看别人"；否则看自己 */
+        viewPersonaId: opts?.queryPersonaId ?? own,
         source: "session",
         displayName: s.displayName,
         zhihuAuthorized: s.zhihuAuthorized,
@@ -82,7 +96,10 @@ export async function resolveIdentity(opts?: {
   if (!isProd()) {
     const demo = await demoIdentity();
     if (demo) {
-      return { ...demo, personaId: opts?.queryPersonaId ?? demo.personaId };
+      return {
+        ...demo,
+        viewPersonaId: opts?.queryPersonaId ?? demo.ownPersonaId,
+      };
     }
   }
 

@@ -245,12 +245,20 @@ export default function PersonaClient({
         </div>
       ) : null}
 
-      <div className={styles.seg} role="tablist" aria-label="我的人格内容">
+      <div className={styles.seg} role="tablist" aria-label={isSelf ? "我的人格内容" : "人格卡内容"}>
         {(
           [
             ["card", "人格卡"],
-            ["sources", "注入数据"],
-            ["distill", "Agent 蒸馏"],
+            /* 「注入数据」与「Agent 蒸馏」是**本人专属操作**：
+               注入要用自己的数据源、蒸馏要处理自己的数据。
+               看别人的人格卡时必须隐藏，否则会出现"可以给别人的卡注数据"
+               这种既无意义又困惑的入口。 */
+            ...(isSelf
+              ? ([
+                  ["sources", "注入数据"],
+                  ["distill", "Agent 蒸馏"],
+                ] as [Tab, string][])
+              : []),
           ] as [Tab, string][]
         ).map(([key, label]) => (
           <button

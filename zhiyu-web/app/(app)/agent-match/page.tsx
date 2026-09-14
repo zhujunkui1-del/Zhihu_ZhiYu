@@ -12,24 +12,24 @@ export const dynamic = "force-dynamic";
  * 后端逻辑（真 LLM 对话 + Judge + Mock 兜底）都在
  * `/api/matches/[id]/start`，本页**只读不跑**，所以进来不会触发新的对话。
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话，生产环境无会话则跳登录页。
+ * 身份来自 `resolveIdentity()`；用 `ownPersonaId`（这是我自己的匹配列表）。
  */
 export default async function AgentMatchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ personaId?: string; matchId?: string }>;
+  searchParams: Promise<{ matchId?: string }>;
 }) {
   const sp = await searchParams;
 
-  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
-  if (!me?.personaId) redirect("/");
+  const me = await resolveIdentity();
+  if (!me?.ownPersonaId) redirect("/");
 
-  const data = await buildAgentMatch(me.personaId);
+  const data = await buildAgentMatch(me.ownPersonaId);
 
   return (
     <AgentMatchClient
       data={data}
-      personaId={me.personaId}
+      personaId={me.ownPersonaId}
       /* 从通知 / 首页跳进来时可以指定要展开的那一条 */
       focusMatchId={sp.matchId ?? null}
     />

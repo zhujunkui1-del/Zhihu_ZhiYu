@@ -7,19 +7,16 @@ import PersonaClient from "./PersonaClient";
 export const dynamic = "force-dynamic";
 
 /**
- * 我的人格。
- *
- * Server Component 取数 + 直接传题库。
- * 题库是从 `lib/sbti/scoring` 静态导入的，**不需要客户端再 fetch** ——
- * 于是 SBTI 测试没有"题库加载中"这个中间态，点开即可答题。
+ * 人格卡页。
  *
  * 两种进入方式：
- *   /persona?personaId=…  看我自己的人格卡
- *   /persona?id=…         看别人的人格卡（发现页/雷达点进来）
- * 后者只读，不显示注入/蒸馏这些对自己才有的操作。
+ *   /persona            看**我自己**的人格卡（可注入数据、可重测 SBTI）
+ *   /persona?id=…       看**别人**的人格卡（只读，发现页/雷达点进来）
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话；`?id=` 只是"要看哪张卡"，
- * 决定 `isSelf` 的是**会话身份**（避免用 query 把自己伪装成别人）。
+ * ⚠️ `isSelf` 必须比较「要看的 id」与「**我自己的** persona id」。
+ * 曾经把这两个概念合成一个字段，导致 `?id=<别人>` 时自己那一份也被覆盖成对方，
+ * 于是 `isSelf` 恒为 true —— 看任何人的人格卡都显示成「我的人格」。
+ * 现在身份里 `ownPersonaId`（我是谁）与 `viewPersonaId`（看谁）是分开的。
  */
 export default async function PersonaPage({
   searchParams,
@@ -28,19 +25,20 @@ export default async function PersonaPage({
 }) {
   const sp = await searchParams;
 
-  const targetId = sp.id ?? sp.personaId ?? null;
-  const me = await resolveIdentity({ queryPersonaId: targetId });
+  /* 要看谁：?id= 优先（看别人），否则看我自己的 */
+  const requested = sp.id ?? sp.personaId ?? null;
+  const me = await resolveIdentity({ queryPersonaId: requested });
 
-  /* 自己那一侧必须有自己的 persona；看别人时只要目标存在即可 */
-  const viewId = targetId ?? me?.personaId ?? null;
+  const viewId = me?.viewPersonaId ?? requested;
   if (!viewId) redirect("/");
 
   const board = await buildPersonaBoard(viewId);
   if (!board) redirect("/");
 
-  const isSelf = Boolean(me?.personaId && viewId === me.personaId);
+  /* 只有「要看的就是我自己」时才是本人视角 */
+  const isSelf = Boolean(me?.ownPersonaId && viewId === me.ownPersonaId);
 
-  /* 题库只在"自己"这一侧需要（别人的人格卡不能重测） */
+  /* 题库只在本人视角需要（别人的人格卡不能重测） */
   const bank = isSelf
     ? questions.map((q) => ({
         id: q.id,

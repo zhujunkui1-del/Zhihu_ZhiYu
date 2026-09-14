@@ -12,24 +12,17 @@ export const dynamic = "force-dynamic";
  *
  * 四区：① 身份与数据源　② Agent 沟通偏好　③ AI 大模型接入　④ 账号与退出
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话，生产环境无会话则跳登录页。
+ * 身份只来自 `resolveIdentity()`（HttpOnly 会话），用 `ownPersonaId`。
  * 加密密钥的配置状态在服务端读，用于给 BYOK 区一个**明确**提示
  * （"未配置加密密钥"比"保存失败"有用得多）。
  */
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ personaId?: string }>;
-}) {
-  const sp = await searchParams;
-
-  /* 身份只来自会话（不接受 ?userId=，那是水平越权） */
-  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
+export default async function SettingsPage() {
+  const me = await resolveIdentity();
   if (!me) redirect("/");
 
   const [user, board, prefsRow, llmCount] = await Promise.all([
     prisma.user.findUnique({ where: { id: me.userId } }),
-    me.personaId ? buildPersonaBoard(me.personaId) : Promise.resolve(null),
+    me.ownPersonaId ? buildPersonaBoard(me.ownPersonaId) : Promise.resolve(null),
     prisma.communicationPrefs.findUnique({ where: { userId: me.userId } }),
     prisma.llmProviderConfig.count({ where: { userId: me.userId } }),
   ]);
@@ -47,7 +40,7 @@ export default async function SettingsPage({
   return (
     <SettingsClient
       userId={me.userId}
-      personaId={me.personaId ?? ""}
+      personaId={me.ownPersonaId ?? ""}
       displayName={user.displayName ?? "演示用户"}
       zhihuAuthorized={user.zhihuAuthorized}
       zhihuHashId={user.zhihuHashId}

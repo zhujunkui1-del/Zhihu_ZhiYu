@@ -12,20 +12,15 @@ export const dynamic = "force-dynamic";
  * 全部交给 `DiscoverClient`。这样首屏就带完整数据，不需要客户端再打一次接口，
  * 也不会出现"先空后闪"。
  *
- * 身份来自 `resolveIdentity()`：优先 HttpOnly 会话，生产环境无会话则跳登录页。
- * `?personaId=` 仍然可用——**看别人的人格卡是产品功能**，但身份始终取自会话。
+ * 身份来自 `resolveIdentity()`（HttpOnly 会话）。
+ * 注意这里用的是 `ownPersonaId` —— 发现页永远是"以**我自己**为中心找别人"，
+ * 不受 URL 上任何 persona 参数影响。
  */
-export default async function FindPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ personaId?: string }>;
-}) {
-  const sp = await searchParams;
+export default async function FindPage() {
+  const me = await resolveIdentity();
+  if (!me?.ownPersonaId) redirect("/");
 
-  const me = await resolveIdentity({ queryPersonaId: sp.personaId ?? null });
-  if (!me?.personaId) redirect("/");
+  const data = await buildDiscover(me.ownPersonaId);
 
-  const data = await buildDiscover(me.personaId);
-
-  return <DiscoverClient data={data} personaId={me.personaId} />;
+  return <DiscoverClient data={data} personaId={me.ownPersonaId} />;
 }
