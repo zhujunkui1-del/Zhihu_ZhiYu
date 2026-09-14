@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/db";
 import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
+import { PROVINCES } from "@/lib/regions";
 
 /** 发现页需要展示的候选视图 */
 export interface DiscoverCandidate {
@@ -154,7 +155,20 @@ export async function buildDiscover(
     };
   });
 
-  const provinces = [...new Set(candidates.map((c) => c.province).filter((x): x is string => !!x))];
+  /**
+   * 省份下拉的选项。
+   *
+   * ★ 必须用**完整地区表**，不能从候选里推导 ★
+   * 曾经写成 `candidates.map(c => c.province)`，后果是下拉只显示"当前有人"
+   * 的那十来个省份 —— 用户看到的就是「省份有欠缺」。实际上地区表里
+   * 34 个省级单位 + 海外都齐，只是没被列出来。
+   *
+   * 顺带一个体验好处：能筛到 0 人的省份，用户会看到明确的空态
+   * （"这个地区暂时没有人"），而不是"找不到这个选项、以为没这个省"。
+   */
+  const provinces = PROVINCES.filter((p) => p !== "海外").concat(
+    candidates.some((c) => c.province === "海外") ? ["海外"] : [],
+  );
 
   return { candidates, total: candidates.length, meReady, provinces };
 }

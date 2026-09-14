@@ -17,6 +17,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { fetchPublicPerson } from "../lib/zhihu/public-profile.ts";
 import { distill } from "./distill-real-people.mjs";
+import { normalizeIpLocation } from "../lib/regions.ts";
 
 const args = process.argv.slice(2);
 const LIMIT = Number(args[args.indexOf("--limit") + 1]) || 20;
@@ -120,8 +121,13 @@ try {
       displayName: d.name,
       bio: d.headline || null,
       publicRef: d.urlToken,
-      province: d.ipLocation,
-      city: null,
+      /* 知乎返回的 IP 属地可能是省级名（北京）、国家名（美国）或「未知」。
+         统一走 normalizeIpLocation：国家名归到「海外」，
+         「未知」返回 null（**不编造**，否则地区筛选会出现假数据）。 */
+      ...(() => {
+        const loc = normalizeIpLocation(d.ipLocation);
+        return { province: loc.province, city: loc.city };
+      })(),
       interests: d.interests.length ? d.interests : ["知乎内容"],
       topics: d.topics,
       communicationStyle: ["公开表达"],
