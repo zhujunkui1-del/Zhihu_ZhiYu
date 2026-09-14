@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import type { Persona, PersonaSource } from "@prisma/client";
 import { computeCompleteness, type PersonaSourceType } from "@/lib/persona/completeness";
 import { axesFromDimensions, type Axis, type RawDimScore } from "@/lib/sbti/axes";
 
@@ -72,12 +73,22 @@ export interface PersonaBoard {
  * 读取并整理一个人设。
  *
  * 副作用：完整度与库中不一致时会顺带回写（沿用原有行为）。
+ *
+ * @param preloaded 调用方已查过的 persona（含 sources）。
+ *   传进来可省一次数据库往返 —— Neon 在新加坡，单次往返约 100~200ms，
+ *   而首页既要人格卡又要发现预览，不共享的话同一个 persona 会查两遍。
  */
-export async function buildPersonaBoard(personaId: string): Promise<PersonaBoard | null> {
-  const persona = await prisma.persona.findUnique({
-    where: { id: personaId },
-    include: { sources: true },
-  });
+export async function buildPersonaBoard(
+  personaId: string,
+  preloaded?: (Persona & { sources: PersonaSource[] }) | null,
+): Promise<PersonaBoard | null> {
+  const persona =
+    preloaded !== undefined
+      ? preloaded
+      : await prisma.persona.findUnique({
+          where: { id: personaId },
+          include: { sources: true },
+        });
   if (!persona) return null;
 
   const injected = persona.sources

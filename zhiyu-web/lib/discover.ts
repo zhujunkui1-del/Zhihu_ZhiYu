@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@/lib/db";
+import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
 
 /** 发现页需要展示的候选视图 */
@@ -91,24 +92,37 @@ function isMatchable(p: {
 /**
  * 装配发现页数据。
  *
+ * 性能说明（实测数据）：Neon 在新加坡，单次查询往返约 **100~200ms**，
+ * 所以"少一次串行查询"就是省 100~200ms。这里做了两件事：
+ *   · `me` 与候选池**并发**查询（候选池只依赖 personaId，不依赖 me 的结果）
+ *   · 支持传入**已取好的 me**，避免调用方（如 buildHome）重复查一次
+ *
  * @param personaId 当前用户的人设 id
+ * @param preloadedMe 调用方已经查过的 persona，传进来可省一次往返
  */
-export async function buildDiscover(personaId: string): Promise<DiscoverResult> {
-  const me = await prisma.persona.findUnique({ where: { id: personaId } });
+export async function buildDiscover(
+  personaId: string,
+  preloadedMe?: Persona | null,
+): Promise<DiscoverResult> {
+  const [me, pool] = await Promise.all([
+    preloadedMe !== undefined
+      ? Promise.resolve(preloadedMe)
+      : prisma.persona.findUnique({ where: { id: personaId } }),
+    /* 候选池：除自己以外的所有 Persona（真人 / 公开创作者 / AI 演示人格）。
+       TODO(可见性): 接入《Agent 社交边界与数据披露规范》后，
+       这里要按 CommunicationPrefs.showSimilarity 过滤掉不愿被推荐的人。 */
+    prisma.persona.findMany({
+      where: { id: { not: personaId } },
+      orderBy: { displayName: "asc" },
+      take: 200,
+    }),
+  ]);
+
   if (!me) {
     return { candidates: [], total: 0, meReady: false, provinces: [] };
   }
 
   const meReady = isMatchable(me);
-
-  /* 候选池：除自己以外的所有 Persona（真人 / 公开创作者 / AI 演示人格）。
-     TODO(可见性): 接入《Agent 社交边界与数据披露规范》后，
-     这里要按 CommunicationPrefs.showSimilarity 过滤掉不愿被推荐的人。 */
-  const pool = await prisma.persona.findMany({
-    where: { id: { not: personaId } },
-    orderBy: { displayName: "asc" },
-    take: 200,
-  });
 
   /* 用与 quickMatch 完全相同的评分逻辑，但不排序截断 —— 搜索/随机也要有相似度 */
   const scored = meReady

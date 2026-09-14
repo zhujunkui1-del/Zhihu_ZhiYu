@@ -1,0 +1,51 @@
+/**
+ * 顶部导航进度条。
+ *
+ * 设计约束：
+ *   · **fixed 定位 + pointer-events: none** —— 不占布局、不挡点击，
+ *     绝不改变现有页面的任何排版（这是我这个项目反复踩过的坑：
+ *     给共享组件加尺寸/定位时容易把别处挤坏）
+ *   · 紧贴界面最上沿（top: 0），宽度 3px，用品牌珊瑚色
+ *   · 默认不可见（opacity 0），加载时才淡入
+ */
+
+.wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  /* 不挡任何点击 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.wrapOn {
+  opacity: 1;
+}
+
+.bar {
+  height: 100%;
+  width: 0;
+  /* 品牌色渐变 + 一点光晕，让它像"进度"而不是一条静态线 */
+  background: linear-gradient(90deg, var(--accent, #e2664f), var(--accent-deep, #c9503a));
+  box-shadow: 0 0 8px rgba(226, 102, 79, 0.55), 0 0 2px rgba(226, 102, 79, 0.8);
+  border-radius: 0 2px 2px 0;
+  /* 宽度变化要平滑；但收尾补到 100% 时不希望拖太久 */
+  transition: width 0.18s ease-out;
+}
+
+/* 走完最后一段时快一些，避免"慢慢爬"的观感 */
+.bar[style*="width: 100%"] {
+  transition: width 0.12s ease-out;
+}
+
+/* 尊重「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .wrap,
+  .bar {
+    transition: none;
+  }
+}

@@ -56,7 +56,15 @@ function notifyTitle(type: string, payload: unknown): string {
 }
 
 export async function buildHome(personaId: string, userId: string): Promise<HomeData | null> {
-  const board = await buildPersonaBoard(personaId);
+  /* 一次取好 persona（含 sources），后面人格卡与发现预览**共用**它。
+     不共享的话同一个 persona 会被查两遍 —— 每次往返 100~200ms。 */
+  const persona = await prisma.persona.findUnique({
+    where: { id: personaId },
+    include: { sources: true },
+  });
+  if (!persona) return null;
+
+  const board = await buildPersonaBoard(personaId, persona);
   if (!board) return null;
 
   const [matches, notifications, discover] = await Promise.all([
@@ -75,7 +83,7 @@ export async function buildHome(personaId: string, userId: string): Promise<Home
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    buildDiscover(personaId),
+    buildDiscover(personaId, persona),
   ]);
 
   /* Agent 匹配：进行中的排前面 */

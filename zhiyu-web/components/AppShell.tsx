@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import NavProgress from "./NavProgress";
 import styles from "./AppShell.module.css";
 
 /** 主导航项。顺序与原型侧栏一致。 */
@@ -95,6 +96,8 @@ export default function AppShell({ children, agentRunning = false }: Props) {
 
   return (
     <div className={`app-shell ${styles.shell}`}>
+      {/* 顶部导航进度条：fixed 定位，不占布局、不挡点击 */}
+      <NavProgress />
       <aside className={styles.sidebar}>
         <Link className={styles.sideBrand} href="/home" aria-label="知遇首页">
           <span className={styles.brandRow}>
