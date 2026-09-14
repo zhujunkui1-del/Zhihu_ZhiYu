@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { createSession, sessionCookieOptions } from "@/lib/auth/session";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,9 @@ const DEMO_PERSONA = {
 };
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   /* 生产环境**不允许**用演示账号登录。
      否则任何人都能拿演示身份进来，而演示身份下还有数据可读；
      更糟的是会掩盖「知乎 OAuth 没配好」这个问题。
@@ -128,16 +132,6 @@ export async function POST(req: NextRequest) {
     personaId: demo.persona.id,
     displayName: demo.user.displayName,
   });
-  res.cookies.set({
-    name: SESSION_COOKIE,
-    value: token,
-    httpOnly: true,
-    /* 走到这里必然是非生产环境（生产已在入口拦截），
-       所以不加 Secure —— 本地是 http，加了浏览器不会写 Cookie。 */
-    secure: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60,
-  });
+  res.cookies.set(sessionCookieOptions(token));
   return res;
 }

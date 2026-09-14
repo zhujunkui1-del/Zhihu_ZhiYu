@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { NotifyData, NotifyCategory } from "@/lib/notify";
 import { formatListTime } from "@/lib/datetime";
+import { reportError, reportSuccess } from "@/lib/client/error-bus";
 import styles from "./notify.module.css";
 
 type Tab = "all" | NotifyCategory;
@@ -40,7 +41,6 @@ export default function NotifyClient({
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [markedAll, setMarkedAll] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState("");
 
   const isRead = (id: string, read: boolean) => read || markedAll || readIds.has(id);
 
@@ -53,11 +53,6 @@ export default function NotifyClient({
     ? 0
     : data.items.filter((i) => !i.read && !readIds.has(i.id)).length;
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast(""), 2800);
-  };
-
   /** 打开一条：先标为已读（本地即时反馈），再跳转 */
   const open = async (id: string, matchId: string | null) => {
     setReadIds((s) => new Set(s).add(id));
@@ -69,16 +64,16 @@ export default function NotifyClient({
     if (busy || unread === 0) return;
     setBusy(true);
     try {
+      /* 不再传 userId —— 服务端只认 HttpOnly 会话（传了也会被忽略） */
       const r = await fetch("/api/notifications", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        headers: { "x-silent-error": "1" },
       }).then((x) => x.json());
       if (!r.ok) throw new Error(r.error ?? "操作失败");
       setMarkedAll(true);
-      showToast("已把全部通知标为已读。");
+      reportSuccess(`已把全部通知标为已读`, `${r.marked ?? 0} 条`);
     } catch (e) {
-      showToast((e as Error).message);
+      reportError(e, { title: "标记已读失败" });
     } finally {
       setBusy(false);
     }
@@ -222,10 +217,6 @@ export default function NotifyClient({
           这里只出现两类：你发起的 Agent 对话完成，以及别人（在你允许的前提下）发来的匹配报告。
         </div>
       </section>
-
-      <div className={`toast ${toast ? "toastShow" : ""}`} role="status" aria-live="polite">
-        {toast}
-      </div>
     </>
   );
 }

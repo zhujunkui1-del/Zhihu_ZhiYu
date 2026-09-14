@@ -5,12 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PersonaBoard } from "@/lib/persona-view";
 import { LLM_PRESETS, presetById } from "@/lib/llm-presets";
+import {
+  showToast as pushToast,
+  reportError,
+  reportSuccess,
+  reportWarn,
+} from "@/lib/client/error-bus";
 import styles from "./settings.module.css";
 
 export interface Prefs {
   allowAgentInvite: boolean;
   showSimilarity: boolean;
   allowReportDelivery: boolean;
+  /** #7：是否使用知遇提供的大模型（默认开） */
+  usePlatformLlm: boolean;
+}
+
+/** 平台免费额度的服务端判定结果（由 page.tsx 传入，避免客户端各算各的） */
+export interface PlatformInfo {
+  configured: boolean;
+  freeOpen: boolean;
+  usable: boolean;
+  freeUntil: string;
+  daysLeft: number;
 }
 
 interface Props {
@@ -24,6 +41,7 @@ interface Props {
   llmCount: number;
   encryptionOk: boolean;
   encryptionMissing: string[];
+  platform: PlatformInfo;
 }
 
 /** 02 区的三个开关：字段名 → 文案 */
@@ -49,14 +67,18 @@ const PREF_ROWS: {
   },
 ];
 
-/** 01 区：数据源行（顺序与人格页一致） */
-const SOURCE_ROWS: { type: string; label: string; action: string }[] = [
-  { type: "wechat", label: "微信数据源", action: "去接入" },
-  { type: "qq", label: "QQ 数据源", action: "去接入" },
-  { type: "feishu", label: "飞书工作数据", action: "去接入" },
-  { type: "dingtalk", label: "钉钉工作数据", action: "去接入" },
-  { type: "sbti", label: "SBTI 人格测试", action: "去测试" },
-];
+/** 01 区按钮文案。行本身从 board.sourceChips 来，避免两处各写一份标签而漂移。 */
+const ACTION_LABEL: Record<string, string> = {
+  wechat: "去接入",
+  qq: "去接入",
+  feishu: "去接入",
+  dingtalk: "去接入",
+  zhihu: "去授权",
+  sbti: "去测试",
+};
+
+/** 这些 fetch 自己会给更准确的提示，别再让全局包装器重复弹一条 */
+const SILENT: RequestInit = { headers: { "x-silent-error": "1" } };
 
 interface SavedLlm {
   id: string;
@@ -80,13 +102,18 @@ export default function SettingsClient({
   llmCount,
   encryptionOk,
   encryptionMissing,
+  platform,
 }: Props) {
   const router = useRouter();
-  const [toast, setToast] = useState("");
-  const showToast = (m: string) => {
-    setToast(m);
-    window.setTimeout(() => setToast(""), 3000);
-  };
+
+  /* 提示统一走全局弹幕（lib/client/error-bus）。
+     这里保留 showToast 这个名字，避免改几十处调用点。 */
+  const showToast = useCallback(
+    (m: string, level: "error" | "warn" | "info" | "success" = "info") => {
+      pushToast(m, level);
+    },
+    [],
+  );
 
   /* ── ② 沟通偏好：乐观更新，失败回滚 ─────────────────────────────────── */
   const [prefs, setPrefs] = useState<Prefs>(initialPrefs);
@@ -101,19 +128,19 @@ export default function SettingsClient({
       try {
         const r = await fetch("/api/settings/prefs", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, [field]: next }),
+          headers: { "Content-Type": "application/json", "x-silent-error": "1" },
+          body: JSON.stringify({ [field]: next }),
         }).then((x) => x.json());
         if (!r.ok) throw new Error(r.error ?? "保存失败");
         setPrefs(r.prefs as Prefs);
       } catch (e) {
         setPrefs(before); /* 回滚，绝不让 UI 与服务端不一致 */
-        showToast(`保存失败：${(e as Error).message}`);
+        showToast(`保存失败：${(e as Error).message}`, "error");
       } finally {
         setSavingPref(null);
       }
     },
-    [prefs, userId],
+    [prefs, showToast],
   );
 
   /* ── ③ BYOK ─────────────────────────────────────────────────────────── */
@@ -131,7 +158,7 @@ export default function SettingsClient({
   const loadLlm = useCallback(async () => {
     try {
       /* 身份由服务端从 HttpOnly 会话解析，不再通过 URL 传 userId */
-      const r = await fetch("/api/settings/llm").then((x) => x.json());
+      const r = await fetch("/api/settings/llm", SILENT).then((x) => x.json());
       if (r.ok) setSaved(r.items as SavedLlm[]);
       else setLoadErr(r.error ?? "读取失败");
     } catch (e) {
@@ -143,7 +170,7 @@ export default function SettingsClient({
     void loadLlm();
   }, [loadLlm]);
 
-  /** 选预设：自动填名称与地址（原型行为） */
+  /** 选预设：自动填名称与地址 */
   const choosePreset = (id: string) => {
     setPreset(id);
     setAiResult("");
@@ -163,6 +190,7 @@ export default function SettingsClient({
   const testLlm = async () => {
     if (!aiBase || !aiKey || !aiModel) {
       setAiResult("请先填好接入地址、API Key 与模型名");
+      reportWarn("连接测试未执行", "还需要填好接入地址、API Key 与模型名");
       return;
     }
     setAiBusy("test");
@@ -170,14 +198,21 @@ export default function SettingsClient({
     try {
       const r = await fetch("/api/settings/llm/test", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
         body: JSON.stringify({ baseUrl: aiBase, apiKey: aiKey, model: aiModel }),
       }).then((x) => x.json());
-      setAiResult(
-        r.ok ? `连接正常 · ${r.latencyMs ?? "?"}ms` : `失败：${r.error ?? "未知错误"}`,
-      );
+      if (r.ok) {
+        setAiResult(`连接正常 · ${r.latencyMs ?? "?"}ms`);
+        reportSuccess("连接正常", `${aiModel} · ${r.latencyMs ?? "?"}ms`);
+      } else {
+        const why = r.error ?? "未知错误";
+        setAiResult(`失败：${why}`);
+        /* 结果框在表单下方，页面长时容易被忽略 —— 弹幕兜底 */
+        reportError(why, { title: "模型连接测试失败" });
+      }
     } catch (e) {
       setAiResult(`失败：${(e as Error).message}`);
+      reportError(e, { title: "模型连接测试失败" });
     } finally {
       setAiBusy("");
     }
@@ -192,9 +227,8 @@ export default function SettingsClient({
     try {
       const r = await fetch("/api/settings/llm", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
         body: JSON.stringify({
-          userId,
           type: preset === "__custom" ? "custom" : "preset",
           providerKey: preset && preset !== "__custom" ? preset : null,
           displayName: aiName,
@@ -208,23 +242,27 @@ export default function SettingsClient({
       setAiResult("已保存");
       setAiKey(""); /* 保存后立刻清掉输入框里的明文 */
       await loadLlm();
-      showToast("模型已接入。Agent 对话会优先使用它。");
+      showToast("模型已接入。Agent 对话会优先使用它。", "success");
     } catch (e) {
-      setAiResult(`保存失败：${(e as Error).message}`);
+      const msg = (e as Error).message;
+      setAiResult(`保存失败：${msg}`);
+      reportError(msg, { title: "模型接入失败", detail: "POST /api/settings/llm" });
     } finally {
       setAiBusy("");
     }
   };
 
   const removeLlm = async (id: string) => {
-    const r = await fetch(`/api/settings/llm?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    }).then((x) => x.json());
-    if (r.ok) {
+    try {
+      const r = await fetch(`/api/settings/llm?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        ...SILENT,
+      }).then((x) => x.json());
+      if (!r.ok) throw new Error(r.error ?? "移除失败");
       await loadLlm();
-      showToast("已移除该模型。");
-    } else {
-      showToast(r.error ?? "移除失败");
+      showToast("已移除该模型。", "success");
+    } catch (e) {
+      showToast((e as Error).message, "error");
     }
   };
 
@@ -244,9 +282,6 @@ export default function SettingsClient({
     }
     router.push("/");
   };
-
-  const injected = (type: string) =>
-    board?.sourceChips.find((c) => c.type === type)?.injected ?? false;
 
   return (
     <>
@@ -287,13 +322,13 @@ export default function SettingsClient({
               </div>
             </div>
 
-            {SOURCE_ROWS.map((r) => (
-              <div key={r.type} className={styles.row}>
+            {board?.sourceChips.map((c) => (
+              <div key={c.type} className={styles.row}>
                 <div className={styles.body}>
                   <h3>
-                    {r.label}
-                    <span className={`badge ${injected(r.type) ? "done" : ""}`}>
-                      {injected(r.type) ? "已注入" : "未注入"}
+                    {c.label}
+                    <span className={`badge ${c.injected ? "done" : ""}`}>
+                      {c.injected ? "已注入" : "未注入"}
                     </span>
                   </h3>
                 </div>
@@ -302,7 +337,7 @@ export default function SettingsClient({
                     className="btn btnSecondary btnSm"
                     href={`/persona?personaId=${personaId}`}
                   >
-                    {r.action}
+                    {ACTION_LABEL[c.type] ?? "去设置"}
                   </Link>
                 </div>
               </div>
@@ -359,6 +394,74 @@ export default function SettingsClient({
               <b>选择下方供应商后会自动填入接入地址</b>，你只需粘贴 API Key；
               也可选择「自定义模型」手动指定。
             </p>
+
+            {/* ── 知遇提供的大模型（#7） ──────────────────────────────────
+                免费期内的默认选项：新用户不需要自带 Key 就能跑通蒸馏与
+                Agent 对话。滑块默认打开，用户可自行关闭（关掉后若无 BYOK，
+                蒸馏会退化为规则归并，这一点会在下方明确告知）。 */}
+            <div className={styles.platformBox} data-platform-llm="1">
+              <div className={styles.platformHead}>
+                <div className={styles.platformTitleRow}>
+                  <h3 className={styles.platformTitle}>使用知遇提供的大模型</h3>
+                  {platform.usable ? (
+                    <span className={styles.freeChip} data-free-chip="1">
+                      免费
+                    </span>
+                  ) : null}
+                </div>
+                <div className={styles.platformCtl}>
+                  <span className={styles.swT}>
+                    {savingPref === "usePlatformLlm"
+                      ? "保存中…"
+                      : prefs.usePlatformLlm
+                        ? "已开启"
+                        : "已关闭"}
+                  </span>
+                  <label className={styles.switchWrap}>
+                    <span className="switch">
+                      <input
+                        type="checkbox"
+                        checked={prefs.usePlatformLlm}
+                        disabled={savingPref === "usePlatformLlm"}
+                        aria-label="使用知遇提供的大模型"
+                        data-platform-switch="1"
+                        onChange={() => void togglePref("usePlatformLlm")}
+                      />
+                      <i aria-hidden="true" />
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <p className={styles.platformDesc}>
+                开启后，人格蒸馏与 Agent 之间的对话使用知遇提供的模型，
+                无需自己准备 API Key。
+                <b>
+                  {platform.freeOpen
+                    ? `截至 ${platform.freeUntil} 前可免费使用。`
+                    : `免费额度已于 ${platform.freeUntil} 结束。`}
+                </b>
+                {platform.freeOpen && platform.daysLeft > 0 ? (
+                  <span className={styles.daysLeft}>还剩 {platform.daysLeft} 天</span>
+                ) : null}
+              </p>
+
+              {!platform.configured ? (
+                <p className={styles.platformWarn}>
+                  站点尚未配置平台大模型，当前只能使用你自己接入的模型。
+                </p>
+              ) : !platform.freeOpen ? (
+                <p className={styles.platformWarn}>
+                  免费额度已结束。开启此开关不会再产生效果，
+                  请在上方接入你自己的模型。
+                </p>
+              ) : !prefs.usePlatformLlm && llmCount === 0 ? (
+                <p className={styles.platformWarn}>
+                  你已关闭平台模型，且还没有接入自己的模型 ——
+                  此时「开始蒸馏」会退化为<b>规则归并</b>（只做统计、不做语义归纳）。
+                </p>
+              ) : null}
+            </div>
 
             {!encryptionOk ? (
               <div className={styles.warn}>
@@ -570,9 +673,7 @@ export default function SettingsClient({
         </div>
       ) : null}
 
-      <div className={`toast ${toast ? "toastShow" : ""}`} role="status" aria-live="polite">
-        {toast}
-      </div>
+      {/* 提示统一由根 layout 的 GlobalToasts 呈现，这里不再自建 */}
     </>
   );
 }

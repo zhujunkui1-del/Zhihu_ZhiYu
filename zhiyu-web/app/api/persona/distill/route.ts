@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveIdentity } from "@/lib/auth/current-user";
 import { distillPersona, distillReadiness } from "@/lib/persona/distill";
+import { platformAvailability, resolveLlmSource } from "@/lib/llm/platform";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -26,26 +28,48 @@ export async function GET() {
       { status: 401 },
     );
   }
-  const readiness = distillReadiness();
+  /* 加密状态提前读一次即可；平台可用性统一由 lib/llm/platform.ts 判定，
+     不再看 distillReadiness().platformLlm —— 那个字段不区分免费窗口与滑块。 */
+  const { encryption } = distillReadiness();
 
-  /* 看该用户有没有接入自己的模型 */
-  const byokCount = await prisma.llmProviderConfig.count({
-    where: { userId: me.userId },
-  });
+  /* 看该用户有没有接入自己的模型，以及平台免费额度的状态（#7） */
+  const [byokCount, prefs] = await Promise.all([
+    prisma.llmProviderConfig.count({ where: { userId: me.userId } }),
+    prisma.communicationPrefs.findUnique({ where: { userId: me.userId } }),
+  ]);
+  const avail = platformAvailability();
+
+  /* 滑块关掉且没有 BYOK 时，蒸馏只能用规则归并 —— 这个事实要**明说**，
+     而不是让用户看到一个质量下降的结果却不知道为什么。 */
+  const usePlatform = prefs?.usePlatformLlm ?? true;
+  const canUseLlm = byokCount > 0 || (usePlatform && avail.usable);
 
   return NextResponse.json({
     ok: true,
-    /** 平台是否提供了可用的大模型（#7 的免费额度走这条） */
-    platformLlm: readiness.platformLlm,
+    /** 平台是否**此刻真的**可用（已配置 且 免费窗口未结束） */
+    platformLlm: usePlatform && avail.usable,
+    /** 平台是否配置了 Key（与上面区分：配置了但滑块关掉也算 false） */
+    platformConfigured: avail.configured,
+    /** 免费额度窗口 */
+    freeWindowOpen: avail.freeOpen,
+    freeUntil: avail.freeUntil,
+    daysLeft: avail.daysLeft,
+    /** 用户是否开着「使用知遇提供的大模型」滑块 */
+    usePlatformLlm: usePlatform,
     /** 用户自己接入的模型数量 */
     byokCount,
     /** 两者都没有时，蒸馏会退化成规则归并 */
-    canUseLlm: readiness.platformLlm || byokCount > 0,
-    encryption: readiness.encryption,
+    canUseLlm,
+    /** 不可用时的原因（可直接展示） */
+    unavailableReason: canUseLlm ? undefined : (avail.usable ? "已关闭「使用知遇提供的大模型」且未接入自己的模型" : avail.reason),
+    encryption,
   });
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const me = await resolveIdentity();
   if (!me?.ownPersonaId) {
     return NextResponse.json(
@@ -54,7 +78,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { personaId?: string; useByok?: boolean } = {};
+  let body: { personaId?: string } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -71,33 +95,43 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  /* 取模型：默认走平台 AI_API_KEY；显式要求且用户配了 BYOK 时用用户的 */
-  let provider: { baseUrl: string; apiKey: string; model: string } | undefined;
-  if (body.useByok) {
-    const cfg = await prisma.llmProviderConfig.findFirst({
-      where: { userId: me.userId },
-      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
-    });
-    if (cfg) {
-      try {
-        const { decryptSecret } = await import("@/lib/crypto");
-        provider = {
-          baseUrl: cfg.baseUrl,
-          apiKey: decryptSecret(cfg.apiKeyEnc),
-          model: cfg.model,
-        };
-      } catch (e) {
-        return NextResponse.json(
-          { ok: false, code: "BYOK_DECRYPT_FAILED", error: `读取你的模型配置失败：${(e as Error).message}` },
-          { status: 500 },
-        );
-      }
+  /* 选模型：BYOK 优先，其次平台免费额度（且受设置页滑块约束）。
+     这段逻辑统一走 lib/llm/platform.ts，避免这里与 Agent 对话两处判断不一致。 */
+  const prefs = await prisma.communicationPrefs.findUnique({
+    where: { userId: me.userId },
+  });
+  const byokCfg = await prisma.llmProviderConfig.findFirst({
+    where: { userId: me.userId },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+  });
+
+  let byok: { baseUrl: string; apiKey: string; model: string } | null = null;
+  if (byokCfg) {
+    try {
+      const { decryptSecret } = await import("@/lib/crypto");
+      byok = {
+        baseUrl: byokCfg.baseUrl,
+        apiKey: decryptSecret(byokCfg.apiKeyEnc),
+        model: byokCfg.model,
+      };
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, code: "BYOK_DECRYPT_FAILED", error: `读取你的模型配置失败：${(e as Error).message}` },
+        { status: 500 },
+      );
     }
   }
 
+  const resolved = resolveLlmSource(prefs, byok);
+  const provider = resolved.provider ?? undefined;
+
   try {
     const result = await distillPersona(targetId, provider);
-    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+    /* 把"这次用了谁的模型 / 为什么没有模型"如实带回前端 */
+    return NextResponse.json(
+      { ...result, llmSource: resolved.source, llmUnavailableReason: resolved.reason },
+      { status: result.ok ? 200 : 400 },
+    );
   } catch (e) {
     return NextResponse.json(
       { ok: false, code: "DISTILL_FAILED", error: (e as Error).message },

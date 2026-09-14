@@ -48,13 +48,18 @@ try {
 
   const loginResp = await fetch(`${BASE}/api/auth/demo`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", origin: new URL(BASE).origin },
     body: "{}",
   });
   const setCookie = loginResp.headers.get("set-cookie") ?? "";
   const sessionToken = (setCookie.match(/zhiyu_session=([^;]+)/) || [])[1] ?? "";
   if (!sessionToken) throw new Error(`演示登录未返回会话：HTTP ${loginResp.status}`);
-  const authHeaders = { Cookie: `zhiyu_session=${sessionToken}` };
+  /* 带上 Origin：状态变更接口有 CSRF 同源校验（lib/auth/csrf.ts），
+     不带来源的裸请求会被 403；浏览器同源请求一定会带 Origin。 */
+  const authHeaders = {
+    Cookie: `zhiyu_session=${sessionToken}`,
+    origin: new URL(BASE).origin,
+  };
   console.log(`会话已建立（personaId=${me.id.slice(0, 12)}…）\n`);
 
   /* ① 状态查询 */

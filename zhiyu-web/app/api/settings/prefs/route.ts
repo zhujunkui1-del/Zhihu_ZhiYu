@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveIdentity } from "@/lib/auth/current-user";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,14 @@ export const dynamic = "force-dynamic";
  * 字段名以 `prisma/schema.prisma` 的 `CommunicationPrefs` 为准（扁平 camelCase）。
  */
 
-const FIELDS = ["allowAgentInvite", "showSimilarity", "allowReportDelivery"] as const;
+const FIELDS = [
+  "allowAgentInvite",
+  "showSimilarity",
+  "allowReportDelivery",
+  /* #7：设置页 03 区「使用知遇提供的大模型」滑块（默认开）。
+     虽然它归在 03 区，但本质也是用户级偏好，放同一张表最省事。 */
+  "usePlatformLlm",
+] as const;
 type Field = (typeof FIELDS)[number];
 
 /** 记录不存在时返回默认值（全 true），**不隐式建行** */
@@ -37,12 +45,16 @@ export async function GET() {
       allowAgentInvite: row?.allowAgentInvite ?? true,
       showSimilarity: row?.showSimilarity ?? true,
       allowReportDelivery: row?.allowReportDelivery ?? true,
+      usePlatformLlm: row?.usePlatformLlm ?? true,
     },
   });
 }
 
 /** 局部更新；记录不存在时用默认值建行后再更新 */
 export async function PATCH(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(
@@ -82,6 +94,7 @@ export async function PATCH(req: NextRequest) {
       allowAgentInvite: prefs.allowAgentInvite,
       showSimilarity: prefs.showSimilarity,
       allowReportDelivery: prefs.allowReportDelivery,
+      usePlatformLlm: prefs.usePlatformLlm,
     },
   });
 }

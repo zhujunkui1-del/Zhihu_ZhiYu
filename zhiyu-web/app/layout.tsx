@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import GlobalToasts from "@/components/GlobalToasts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,12 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* 全局报错弹幕：挂在根 layout，任何页面的报错都在这里出现。
+            它同时负责安装「未捕获异常 / 未处理接口失败」的全局捕获。 */}
+        <GlobalToasts />
+      </body>
     </html>
   );
 }

@@ -13,6 +13,10 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import fs from "node:fs";
 import path from "node:path";
 
+/* 六个人格数据源的展示标签（对应 lib/persona-view.ts 的 SOURCE_TYPES）。
+   这里独立写一份是**故意的**：测试若 import 同一常量，改坏了标签也测不出来。 */
+const SOURCE_LABELS = ["微信", "QQ", "飞书", "钉钉", "知乎", "SBTI"];
+
 const BASE = process.argv[2] || "http://127.0.0.1:3000";
 const OUT = path.resolve("../RECON/web-settings");
 fs.mkdirSync(OUT, { recursive: true });
@@ -192,6 +196,9 @@ const sections = await page.evaluate(() =>
 );
 rec("四个分区齐全", sections.length === 4, sections.join(" | "));
 
+/* 01 区的数据源行由 board.sourceChips 渲染，即 SOURCE_TYPES 的六项。
+   以前这里断言"恰好 6 行"，而当时行是**手写列表**、漏掉了「知乎」这一源
+   （只把知乎当账号）。现在从 schema 取标签做成员校验，六源一个都不能漏。 */
 const idRows = await page.evaluate(() => {
   const sec = [...document.querySelectorAll("section")].find((s) =>
     s.textContent.includes("01 · 身份与数据源"),
@@ -199,22 +206,124 @@ const idRows = await page.evaluate(() => {
   if (!sec) return [];
   return [...sec.querySelectorAll("h3")].map((h) => h.textContent.trim());
 });
+const missingSources = SOURCE_LABELS.filter(
+  (label) => !idRows.some((t) => t.startsWith(label)),
+);
 rec(
-  "01 区六行（知乎账号 + 五个数据源）",
-  idRows.length === 6 && idRows.some((t) => t.startsWith("知乎账号")),
-  `${idRows.length} 行：${idRows.join(" / ")}`,
+  `01 区渲染全部 ${SOURCE_LABELS.length} 个数据源 + 知乎账号行`,
+  missingSources.length === 0 && idRows.some((t) => t.startsWith("知乎账号")),
+  missingSources.length
+    ? `缺少数据源：${missingSources.join(" / ")}（实得 ${idRows.length} 行：${idRows.join(" / ")}）`
+    : `${idRows.length} 行：${idRows.join(" / ")}`,
+);
+rec(
+  "每个数据源都标了注入状态",
+  idRows.filter((t) => /已注入|未注入/.test(t)).length === SOURCE_LABELS.length,
+  idRows.filter((t) => /已注入|未注入/.test(t)).join(" / "),
 );
 
-const prefRows = await page.evaluate(() =>
-  [...document.querySelectorAll('[class*="switchWrap"] input')].map((i) => ({
+/* 只统计 02 区里的开关：#7 在 03 区也加了一个开关（平台大模型滑块），
+   不限定区域的话这个数字会跟着变，测试就不再守着"02 区三个偏好"。 */
+const prefRows = await page.evaluate(() => {
+  const sec = [...document.querySelectorAll("section")].find((s) =>
+    s.textContent.includes("02 · Agent 沟通偏好"),
+  );
+  if (!sec) return [];
+  return [...sec.querySelectorAll('[class*="switchWrap"] input')].map((i) => ({
     label: i.getAttribute("aria-label"),
     checked: i.checked,
-  })),
-);
+  }));
+});
 rec(
   "02 区三个开关且默认全开",
   prefRows.length === 3 && prefRows.every((p) => p.checked),
-  prefRows.map((p) => `${p.label}=${p.checked}`).join(" / "),
+  prefRows.map((p) => `${p.label}=${p.checked}`).join(" / ") || "未找到 02 区开关",
+);
+
+/* ── #7：03 区的「使用知遇提供的大模型」滑块（默认开、带免费截止日） ──── */
+console.log("\n== #7 平台大模型免费额度滑块 ==");
+const platformBox = await page.evaluate(() => {
+  const box = document.querySelector('[data-platform-llm="1"]');
+  if (!box) return null;
+  const sw = box.querySelector('[data-platform-switch="1"]');
+  const sec03 = box.closest("section");
+  return {
+    inSection03: Boolean(sec03?.textContent.includes("03 · AI 大模型接入")),
+    hasSwitch: Boolean(sw),
+    checked: sw?.checked ?? false,
+    aria: sw?.getAttribute("aria-label") ?? "",
+    text: box.innerText.replace(/\s+/g, " ").trim(),
+    freeChip: Boolean(box.querySelector('[data-free-chip="1"]')),
+  };
+});
+rec("03 区存在平台大模型滑块", platformBox !== null, platformBox ? platformBox.aria : "未找到");
+rec(
+  "滑块位于「03 · AI 大模型接入」区内",
+  platformBox?.inSection03 === true,
+  `inSection03=${platformBox?.inSection03}`,
+);
+rec("滑块默认打开", platformBox?.checked === true, `checked=${platformBox?.checked}`);
+rec(
+  "文案写明免费截止日 2026-09-23",
+  /2026-09-23/.test(platformBox?.text ?? ""),
+  platformBox?.text?.slice(0, 150) ?? "",
+);
+rec(
+  "写明「免费」并给出剩余天数",
+  platformBox?.freeChip === true && /还剩\s*\d+\s*天/.test(platformBox?.text ?? ""),
+  platformBox?.text?.match(/还剩\s*\d+\s*天/)?.[0] ?? "(无剩余天数)",
+);
+
+/* 切换滑块，验证服务端真的落库（与 02 区开关同等要求） */
+const platformToggle = await page.evaluate(async () => {
+  const before = await fetch("/api/settings/prefs").then((r) => r.json());
+  const sw = document.querySelector('[data-platform-switch="1"]');
+  if (!sw) return { found: false };
+  sw.click();
+  await new Promise((r) => setTimeout(r, 2000));
+  const after = await fetch("/api/settings/prefs").then((r) => r.json());
+  /* 还原 */
+  sw.click();
+  await new Promise((r) => setTimeout(r, 2000));
+  const restored = await fetch("/api/settings/prefs").then((r) => r.json());
+  return {
+    found: true,
+    before: before.prefs?.usePlatformLlm,
+    after: after.prefs?.usePlatformLlm,
+    restored: restored.prefs?.usePlatformLlm,
+  };
+});
+rec(
+  "切换滑块后服务端真的改了（不只是 UI）",
+  platformToggle.found && platformToggle.after === !platformToggle.before,
+  `${platformToggle.before} → ${platformToggle.after}`,
+);
+rec(
+  "已还原滑块状态（不留测试痕迹）",
+  platformToggle.restored === true,
+  `还原为 ${platformToggle.restored}`,
+);
+
+/* 蒸馏接口的就绪状态要如实反映滑块与免费窗口 */
+const distillReady = await page.evaluate(async () => {
+  const r = await fetch("/api/persona/distill").then((x) => x.json());
+  return {
+    ok: r.ok,
+    platformLlm: r.platformLlm,
+    freeWindowOpen: r.freeWindowOpen,
+    freeUntil: r.freeUntil,
+    usePlatformLlm: r.usePlatformLlm,
+    canUseLlm: r.canUseLlm,
+  };
+});
+rec(
+  "蒸馏就绪接口回报免费窗口与滑块状态",
+  distillReady.ok === true &&
+    distillReady.freeWindowOpen === true &&
+    distillReady.freeUntil === "2026-09-23" &&
+    distillReady.usePlatformLlm === true &&
+    distillReady.canUseLlm === true,
+  JSON.stringify(distillReady),
 );
 
 const align = await page.evaluate(() => {

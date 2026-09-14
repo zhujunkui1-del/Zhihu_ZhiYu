@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const { id } = await params;
   let fromPersonaId: string | null = null;
   try {

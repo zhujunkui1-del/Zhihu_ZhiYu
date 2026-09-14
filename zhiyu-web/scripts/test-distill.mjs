@@ -20,10 +20,10 @@ const rec = (label, ok, detail = "") => {
 console.log("人格蒸馏实测（真实调用 LLM）");
 console.log("=".repeat(80));
 
-/* 建立会话 */
+/* 建立会话（带 Origin：状态变更接口有 CSRF 同源校验） */
 const login = await fetch(`${BASE}/api/auth/demo`, {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", origin: new URL(BASE).origin },
   body: "{}",
 });
 const setCookie = login.headers.get("set-cookie") ?? "";
@@ -32,7 +32,7 @@ if (!token) {
   console.error(`演示登录失败：HTTP ${login.status}`);
   process.exit(1);
 }
-const auth = { Cookie: `zhiyu_session=${token}` };
+const auth = { Cookie: `zhiyu_session=${token}`, origin: new URL(BASE).origin };
 const me = await login.json();
 console.log(`会话已建立（personaId=${me.personaId?.slice(0, 12)}…）\n`);
 

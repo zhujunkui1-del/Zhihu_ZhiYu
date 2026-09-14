@@ -110,7 +110,9 @@ try {
 
     const r = await fetch(`${BASE}/api/auth/session`, {
       method: "DELETE",
-      headers: { Cookie: `${COOKIE}=${token}` },
+      /* 带 Origin：退出登录是状态变更接口，受 CSRF 同源校验保护
+         （lib/auth/csrf.ts）。浏览器发同源 DELETE 一定会带 Origin。 */
+      headers: { Cookie: `${COOKIE}=${token}`, origin: new URL(BASE).origin },
     });
     const j = await r.json();
     rec("DELETE /api/auth/session 返回 ok", r.status === 200 && j.ok === true, JSON.stringify(j));

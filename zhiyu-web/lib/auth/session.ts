@@ -12,10 +12,11 @@
 import { prisma } from "@/lib/db";
 import { decryptFor, encryptFor } from "@/lib/crypto-box";
 import { newSessionToken, newState } from "./zhihu-oauth";
+import { SESSION_COOKIE, SESSION_DAYS } from "./cookie";
 
-export const SESSION_COOKIE = "zhiyu_session";
-/** 会话有效期：30 天 */
-const SESSION_DAYS = 30;
+/* Cookie 属性集中在 ./cookie（无依赖，便于单独测试），这里转出去，
+   调用方仍然可以只从 session 引入，不必知道文件是怎么切的。 */
+export { SESSION_COOKIE, SESSION_DAYS, sessionCookieOptions, clearedSessionCookieOptions } from "./cookie";
 /** state 有效期：10 分钟（够用户登录并点同意） */
 const STATE_MINUTES = 10;
 /** 会话滑动续期的最小间隔，避免每个请求都写库 */

@@ -427,6 +427,14 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
 
             /* 远景：一个圆点足够表达"这里有人" */
             if (detail === "dot") {
+              /* ⚠️ 圆点尺寸要按 k 反向补偿。
+                 节点尺寸写在**世界坐标**里，会被画布整体的 scale(k) 一起缩放：
+                 26px 的圆点在「全览」(k 可能触底到 K_MIN=0.12) 下只有约 3px
+                 —— 几乎点不中，用户只会觉得"点了没反应"。
+                 这里把视觉直径固定在 16px 屏幕像素（世界尺寸 = 16 / k），
+                 这样无论缩放到哪一档，圆点都是同一个可点的目标。 */
+              /* 相似度最高的那个人保持"更大一圈"的相对关系（1.3×） */
+              const dotPx = Math.max(16, 16 / viewRef.current.k) * (n.isTop ? 1.3 : 1);
               return (
                 <button
                   key={n.person.id}
@@ -435,7 +443,13 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
                   data-id={n.person.id}
                   data-detail="dot"
                   className={`${styles.dotNode} ${n.isTop ? styles.dotNodeTop : ""}`}
-                  style={{ left: centre.x + n.x, top: centre.y + n.y }}
+                  style={{
+                    left: centre.x + n.x,
+                    top: centre.y + n.y,
+                    width: dotPx,
+                    height: dotPx,
+                    borderWidth: Math.max(1.5, 2.5 * viewRef.current.k),
+                  }}
                   aria-label={`查看 ${n.person.title} 的人格卡（相似度 ${n.sim}%）`}
                   title={`${n.person.title} · ${n.sim}%`}
                 />

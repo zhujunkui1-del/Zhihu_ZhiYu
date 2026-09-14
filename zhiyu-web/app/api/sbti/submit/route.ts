@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { scoreSbti, questions } from "@/lib/sbti/scoring";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ interface SubmitBody {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
   let body: SubmitBody;
   try {
     body = (await req.json()) as SubmitBody;

@@ -28,10 +28,14 @@ const rec = (label, ok, detail = "") => {
 console.log("身份与鉴权验证");
 console.log("=".repeat(84));
 
-/* 用原生 fetch 打接口（能精确控制 Cookie） */
+/* 用原生 fetch 打接口（能精确控制 Cookie）。
+   ⚠️ 必须带 `Origin`：状态变更接口现在有 CSRF 同源校验
+   （lib/auth/csrf.ts），不带 Origin/Referer 的裸请求会被 403。
+   浏览器发同源 POST 时一定会带 Origin，所以这里补上才是等价模拟。 */
+const ORIGIN = new URL(BASE).origin;
 const login = await fetch(`${BASE}/api/auth/demo`, {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", origin: ORIGIN },
   body: JSON.stringify({}),
 });
 const loginJson = await login.json();
@@ -39,7 +43,14 @@ const setCookie = login.headers.get("set-cookie") || "";
 
 rec("演示登录种下会话 Cookie", setCookie.includes("zhiyu_session="), setCookie.slice(0, 70));
 rec("会话 Cookie 是 HttpOnly（脚本读不到）", /HttpOnly/i.test(setCookie), setCookie.slice(0, 90));
-rec("会话 Cookie 是 SameSite=Lax", /SameSite=Lax/i.test(setCookie));
+/* 开发环境（http）必须是 Lax：SameSite=None 要求 Secure，
+   在 http 下浏览器会直接丢弃该 Cookie，本地就没法登录了。
+   生产环境才用 None（修 Safari 的 OAuth 回跳），见 lib/auth/cookie.ts。 */
+rec(
+  "开发环境会话 Cookie 是 SameSite=Lax",
+  /SameSite=Lax/i.test(setCookie),
+  setCookie.match(/SameSite=\w+/)?.[0] ?? "(未设置)",
+);
 const cookieVal = (setCookie.match(/zhiyu_session=([^;]+)/) || [])[1] ?? "";
 rec("会话 token 足够长（不可猜）", cookieVal.length >= 32, `${cookieVal.length} 字符`);
 

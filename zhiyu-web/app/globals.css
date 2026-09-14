@@ -607,32 +607,11 @@ textarea:focus-visible {
   margin-top: 22px;
 }
 
-/* ── ⑪ Toast ───────────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  z-index: 80;
-  left: 50%;
-  bottom: 28px;
-  max-width: min(560px, calc(100vw - 32px));
-  padding: 12px 20px;
-  border: 2px solid var(--fg);
-  border-radius: var(--r-hand);
-  background: #fff8e4;
-  color: var(--fg);
-  font-family: var(--font-hand);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.5;
-  box-shadow: 0 12px 36px rgba(58, 26, 10, 0.22);
-  transform: translate(-50%, 140%);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.22s ease, opacity 0.22s ease;
-}
-.toastShow {
-  transform: translate(-50%, 0);
-  opacity: 1;
-}
+/* ── ⑪ 提示弹幕 ─────────────────────────────────────────────────────────
+   旧的全站 `.toast` / `.toastShow` 已删除。
+   现在所有提示都由根 layout 的 <GlobalToasts /> 统一渲染（弹幕式堆叠、
+   分等级配色、可手动关闭），样式在 components/GlobalToasts.module.css。
+   各页面不再自建 toast，避免出现"有的页面报错根本不显示"。 */
 
 /* ── ⑫ 空态 ─────────────────────────────────────────────────────────────── */
 .empty,

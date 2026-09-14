@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getSession, destroySession, SESSION_COOKIE } from "@/lib/auth/session";
+import {
+  getSession,
+  destroySession,
+  SESSION_COOKIE,
+  clearedSessionCookieOptions,
+} from "@/lib/auth/session";
 import { isConfigured, readConfigFromEnv } from "@/lib/auth/zhihu-oauth";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -35,20 +41,17 @@ export async function GET() {
 }
 
 /** 退出登录：删除服务端会话并清 Cookie */
-export async function DELETE(_req: NextRequest) {
+export async function DELETE(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   await destroySession(token);
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set({
-    name: SESSION_COOKIE,
-    value: "",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  /* 清 Cookie 的属性必须与写入时一致（同一 SameSite/Path/Secure），
+     否则浏览器认为不是同一个 Cookie，删不掉 —— 表现为"退不出去"。 */
+  res.cookies.set(clearedSessionCookieOptions());
   return res;
 }

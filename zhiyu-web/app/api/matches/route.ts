@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const body = (await req.json()) as { personaAId?: string; personaBId?: string; mode?: string };
   if (!body.personaAId || !body.personaBId) {
     return NextResponse.json({ ok: false, error: "缺少 personaAId / personaBId" }, { status: 400 });

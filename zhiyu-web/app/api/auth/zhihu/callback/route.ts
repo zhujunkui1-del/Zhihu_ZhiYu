@@ -8,7 +8,12 @@ import {
   readConfigFromEnv,
   ZhihuOAuthError,
 } from "@/lib/auth/zhihu-oauth";
-import { consumeState, createSession, SESSION_COOKIE, destroyUserSessions } from "@/lib/auth/session";
+import {
+  consumeState,
+  createSession,
+  sessionCookieOptions,
+  destroyUserSessions,
+} from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -131,15 +136,6 @@ export async function GET(req: NextRequest) {
 
   const dest = new URL(check.ok ? (check.returnTo ?? "/home") : "/home", origin);
   const res = NextResponse.redirect(dest);
-  res.cookies.set({
-    name: SESSION_COOKIE,
-    value: sessionToken,
-    httpOnly: true,
-    /* 本地 http 调试时不加 Secure，否则浏览器不写 Cookie */
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60,
-  });
+  res.cookies.set(sessionCookieOptions(sessionToken));
   return res;
 }

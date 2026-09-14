@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Radar from "@/components/radar/Radar";
 import Avatar from "@/components/radar/Avatar";
 import { citiesOf, locText } from "@/lib/regions";
+import { reportSuccess } from "@/lib/client/error-bus";
 import type { DiscoverCandidate, DiscoverResult } from "@/lib/discover";
 import styles from "./find.module.css";
 
@@ -69,13 +70,6 @@ export default function DiscoverClient({
   /* 快速匹配：点击后才出结果 */
   const [quickList, setQuickList] = useState<DiscoverCandidate[] | null>(null);
 
-  const [toast, setToast] = useState("");
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast(""), 3200);
-  };
-
   /* ── 筛选 ────────────────────────────────────────────────────────────── */
   const filtered = useMemo(() => {
     const q = kw.trim().toLowerCase();
@@ -118,7 +112,7 @@ export default function DiscoverClient({
     } catch {
       /* 隐私模式下写入失败不影响本次交互 */
     }
-    showToast(`你的 Agent 已在后台开始和 ${p.displayName} 对话，有进展会通知你。`);
+    reportSuccess(`你的 Agent 已在后台开始和 ${p.displayName} 对话`, "有进展会在通知中心告诉你。");
   };
 
   /* ── 卡片 ────────────────────────────────────────────────────────────── */
@@ -433,9 +427,6 @@ export default function DiscoverClient({
         </section>
       ) : null}
 
-      <div className={`toast ${toast ? "toastShow" : ""}`} role="status" aria-live="polite">
-        {toast}
-      </div>
     </>
   );
 }

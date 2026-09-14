@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret, keyMask } from "@/lib/crypto";
 import { resolveIdentity } from "@/lib/auth/current-user";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(
@@ -146,6 +150,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(

@@ -38,6 +38,13 @@ export interface CurrentIdentity {
   /** 身份来源，便于页面提示与排查 */
   source: "session" | "demo";
   displayName: string | null;
+  /**
+   * 知乎头像地址（侧栏展示用 #8）。
+   *
+   * 开放平台在**无权限/未授权时返回空串**，所以这里可能是 null ——
+   * 调用方必须能兜底（见 `lib/sidebar-user.ts`），不能直接塞进 <img src>。
+   */
+  avatarUrl: string | null;
   /** 是否已通过知乎 OAuth 授权 */
   zhihuAuthorized: boolean;
 }
@@ -56,6 +63,7 @@ async function demoIdentity(): Promise<Omit<CurrentIdentity, "viewPersonaId"> | 
     ownPersonaId: demo.persona?.id ?? null,
     source: "demo",
     displayName: demo.displayName,
+    avatarUrl: demo.avatarUrl,
     zhihuAuthorized: demo.zhihuAuthorized,
   };
 }
@@ -87,6 +95,7 @@ export async function resolveIdentity(opts?: {
         viewPersonaId: opts?.queryPersonaId ?? own,
         source: "session",
         displayName: s.displayName,
+        avatarUrl: s.avatarUrl,
         zhihuAuthorized: s.zhihuAuthorized,
       };
     }

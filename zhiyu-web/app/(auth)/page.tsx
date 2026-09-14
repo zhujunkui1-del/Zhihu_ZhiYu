@@ -1,11 +1,38 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Reveal from "@/components/Reveal";
 import styles from "./login.module.css";
 
 const STORAGE_KEY = "zhiyu_demo";
+
+/**
+ * 回调失败时 `?oauth=<原因>` 的中文说明。
+ *
+ * 为什么要有这张表：以前 oauth 参数被**完全忽略**，
+ * 用户授权失败后只看到登录页原样不动，只能猜是不是自己点错了。
+ */
+const OAUTH_ERROR_TEXT: Record<string, string> = {
+  unconfigured: "服务端尚未配置知乎开放平台凭证，请稍后再试。",
+  denied: "你在知乎授权页选择了拒绝，或授权被取消。",
+  code_missing: "知乎没有回传授权码，请重新发起登录。",
+  no_uid: "没有读取到知乎账号标识，请重新授权。",
+  exchange_failed: "用授权码换取访问令牌失败，请重新登录。",
+  state_mismatch: "授权状态校验失败（可能被重放），请重新发起登录。",
+  state_expired: "授权等待超时（超过 10 分钟），请重新发起登录。",
+  state_consumed: "这次授权已经用过了，请重新发起登录。",
+};
+
+/** 把 `state_xxx` 之类的后缀原因转成人话 */
+function oauthErrorText(code: string, detail: string | null): string {
+  const base = OAUTH_ERROR_TEXT[code] ?? `授权未完成（${code}）。`;
+  /* state_ 前缀的原因是上面状态校验的分支，统一给一句可操作的提示 */
+  const stateMsg = code.startsWith("state_")
+    ? "授权状态校验失败，请重新发起登录。"
+    : base;
+  return detail ? `${stateMsg}（${detail}）` : stateMsg;
+}
 
 /* 认识三步：文案与原型一致 */
 const STEPS = [
@@ -55,6 +82,79 @@ export default function LoginPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+  /**
+   * 本次页面加载**出现过**授权失败吗。
+   *
+   * 为什么要用 ref 记住：React 19 的 StrictMode 会把 effect 跑两遍
+   * （挂载 → 清理 → 再挂载），而第一遍会用 `replaceState` 把 `?oauth=` 清掉，
+   * 于是第二遍读到的是**干净的 URL**，会走进"已登录 → 跳 /home"的分支，
+   * 把刚设好的报错顶掉，用户永远看不到失败原因（实测症状）。
+   * 用 ref 记住"这次加载报过错"，第二遍就不会再跳转。
+   */
+  const sawAuthError = useRef(false);
+
+  /**
+   * 进来先看两件事：① 回调有没有带错误原因 ② 是不是已经登录了。
+   *
+   * **① 必须优先于 ②。** 否则会出现这种情况：用户其实是已登录的，
+   * 但这次回调失败了（比如在知乎页点了「拒绝」），带 `?oauth=denied` 回来，
+   * 结果被自动跳转直接送进 /home —— 用户永远看不到"授权失败"的原因。
+   * 报错信息优先于便利性。
+   *
+   * ② **已登录就直接进 /home**。
+   *    手机端"授权后又跳回登录页"的最后一段就是这个：回调已经把会话
+   *    Cookie 种好了，即使中间某一步判定未登录把用户送回 `/`，
+   *    这里也能立刻把他送回 `/home`，而不是停在登录页让人以为没登上。
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthErr = params.get("oauth");
+    const detail = params.get("detail");
+
+    /* ① 回调失败：先报错并留在登录页，不做自动跳转。
+       报错优先于便利性 —— 否则"已登录但这次授权失败"的用户会被直接送进
+       /home，永远看不到失败原因。 */
+    if (oauthErr) {
+      sawAuthError.current = true;
+      setError(oauthErrorText(oauthErr, detail));
+      setChecking(false);
+      /* 把参数清掉，避免用户刷新后又被同一条错误拦住 */
+      window.history.replaceState(null, "", "/");
+    }
+
+    /* ② 已登录：直接进主界面（除非本次加载报过错，见 sawAuthError 说明）。
+       手机端"授权后又跳回登录页"的最后一段就是这个：回调已经把会话 Cookie
+       种好了，即使中间某一步判定未登录把用户送回 `/`，这里也能立刻把他送回
+       `/home`，而不是停在登录页让人以为没登上。 */
+    let cancelled = false;
+    if (!sawAuthError.current) {
+      void (async () => {
+        try {
+          const s = (await fetch("/api/auth/session", { cache: "no-store" }).then((r) =>
+            r.json(),
+          )) as { authenticated?: boolean };
+          /* 再次确认：等请求回来时若已出现过报错，就不要再跳走 */
+          if (!cancelled && !sawAuthError.current && s?.authenticated) {
+            router.replace("/home");
+            return;
+          }
+        } catch {
+          /* 查不到就当未登录，正常展示登录卡片 */
+        }
+        if (!cancelled) setChecking(false);
+      })();
+    }
+
+    /* ⚠️ 清理只做"别再 setState"，**不要**拦 router.replace。
+       原因：React 19 的 StrictMode 会把 effect 跑两遍（挂载→清理→再挂载）。
+       第一遍的清理会把 cancelled 置 true，真正生效的是第二遍；
+       如果这里连替换路由一起拦掉，已登录用户就永远停在登录页。
+       这是实际踩过的坑（症状：/ 明明已登录却不跳转）。 */
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   /**
    * 登录。
@@ -194,7 +294,7 @@ export default function LoginPage() {
                     className={`btn oauthBtn ${styles.oauthBtn}`}
                     type="button"
                     onClick={startLogin}
-                    disabled={busy}
+                    disabled={busy || checking}
                     aria-busy={busy}
                   >
                     {/* 知乎官方 logo 是白色描边，因此只放在知乎蓝实心按钮上 */}
@@ -220,7 +320,7 @@ export default function LoginPage() {
                   ) : null}
                 </section>
                 <p className="meta" style={{ textAlign: "center", marginTop: 12 }}>
-                  演示原型 · 接入开放平台后此处将跳转知乎授权页
+                  {checking ? "正在检查登录状态…" : "已接入知乎开放平台 · 授权后可同步你的公开内容"}
                 </p>
               </div>
             </Reveal>
@@ -458,7 +558,7 @@ export default function LoginPage() {
                   className={`btn btnPrimary ${styles.ctaBtn}`}
                   type="button"
                   onClick={startLogin}
-                  disabled={busy}
+                  disabled={busy || checking}
                 >
                   {busy ? "正在登录…" : "使用知乎账号登录"}
                 </button>

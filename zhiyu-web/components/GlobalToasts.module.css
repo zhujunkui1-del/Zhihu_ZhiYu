@@ -1,0 +1,166 @@
+/**
+ * 全局报错弹幕样式。
+ *
+ * 设计要点：
+ *   · **fixed 定位 + pointer-events: none（容器）/ auto（每条）**
+ *     容器不挡点击；单条可点（有关闭与操作按钮）
+ *   · 紧贴界面下方中部，自下而上堆叠，最新的在最下面
+ *   · 宽度上限 min(560px, 视口-32px)，窄屏不溢出
+ *   · 进入用轻微上移 + 淡入，不用弹跳（报错场景不该"活泼"）
+ */
+
+.stack {
+  position: fixed;
+  z-index: 9998; /* 高于内容、低于顶部进度条(9999) */
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 22px;
+  width: min(560px, calc(100vw - 28px));
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  /* 容器不拦截点击，避免遮住页面下方内容 */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+  border: 1.8px solid var(--line);
+  border-radius: var(--r-hand);
+  background: rgba(255, 251, 239, 0.97);
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.22s ease-out;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 左侧色条区分层级，颜色是唯一强信号 */
+.error {
+  border-left: 5px solid #d0503f;
+}
+.warn {
+  border-left: 5px solid #e0a13c;
+}
+.info {
+  border-left: 5px solid var(--accent-deep);
+}
+.success {
+  border-left: 5px solid #5d8a4a;
+}
+
+.icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+.error .icon {
+  color: #d0503f;
+}
+.warn .icon {
+  color: #e0a13c;
+}
+.info .icon {
+  color: var(--accent-deep);
+}
+.success .icon {
+  color: #5d8a4a;
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--fg);
+  line-height: 1.45;
+}
+.detail {
+  margin: 3px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  /* 长 URL / 堆栈要能换行，否则撑破容器 */
+  word-break: break-all;
+  max-height: 4.8em;
+  overflow: hidden;
+}
+
+.action {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 5px 11px;
+  border: 1.6px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--fg);
+  font-family: var(--font-hand);
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.action:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.close {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+}
+.close:hover {
+  background: var(--fg-softer);
+  color: var(--fg);
+}
+
+/* 尊重「减少动态效果」偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* 窄屏：贴近底部，去掉圆角外的多余留白 */
+@media (max-width: 560px) {
+  .stack {
+    bottom: 12px;
+    width: calc(100vw - 16px);
+  }
+  .toast {
+    padding: 10px;
+  }
+  .detail {
+    max-height: 3.2em;
+  }
+}

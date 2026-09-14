@@ -7,6 +7,7 @@ import Avatar from "@/components/radar/Avatar";
 import PersonaRadar from "@/components/PersonaRadar";
 import type { PersonaBoard, SourceChip } from "@/lib/persona-view";
 import { formatDate } from "@/lib/datetime";
+import { reportError } from "@/lib/client/error-bus";
 import styles from "./persona.module.css";
 
 type Tab = "card" | "sources" | "distill";
@@ -134,7 +135,7 @@ export default function PersonaClient({
       try {
         const resp = await fetch("/api/sbti/submit", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-silent-error": "1" },
           body: JSON.stringify({ personaId: board.id, answers: final }),
         }).then((r) => r.json());
         if (!resp.ok) throw new Error(resp.error ?? "提交失败");
@@ -148,6 +149,8 @@ export default function PersonaClient({
         router.refresh();
       } catch (e) {
         setError((e as Error).message);
+        /* 弹幕同步一份：错误文案在弹窗里，弹窗被关掉/滚动出视野就看不到了 */
+        reportError(e, { title: "SBTI 提交失败" });
       } finally {
         setBusy(false);
       }
@@ -189,7 +192,7 @@ export default function PersonaClient({
     try {
       const r = await fetch("/api/zhihu/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
         body: JSON.stringify({ personaId: board.id }),
       }).then((x) => x.json());
       if (!r.ok) throw new Error(r.error ?? "同步失败");
@@ -210,6 +213,7 @@ export default function PersonaClient({
       router.refresh();
     } catch (e) {
       setSyncMsg(`同步失败：${(e as Error).message}`);
+      reportError(e, { title: "知乎数据同步失败" });
     } finally {
       setSyncing(false);
     }
@@ -270,7 +274,7 @@ export default function PersonaClient({
     try {
       const r = (await fetch("/api/persona/distill", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
         body: JSON.stringify({ personaId: board.id }),
       }).then((x) => x.json())) as DistillResponse & { error?: string };
 
@@ -280,7 +284,8 @@ export default function PersonaClient({
       router.refresh();
     } catch (e) {
       setDistillResult(null);
-      alert(`蒸馏失败：${(e as Error).message}`);
+      /* 弹幕而非 alert：alert 会阻塞页面，移动端体验尤其差 */
+      reportError(e, { title: "蒸馏失败", detail: `POST /api/persona/distill` });
     } finally {
       setDistilling(false);
     }

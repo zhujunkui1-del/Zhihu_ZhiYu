@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavProgress from "./NavProgress";
+import type { SidebarUser } from "@/lib/sidebar-user";
+import { characterAvatar } from "@/lib/sidebar-user";
 import styles from "./AppShell.module.css";
 
 /** 主导航项。顺序与原型侧栏一致。 */
@@ -84,15 +87,22 @@ interface Props {
    * 因为「让我的 Agent 先聊聊」不再跳页，需要这个提示补偿进度线索。
    */
   agentRunning?: boolean;
+  /** 侧栏底部展示的用户身份（头像 + 名称），由 layout 在服务端解析好 */
+  user: SidebarUser;
 }
 
 /**
  * 应用外壳：侧栏 + 主内容区。
  * 登录页不使用本组件（它有自己的全屏布局）。
  */
-export default function AppShell({ children, agentRunning = false }: Props) {
+export default function AppShell({ children, agentRunning = false, user }: Props) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  /* 知乎头像挂在 zhimg.com，加载失败时退到本地角色插画，绝不留裂图 */
+  const avatarSrc =
+    user.kind === "zhihu" && avatarFailed ? characterAvatar("self") : user.avatar;
 
   return (
     <div className={`app-shell ${styles.shell}`}>
@@ -139,6 +149,26 @@ export default function AppShell({ children, agentRunning = false }: Props) {
         </nav>
 
         <div className={styles.sideFoot}>
+          {/* 用户身份：圆形头像 + 名称，**无交互**（不是按钮、不跳转）。
+              知乎头像抓不到时用 assets/characters 的随机插画 + zhiyu000000 兜底。 */}
+          <div className={styles.sideUser} data-side-user="1">
+            <span className={styles.sideUserAvatar}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={avatarSrc}
+                width={72}
+                height={72}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={() => setAvatarFailed(true)}
+              />
+            </span>
+            <span className={styles.sideUserName} title={user.name}>
+              {user.name}
+            </span>
+          </div>
+
           <Link
             href={SETTINGS.href}
             className={`${styles.navItem} ${isActive(SETTINGS.href) ? styles.navItemActive : ""}`}

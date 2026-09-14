@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { syncZhihuToPersona } from "@/lib/zhihu/sync";
 import { currentZhihuToken, resolveIdentity } from "@/lib/auth/current-user";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ export const dynamic = "force-dynamic";
  *     （需要用户已通过知乎 OAuth 授权，token 在服务端加密存储）
  */
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
   let body: { personaId?: string; oauthUserId?: string };
   try {
     body = (await req.json()) as { personaId?: string; oauthUserId?: string };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveIdentity } from "@/lib/auth/current-user";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export async function GET() {
   return NextResponse.json({ ok: true, items });
 }
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const me = await resolveIdentity();
   if (!me) {
     return NextResponse.json(

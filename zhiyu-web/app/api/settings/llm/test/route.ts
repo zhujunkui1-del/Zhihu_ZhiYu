@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
 import { chatCompletion } from "@/lib/llm/chat";
+import { denyIfCrossSite } from "@/lib/auth/csrf";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  const blocked = denyIfCrossSite(req);
+  if (blocked) return blocked;
+
   const body = (await req.json()) as {
     configId?: string;
     baseUrl?: string;

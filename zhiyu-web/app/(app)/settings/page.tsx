@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { buildPersonaBoard, type PersonaBoard } from "@/lib/persona-view";
 import { encryptionStatus } from "@/lib/crypto-box";
 import { resolveIdentity } from "@/lib/auth/current-user";
+import { platformAvailability } from "@/lib/llm/platform";
 import SettingsClient, { type Prefs } from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,11 @@ export default async function SettingsPage() {
     allowAgentInvite: prefsRow?.allowAgentInvite ?? true,
     showSimilarity: prefsRow?.showSimilarity ?? true,
     allowReportDelivery: prefsRow?.allowReportDelivery ?? true,
+    usePlatformLlm: prefsRow?.usePlatformLlm ?? true,
   };
   const enc = encryptionStatus();
+  /* 免费额度的截止日与剩余天数由服务端算好，避免客户端时区/时间不同导致文案不一致 */
+  const platform = platformAvailability();
 
   return (
     <SettingsClient
@@ -49,6 +53,13 @@ export default async function SettingsPage() {
       llmCount={llmCount}
       encryptionOk={enc.ok}
       encryptionMissing={enc.missing}
+      platform={{
+        configured: platform.configured,
+        freeOpen: platform.freeOpen,
+        usable: platform.usable,
+        freeUntil: platform.freeUntil,
+        daysLeft: platform.daysLeft,
+      }}
     />
   );
 }
