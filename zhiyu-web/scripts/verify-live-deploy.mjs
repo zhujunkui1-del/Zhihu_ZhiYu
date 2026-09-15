@@ -53,26 +53,41 @@ rec(
   `feishu=${payload?.providers?.feishu?.configured} dingtalk=${payload?.providers?.dingtalk?.configured}`,
 );
 rec(
-  "能力声明随接口下发（含「读不到什么」）",
-  Array.isArray(payload?.providers?.dingtalk?.meta?.capability?.cannotPull) &&
-    payload.providers.dingtalk.meta.capability.cannotPull.some((c) => c.what.includes("消息")),
-  payload?.providers?.dingtalk?.meta?.capability?.cannotPull?.map((c) => c.what).join("、"),
+  "状态接口只回「配没配 / 授权没授权」，**不再下发能力清单与环境变量名**（那堆文字已删）",
+  Boolean(payload?.providers?.feishu) &&
+    !("capability" in (payload?.providers?.feishu ?? {})) &&
+    !("envKeys" in (payload?.providers?.feishu ?? {})),
+  Object.keys(payload?.providers?.feishu ?? {}).join("、"),
 );
 rec(
-  "envKeys 回的是环境变量**名字**而不是密钥值",
-  (() => {
-    const names = Object.values(payload?.providers ?? {}).flatMap((p) =>
-      Object.values(p?.envKeys ?? {}),
-    );
-    return names.length >= 6 && names.every((v) => /^[A-Z][A-Z0-9_]*$/.test(String(v)));
-  })(),
-  Object.values(payload?.providers ?? {})
-    .flatMap((p) => Object.values(p?.envKeys ?? {}))
-    .join(" / "),
+  "回显了向导需要的东西：开放平台入口 / 回调地址 / 权限 scope",
+  typeof payload?.providers?.feishu?.consoleUrl === "string" &&
+    String(payload?.providers?.feishu?.redirectUri).includes("/api/oauth/feishu/callback") &&
+    typeof payload?.providers?.feishu?.scope === "string",
+  `${payload?.providers?.feishu?.consoleUrl} ｜ ${payload?.providers?.feishu?.redirectUri}`,
 );
 rec(
   "响应里没有密钥形状的字符串（sk- / PEM / Google key）",
   !/sk-[A-Za-z0-9]{20,}|-----BEGIN|AIza[0-9A-Za-z_-]{20,}/.test(status.text),
+);
+
+const appApi = await get("/api/oauth/app");
+rec("新增的 /api/oauth/app（凭证存本站，不用配环境变量）已上线", appApi.status === 200, `${appApi.status}`);
+rec(
+  "凭证接口**不下发 app_secret**",
+  !/"(appSecret|appSecretEnc|secret)"\s*:\s*"[^"]/.test(appApi.text) &&
+    !/sk-[A-Za-z0-9]{20,}/.test(appApi.text),
+);
+rec(
+  "线上如实回报未配置（凭证还没填）",
+  (() => {
+    try {
+      const j = JSON.parse(appApi.text);
+      return j.apps?.feishu?.configured === false && j.apps?.dingtalk?.configured === false;
+    } catch {
+      return false;
+    }
+  })(),
 );
 
 const imp = await get("/api/import");
