@@ -134,7 +134,17 @@ export interface PersonaBoard {
     partialReason: string | null;
     /** 该源是**本人自评**（SBTI），不是观察数据 —— 界面要标出来 */
     selfReport: boolean;
+    /** 这份解析被体检判定"没有区分度"，因此**未计入**综合画像 */
+    skippedFromFusion?: boolean;
   }[];
+  /**
+   * 数据体检结论。两类"看着有数、其实没信息"的值会被挡在结论之外：
+   *   · 自评各维零区分度（每题都答了同一档）
+   *   · 跨源同值（几个源给出同一个数 = 这个信号根本没量到）
+   */
+  facetWarnings: { code: string; text: string; sources: string[]; keys?: string[] }[];
+  /** 因零区分度被排除在综合画像之外的源 */
+  skippedSources: string[];
   /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
   selfReport: {
     type: string | null;
@@ -234,6 +244,23 @@ export async function buildPersonaBoard(
     : null;
 
   /**
+   * 雷达取值的优先级（逐维）：
+   *   ① 多源融合值（`facets.fused`）
+   *   ② 蒸馏产物 `Persona.values`（LLM 归纳）
+   *   ③ SBTI 自评的 15 维聚合（前两者都给不出时才用）
+   *
+   * ⚠️ **被体检挡掉的维度不参与**：跨源同值的维（= 信号根本没量到）与
+   * 零区分度自评的维，在 `buildPersonaFacets` 里已经被排除出 `fused`；
+   * 这里再用 `Persona.values` 去补，就会把刚挡掉的那个假数字又请回来。
+   * 所以下面多一道 `blanked` 过滤。
+   */
+  const blanked = new Set<string>();
+  for (const w of facets?.warnings ?? []) {
+    for (const k of w.keys ?? []) blanked.add(k);
+  }
+  const skipped = new Set(facets?.skippedSources ?? []);
+
+  /**
    * 雷达画什么：**逐维补全**，而不是整组二选一。
    *
    * 每一维单独按优先级取值：
@@ -249,10 +276,13 @@ export async function buildPersonaBoard(
   const mergedValues: Record<string, number> = {};
   const personaValues = (persona.values ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(personaValues)) {
+    /* 被体检判定为"信号没量到"的维度，**不要**用 LLM 的旧值补回来 */
+    if (blanked.has(k)) continue;
     if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
   }
   /* 融合值覆盖同名的蒸馏值（逐维，融合值更接近原始观察） */
   for (const [k, v] of Object.entries(facets?.fused ?? {})) {
+    if (blanked.has(k)) continue;
     if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
   }
 
@@ -293,6 +323,13 @@ export async function buildPersonaBoard(
     axesSource,
     axesIncludesSelfReport,
     fused,
+    /**
+     * 数据体检结论（零区分度自评 / 跨源同值）。
+     * 界面要如实说出来 —— "为什么这一维没有"比"编一个数"重要。
+     */
+    facetWarnings: facets?.warnings ?? [],
+    /** 因零区分度被排除在综合画像之外的源（展示时标注"未计入综合画像"） */
+    skippedSources: facets?.skippedSources ?? [],
     sourceFacets: (facets?.sources ?? []).map((f) => ({
       source: f.source,
       label: f.label,
@@ -304,6 +341,8 @@ export async function buildPersonaBoard(
       titleOnly: f.titleOnly === true,
       partialReason: f.partialReason ?? null,
       selfReport: (facets?.selfReportSources ?? []).includes(f.source),
+      /** 这份 facet 有没有被排除在综合画像之外（零区分度自评） */
+      skippedFromFusion: (facets?.skippedSources ?? []).includes(f.source),
     })),
     selfReport: facets?.selfReport ?? null,
   };

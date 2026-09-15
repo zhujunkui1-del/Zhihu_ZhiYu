@@ -51,6 +51,11 @@ export interface FacetView {
   partialReason: string | null;
   /** 该源是**本人自评**（SBTI），不是观察数据 */
   selfReport: boolean;
+  /**
+   * 这份解析被数据体检判定"没有区分度"（各维落在同一档），
+   * 因此**没有计入**综合画像 —— 界面要标出来，否则用户会以为它参与了。
+   */
+  skippedFromFusion?: boolean;
 }
 
 export default function SourceFacets({
@@ -110,6 +115,12 @@ export default function SourceFacets({
                       : `${f.itemCount} 条依据`
                     : "无逐条依据"}
                 </span>
+                {/* 这份解析被体检判定"没有区分度"（每题都答了同一档）→ 未计入综合画像 */}
+                {f.skippedFromFusion ? (
+                  <span className={styles.count} data-facet-skipped="1">
+                    · 未计入综合画像
+                  </span>
+                ) : null}
               </header>
 
               <p className={styles.summary}>{f.summary}</p>

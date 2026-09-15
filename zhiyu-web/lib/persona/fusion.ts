@@ -23,6 +23,10 @@
  */
 
 import { clampPercent } from "@/lib/score";
+import { inspectFacets, type FacetWarning } from "./sanity";
+
+/* 体检类型从 sanity 转出去，调用方不必知道它是哪个文件定义的 */
+export type { FacetWarning };
 
 /** 六维价值观的键（顺序固定，便于展示与比较） */
 export const VALUE_KEYS = [
@@ -388,13 +392,61 @@ export const DOMAIN_LEXICON: Record<string, string[]> = {
 
 /** 命中词典的兴趣方向（按命中次数降序） */
 export function interestsFromTexts(texts: string[]): string[] {
+  return [...interestCountsFromTexts(texts)]
+    .sort((a, b) => b[1] - a[1])
+    .map(([d]) => d);
+}
+
+/**
+ * 命中词典的兴趣方向 → **次数**。
+ *
+ * 为什么要次数：集中度不能只看"命中几个领域"，还要看分布是否均匀。
+ * 八个领域各命中一次，和一个领域命中八次，是完全不同的两种人。
+ * 之前用 `1-(领域数-1)/8` 把这两者算成同一个值，还顺手造出 99% 这种极端值。
+ */
+export function interestCountsFromTexts(texts: string[]): Map<string, number> {
   const hits = new Map<string, number>();
   for (const t of texts) {
     for (const [domain, words] of Object.entries(DOMAIN_LEXICON)) {
       if (words.some((w) => t.includes(w))) hits.set(domain, (hits.get(domain) ?? 0) + 1);
     }
   }
-  return [...hits.entries()].sort((a, b) => b[1] - a[1]).map(([d]) => d);
+  return hits;
+}
+
+/**
+ * 话题集中度（0~1）：HHI 归一化，1 = 只聊一个方向，0 = 各方向完全均分。
+ *
+ * 公式：`p_d = 该领域命中次数 / 总命中次数`，`HHI = Σ p_d²`，
+ * 再按**观测到的领域数 D** 归一化：`(HHI - 1/D) / (1 - 1/D)`。
+ * 这样"均匀分布"永远落在 0，"独占"永远落在 1，与 D 的大小无关 ——
+ * 而旧公式 `1-(D-1)/8` 里那个 8 是词典长度，纯属拍脑袋，
+ * 并且只要命中 1 个领域就直接顶到 1.0（界面上就是 99%）。
+ *
+ * @returns 0~1；**命中领域数 < 2 时返回 null** —— 一个领域谈不上"集中"还是"分散"，
+ *          这种情况该留空，而不是报 99%。
+ */
+export function topicConcentration(counts: Map<string, number>): number | null {
+  const vals = [...counts.values()].filter((v) => v > 0);
+  const total = vals.reduce((a, b) => a + b, 0);
+  if (vals.length < 2 || total <= 0) return null;
+  const hhi = vals.reduce((s, c) => s + (c / total) ** 2, 0);
+  const d = vals.length;
+  return clamp01((hhi - 1 / d) / (1 - 1 / d));
+}
+
+/**
+ * 互动强度是否真的量到了。
+ *
+ * `heat` 全是 0 有两种可能：① 这个源确实没人点赞；② 这个源根本没有互动量字段。
+ * 两者从数据上分不开，但都不该输出"社交连接 1%"这种断言 ——
+ * 把"没量到"说成"量出来很低"是这个项目反复踩的同一个坑。
+ * 判据：**非零热度的条目占比 ≥ 10%** 才算有信号。
+ */
+export function hasHeatSignal(heats: number[], minRatio = 0.1): boolean {
+  if (heats.length === 0) return false;
+  const nonZero = heats.filter((h) => h > 0).length;
+  return nonZero / heats.length >= minRatio;
 }
 
 /** `interestsFromTexts` 的别名：调用处读作"从这批内容里取兴趣"更顺 */
@@ -457,7 +509,9 @@ export function facetFromContents(
   const shortRatio = lens.filter((x) => x < 120).length / n;
   const heat = contents.map((c) => c.heat ?? 0);
   const avgHeat = heat.reduce((s, x) => s + x, 0) / n;
-  const domains = interestsFromTexts(contents.map((c) => c.text));
+  /* 领域命中**次数**（不是"命中几个领域"）——集中度要用分布算，见 topicConcentration */
+  const domainCounts = interestCountsFromTexts(contents.map((c) => c.text));
+  const domains = [...domainCounts].sort((a, b) => b[1] - a[1]).map(([d]) => d);
 
   /**
    * 是否"实际上只有标题"。
@@ -472,7 +526,8 @@ export function facetFromContents(
    * 于是又用标题长度算出了 learning=0.03 这种噪声值。
    */
   const looksLikeTitlesOnly = opts.titleOnly === true || shortRatio >= 0.8;
-  const hasHeatSignal = opts.noHeat !== true;
+  /** 调用方声明这个源**有**互动量字段（没声明就当作没有） */
+  const heatDeclared = opts.noHeat !== true;
   const isIm = opts.profile === "im";
   /**
    * 对外回报的 `titleOnly`。
@@ -487,13 +542,29 @@ export function facetFromContents(
   const repeatRatio =
     1 - new Set(contents.map((c) => c.text.trim())).size / Math.max(1, n);
 
+  /**
+   * 各维取值。
+   *
+   * ⚠️ 三条"无信号就留空"的纪律（用户反复投诉的 1%/99% 就出在这三处）：
+   *   · `social`   —— 只有**真的量到互动**才算（`hasHeatSignal`），
+   *                   否则留空。以前热度全 0 时会算成 `0/300 = 0` → 界面 1%。
+   *   · `stability`—— CV（篇幅变异系数）≥1 时留空。CV≥1 意味着篇幅混乱到
+   *                   "稳定输出"这个说法不成立，`1-min(CV,1)` 会恒定输出 0 → 界面 1%。
+   *                   实测一份真实私聊（平均 8.9 字、标准差 56.7）就是这样顶到 1% 的。
+   *   · `autonomy` —— 改为 HHI 归一化（见 `topicConcentration`），命中领域 <2 时留空。
+   *                   旧公式只要命中 1 个领域就 = 1.0 → 界面 99%。
+   */
+  const concentrations = topicConcentration(domainCounts);
+  const consistency = contentConsistency(lens, avgChars);
+  const heatOk = hasHeatSignal(heat);
+
   const values: Partial<Record<ValueKey, number>> = isIm
     ? {
         /* 说新东西 vs 复读 —— "创造表达"在聊天场景下唯一量得准的代理 */
         creation: clampDisplay(1 - repeatRatio),
-        stability: contentConsistency(lens, avgChars),
-        ...(hasHeatSignal ? { social: clampDisplay(avgHeat / 300) } : {}),
-        autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+        ...(consistency == null ? {} : { stability: consistency }),
+        ...(heatOk ? { social: clampDisplay(avgHeat / 300) } : {}),
+        ...(concentrations == null ? {} : { autonomy: clampDisplay(concentrations) }),
       }
     : {
         /* 与"文本长度"有关的三维：只有确认拿到正文才算，否则留空 */
@@ -502,11 +573,11 @@ export function facetFromContents(
           : {
               learning: clampDisplay(avgChars / 600),
               creation: clampDisplay(1 - shortRatio),
-              stability: contentConsistency(lens, avgChars),
+              ...(consistency == null ? {} : { stability: consistency }),
             }),
         /* 没互动量的源（聊天记录 / 工作文档）留空，而不是按 0 算成"社交极弱" */
-        ...(hasHeatSignal ? { social: clampDisplay(avgHeat / 300) } : {}),
-        autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+        ...(heatOk ? { social: clampDisplay(avgHeat / 300) } : {}),
+        ...(concentrations == null ? {} : { autonomy: clampDisplay(concentrations) }),
       };
 
   const top = domains.slice(0, 3);
@@ -542,7 +613,9 @@ export function facetFromContents(
         `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`
       : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${shortPct}% 为短内容）；` +
         `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
-        (hasHeatSignal ? "" : "该源没有互动量，社交连接强度由其它源补充。");
+        /* 只在"调用方声明有互动量、但实际没量到"时才提一句；
+           本来就声明了 noHeat 的源不必赘述（那行也属于"讲自己做不到什么"） */
+        (heatDeclared && !heatOk ? "该源没有互动量，社交连接强度由其它源补充。" : "");
     if (looksLikeTitlesOnly && !isIm) {
       partialReason =
         "该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算。";
@@ -566,12 +639,18 @@ export function facetFromContents(
  * 为什么不用"条数"：条数受抓取上限影响（实测 26 人里 22 人都取满 30 条，
  * 于是 stability 恒为 1.00，这一维完全没有信息量，还把判型整体推向
  * 原型里 stability 最高的那一型）。CV 才是"输出是否稳定"的可观测代理。
+ *
+ * @returns 0~1；**CV ≥ 1 时返回 null（留空）** —— 篇幅乱到 CV≥1 时，
+ *          "稳定输出"这个说法本身不成立，硬算只会得到恒定 0（界面 1%）。
+ *          实测一份真实私聊：平均 8.9 字、标准差 56.7（几条长文混着短句）→ CV≈6.4，
+ *          旧逻辑每次都输出 1%，被用户当成"假数据"。
  */
-function contentConsistency(lens: number[], avgChars: number): number {
-  if (lens.length < 2 || avgChars <= 0) return 0.5; // 单条无从谈波动，给中性
+function contentConsistency(lens: number[], avgChars: number): number | null {
+  if (lens.length < 2 || avgChars <= 0) return null; // 单条无从谈波动 → 留空
   const variance = lens.reduce((s, x) => s + (x - avgChars) ** 2, 0) / lens.length;
   const cv = Math.sqrt(variance) / avgChars;
-  return clampDisplay(1 - Math.min(cv, 1));
+  if (!Number.isFinite(cv) || cv >= 1) return null;
+  return clampDisplay(1 - cv);
 }
 
 /**
@@ -598,14 +677,25 @@ export function fuseSourceFacets(facets: SourceFacet[]): {
   usedSources: string[];
   selfReportSources: string[];
   observedSources: string[];
+  /** 体检发现的问题（零区分度自评 / 跨源同值），界面要如实说 */
+  warnings: FacetWarning[];
+  /** 因"零区分度"被排除在平均之外的源 */
+  skippedSources: string[];
 } {
-  const usedSources = facets.map((f) => f.source);
+  /* 先体检再平均：把"看着有数、其实没信息"的值挡在结论之外。
+     两类问题都不该靠人记得检查 —— 详见 lib/persona/sanity.ts 的说明。 */
+  const { skipFromFusion, warnings, blankDimensions } = inspectFacets(facets);
+
+  const contributing = facets.filter((f) => !skipFromFusion.includes(f.source));
+  const usedSources = contributing.map((f) => f.source);
   const selfReportSources = usedSources.filter((s) => SELF_REPORT_SOURCES.includes(s));
   const observedSources = usedSources.filter((s) => !SELF_REPORT_SOURCES.includes(s));
   const fused: Partial<Record<ValueKey, number>> = {};
 
   for (const key of VALUE_KEYS) {
-    const vals = facets
+    /* 跨源同值 → 这个信号根本没量到，整维留空 */
+    if (blankDimensions.includes(key)) continue;
+    const vals = contributing
       .map((f) => f.values[key])
       .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
     if (vals.length) {
@@ -613,6 +703,6 @@ export function fuseSourceFacets(facets: SourceFacet[]): {
     }
   }
 
-  return { fused, usedSources, selfReportSources, observedSources };
+  return { fused, usedSources, selfReportSources, observedSources, warnings, skippedSources: skipFromFusion };
 }
 

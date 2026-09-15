@@ -119,12 +119,25 @@ console.log("\n== ② 导入路径 vs 蒸馏路径：同一批内容必须算出
   rec("summary 相等", viaImport.summary === viaDistill.summary);
   rec("itemCount 相等", viaImport.itemCount === viaDistill.itemCount);
 
-  /* 反证：不传 opts（= 修复前的蒸馏路径）会长什么样 */
+  /* 反证：不传 opts（= 修复前的蒸馏路径）仍会误判"只有标题"。
+     ⚠️ 这里不再断言 social=0.01 —— ③ 批次之后，"没有互动量就不给 social"
+     这条纪律在**所有**路径上都生效了，所以旧 bug 现在只剩"误判只有标题 +
+     丢掉三维"这一半。（那 1% 是它顺手造出来的另一个错，已被体检挡住。） */
   const buggy = facetFromContents("wechat", "微信", chat);
   rec(
-    "复现旧 bug：不传 opts 时聊天被当成「只有标题」",
-    buggy.titleOnly === true && typeof buggy.values.social === "number" && buggy.values.social < 0.02,
-    `titleOnly=${buggy.titleOnly} social=${buggy.values.social} values=${JSON.stringify(buggy.values)}`,
+    "复现旧 bug 的另一半：不传 opts 时聊天被误判成「只有标题」",
+    buggy.titleOnly === true,
+    `titleOnly=${buggy.titleOnly} values=${JSON.stringify(buggy.values)}`,
+  );
+  rec(
+    "旧路径丢了「创造表达/稳定安全」（三维被整组丢掉）",
+    typeof buggy.values.creation !== "number" && typeof buggy.values.stability !== "number",
+    JSON.stringify(buggy.values),
+  );
+  rec(
+    "旧路径不再凭空产出 social=1%（③ 之后无热度信号一律留空）",
+    typeof buggy.values.social !== "number",
+    JSON.stringify(buggy.values),
   );
   rec(
     "修好之后的路径**不会**走到这个结果",

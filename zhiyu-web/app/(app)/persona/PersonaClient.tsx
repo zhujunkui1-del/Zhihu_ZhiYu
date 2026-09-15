@@ -586,6 +586,18 @@ export default function PersonaClient({
                           .join("、")}
                       </p>
                     ) : null}
+
+                    {/* 数据体检结论：为什么某一维没有、为什么某个源没算进来。
+                        宁可说"这个信号没量到"，也不要编一个数糊上去。 */}
+                    {board.facetWarnings?.length ? (
+                      <div data-facet-warnings="1" style={{ marginTop: 10 }}>
+                        {board.facetWarnings.map((w, i) => (
+                          <p key={`${w.code}-${i}`} className={styles.hint} style={{ marginTop: 4 }}>
+                            {w.text}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <p className={styles.hint}>

@@ -457,6 +457,11 @@ const chatContents = [
   { text: "同意" },
   { text: "同意" },
   { text: "先做小范围灰度，出问题也好回滚" },
+  /* ⚠️ 集中度维度需要**至少两个领域**才能算（只命中一个领域谈不上"集中"还是"分散"，
+     以前那种情况会直接给 1.0 → 界面 99%，已被 ③ 批次改成留空）。
+     所以这里补两条**不同领域**的内容，让 autonomy 真的有值可算。 */
+  { text: "周末想去旅行，吃点好吃的换换心情" },
+  { text: "这次的产品体验和交互设计还得再打磨一下" },
 ];
 
 const im = facetFromContents("wechat", "微信 · 私域生活", chatContents, {
@@ -477,8 +482,11 @@ rec(
   typeof im.values.learning !== "number",
 );
 rec(
-  "creation = 1 - 重复率（6 条里有 2 条是重复的「同意」→ 2/3）",
-  Math.abs(im.values.creation - 2 / 3) < 1e-9,
+  "creation = 1 - 重复率（按本组实际条数算，不写死数字）",
+  (() => {
+    const repeat = 1 - new Set(chatContents.map((c) => c.text)).size / chatContents.length;
+    return Math.abs(im.values.creation - (1 - repeat)) < 1e-9;
+  })(),
   `creation=${im.values.creation}（重复率 ${(1 - im.values.creation).toFixed(3)}）`,
 );
 rec(
@@ -508,10 +516,15 @@ rec(
 );
 
 /* 知乎口径不能被改坏 */
-const zhihuContents = Array.from({ length: 6 }, (_, i) => ({
-  text: "长".repeat(200 + i * 10) + `标题化正文 ${i}`,
-  heat: 120,
-}));
+const zhihuContents = [
+  ...Array.from({ length: 6 }, (_, i) => ({
+    text: "长".repeat(200 + i * 10) + `标题化正文 ${i}`,
+    heat: 120,
+  })),
+  /* 集中度需要 ≥2 个领域（见上面那条说明），补两条不同方向的正文 */
+  { text: "聊到 AI 大模型和算法的落地", heat: 120 },
+  { text: "也聊历史文化与哲学思想", heat: 120 },
+];
 const zf = facetFromContents("zhihu", "知乎 · 公共表达", zhihuContents);
 rec(
   "长文源（默认 long-form）仍然算出 learning/creation/stability/social/autonomy",

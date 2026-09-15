@@ -113,9 +113,20 @@ rec(
   axisInfo.count === 5,
   `${axisInfo.count} 条：${axisInfo.labels.join("/")}`,
 );
+/* ⚠️ 断言已按新政策反转（③ 批次）：
+   以前要求"五条轴全部有数值"，那是为了不出现空的雷达 —— 代价是把量不到的
+   维度用 0/1 端点硬填，界面就是 1% / 99%（用户原话："你就整 99% 和 1%"）。
+   现在的政策是**量不到就留空**（`—`），所以这里改成：
+     · 至少有一条轴有值（雷达不能整张空掉）
+     · 有值的轴不能是 0% / 100%（不许出现绝对化数值） */
 rec(
-  "五条轴**全部有数值**（不因某个源缺维而变「—」）",
-  axisInfo.vals.length === 5 && axisInfo.vals.every((v) => v && v !== "—"),
+  "五条轴里至少一条有值（不整张空掉）",
+  axisInfo.vals.some((v) => v && v !== "—"),
+  axisInfo.vals.join(" "),
+);
+rec(
+  "有值的轴都不是 0% / 100%（量不到就留空，不用端点值硬填）",
+  axisInfo.vals.filter((v) => v && v !== "—").every((v) => !/^(0|100)%$/.test(v)),
   axisInfo.vals.join(" "),
 );
 rec(
@@ -145,10 +156,19 @@ rec(
   facetInfo.count >= 1,
   `${facetInfo.count} 个源：${facetInfo.sources.join(", ")}`,
 );
+/* ⚠️ 断言已按新政策反转（③ 批次）：
+   以前要求"每个源都画出六维"，同样是为了卡片不空 —— 代价是给量不到的维度
+   硬凑 1%/99%（知乎只给标题、没有点赞数，社交连接和集中度都无从算起）。
+   现在允许某个源**一根条都没有**（卡片只剩结论句），只要整体不是全空。 */
 rec(
-  "每个源都画出了自己的六维",
-  facetInfo.bars.length > 0 && facetInfo.bars.every((n) => n > 0),
+  "至少有一个源画出了维度（整体不空）",
+  facetInfo.bars.some((n) => n > 0),
   `各卡进度条数：${facetInfo.bars.join(", ")}`,
+);
+rec(
+  "没有任何一条进度条是 0% / 100%",
+  !facetInfo.texts.some((t) => /(^|[^\d])(0|100)%/.test(t)),
+  facetInfo.texts.map((t) => (t.match(/(^|[^\d])(0|100)%/) ?? [])[0] ?? "").filter(Boolean).join(" | ") || "无",
 );
 /* 用户要求删掉"未覆盖：…（该源只提供标题、没有正文…）"那行：
    缺维由"算不出来就不画那根条"表达，不再写字解释自己做不到什么。 */

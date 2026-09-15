@@ -37,6 +37,7 @@ import {
   type SourceFacet,
   type TypeMatch,
   type ValueKey,
+  type FacetWarning,
 } from "./fusion";
 
 /**
@@ -133,6 +134,14 @@ export interface PersonaFacets {
     /** 自评结果的一句话解读（来自 sbti-skill 的人格库） */
     blurb: string | null;
   } | null;
+  /**
+   * 体检结论。有两类"看着有数、其实没信息"的值会被挡在结论之外：
+   *   · 自评维度零区分度（每题都答了同一档）
+   *   · 跨源同值（几个源给出同一个数 = 这个信号根本没量到）
+   */
+  warnings: FacetWarning[];
+  /** 因零区分度被排除在平均之外的源 */
+  skippedSources: string[];
 }
 
 /** PersonaFeature 里存"分源解析结果"用的 key 前缀 */
@@ -262,7 +271,8 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
       a.source.localeCompare(b.source),
   );
 
-  const { fused, usedSources, selfReportSources, observedSources } = fuseSourceFacets(sources);
+  const { fused, usedSources, selfReportSources, observedSources, warnings, skippedSources } =
+    fuseSourceFacets(sources);
 
   /**
    * "是不是只有自评"要按**行为源**判，不能只看非自报源：
@@ -283,6 +293,9 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
     usedSources,
     type: matchPersonaType(fused),
     selfReport,
+    /** 体检结论（零区分度自评 / 跨源同值），界面据此解释"为什么少了一块" */
+    warnings,
+    skippedSources,
   };
 }
 
