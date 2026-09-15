@@ -11,6 +11,10 @@ import { reportError } from "@/lib/client/error-bus";
 import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import SbtiResultModal, { type SbtiResultData } from "@/components/SbtiResultModal";
 import SourceFacets from "@/components/SourceFacets";
+import ImportDataDialog, {
+  type ImportFileResult,
+} from "@/components/ImportDataDialog";
+import { IMPORT_SOURCE_LABEL, isImportSource, type ImportSource } from "@/lib/import/parse";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
 import styles from "./persona.module.css";
 
@@ -28,10 +32,10 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 const SOURCE_SUB: Record<string, string> = {
   zhihu: "Observed · 公开内容推断",
-  wechat: "Observed · 本地聊天分析",
-  qq: "Observed · 本地群聊分析",
-  feishu: "Observed · 官方 API / 文档",
-  dingtalk: "Observed · 文档 API / 消息上传",
+  wechat: "Observed · 聊天文件导入",
+  qq: "Observed · 聊天文件导入",
+  feishu: "Observed · 消息导出 / distilly",
+  dingtalk: "Observed · 文档 + 消息导入",
   sbti: "Self-reported · 你眼中的自己",
 };
 
@@ -50,27 +54,27 @@ const SOURCE_META: Record<
 > = {
   wechat: {
     title: "微信聊天记录",
-    dim: "私域人格 · 本地处理",
-    action: "选择聊天文件",
-    note: "上传导出的聊天 JSON。数据仅用于生成你的人格，不会离开你的账号。",
+    dim: "私域人格 · 本地文件导入",
+    action: "导入聊天文件",
+    note: "上传导出的聊天 JSON / TXT / CSV。数据仅用于生成你的人格，不会离开你的账号。",
   },
   qq: {
     title: "QQ 聊天记录",
-    dim: "私域人格 · 本地处理",
-    action: "选择导出文件",
-    note: "支持 QCE 导出的 JSON。群聊与私聊会分开提取证据。",
+    dim: "私域人格 · 本地文件导入",
+    action: "导入导出文件",
+    note: "支持 QCE / TIM 导出的 TXT、JSON、CSV。群聊与私聊都会只提取你发的内容。",
   },
   feishu: {
     title: "飞书工作数据",
-    dim: "职场人格 · 官方 API",
-    action: "连接飞书",
-    note: "通过飞书官方 API 授权同步文档与协作记录（待接入）。",
+    dim: "职场人格 · 消息导出 / distilly",
+    action: "导入飞书数据",
+    note: "支持飞书官方消息导出 JSON，以及 distilly 采集脚本产出的 messages.txt / docs.txt。",
   },
   dingtalk: {
     title: "钉钉工作数据",
-    dim: "职场人格 · 文档 API + 消息上传",
+    dim: "职场人格 · 文档 + 消息导入",
     action: "导入钉钉数据",
-    note: "支持文档 API 与消息记录上传（开发中）。",
+    note: "支持 distilly 钉钉采集脚本产出的 docs.txt / bitables.txt / messages.txt。",
   },
   zhihu: {
     title: "知乎公开数据",
@@ -266,6 +270,30 @@ export default function PersonaClient({
       setSyncing(false);
     }
   }, [board.id, router]);
+
+  /* ── 手动导入（微信 / QQ / 飞书 / 钉钉）────────────────────────────────
+   * 需求："点击按钮后要能跳出用户的电脑窗口，然后让用户把 json、txt 等
+   * 文件格式的、产品支持的、可以用于蒸馏的文件数据导入到网站上。"
+   * 所以这里只负责"哪个源、开弹窗、导入完刷新服务端数据"，
+   * 解析与落库都在 /api/import（见 lib/import/parse.ts）。
+   */
+  const [importSource, setImportSource] = useState<ImportSource | null>(null);
+  const [importMsg, setImportMsg] = useState("");
+  const [importDetail, setImportDetail] = useState<ImportFileResult | null>(null);
+
+  const onImported = useCallback(
+    (r: ImportFileResult) => {
+      setImportDetail(r);
+      setImportMsg(
+        `导入完成：${r.counts?.items ?? 0} 条内容已写入「${
+          IMPORT_SOURCE_LABEL[r.source as ImportSource] ?? r.source
+        }」，分源解析已刷新。`,
+      );
+      /* 刷新服务端数据：六源状态、完整度、分源解析、综合画像都会跟着更新 */
+      router.refresh();
+    },
+    [router],
+  );
 
   /* ── Agent 蒸馏 ─────────────────────────────────────────────────────────
    * 之前这里只有展示：按钮 disabled + 标着"蒸馏服务尚未接入（演示占位）"。
@@ -623,6 +651,20 @@ export default function PersonaClient({
                       >
                         {c.injected ? "重新测试" : "去完成 SBTI"}
                       </button>
+                    ) : isImportSource(c.type) ? (
+                      /* 微信 / QQ / 飞书 / 钉钉：**手动导入本地文件**。
+                         没有其它平台的网页授权可走（原因见 api/import/route.ts），
+                         所以这里的按钮必须真的能打开系统文件窗口。 */
+                      <button
+                        type="button"
+                        className="btn btnPrimary"
+                        data-open-import={c.type}
+                        onClick={() => setImportSource(c.type as ImportSource)}
+                        disabled={!isSelf}
+                        title={isSelf ? undefined : "只能导入自己的人格数据"}
+                      >
+                        {c.injected ? `重新${meta.action}` : meta.action}
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -638,6 +680,86 @@ export default function PersonaClient({
               );
             })}
           </div>
+
+          {/* 手动导入结果（微信 / QQ / 飞书 / 钉钉）。
+              导入完必须让用户看见"到底读到了什么"，而不是一句"成功"。 */}
+          {importMsg ? (
+            <div className={styles.syncBox} data-import-box="1">
+              <p className={styles.syncMsg}>{importMsg}</p>
+
+              {importDetail?.counts ? (
+                <ul className={styles.syncCounts}>
+                  <li>
+                    <span>读到的原始内容</span>
+                    <b>{importDetail.counts.raw}</b>
+                  </li>
+                  <li>
+                    <span>可用于蒸馏</span>
+                    <b>{importDetail.counts.items}</b>
+                  </li>
+                  <li>
+                    <span>写入证据</span>
+                    <b>{importDetail.counts.evidence}</b>
+                  </li>
+                  <li>
+                    <span>总字数</span>
+                    <b>{importDetail.counts.chars}</b>
+                  </li>
+                </ul>
+              ) : null}
+
+              {importDetail?.addedInterests?.length ? (
+                <p className={styles.syncLine}>
+                  <span className={styles.syncLbl}>新增兴趣标签</span>
+                  <span className={styles.syncTags}>
+                    {importDetail.addedInterests.slice(0, 14).map((t) => (
+                      <span key={t} className="badge">
+                        {t}
+                      </span>
+                    ))}
+                  </span>
+                </p>
+              ) : null}
+
+              {importDetail?.samples?.length ? (
+                <div className={styles.syncSamples}>
+                  <p className={styles.syncLbl}>读到的内容</p>
+                  <ul>
+                    {importDetail.samples.map((s, i) => (
+                      <li key={i}>
+                        <span className="badge">{s.trait}</span>
+                        <span className={styles.sampleTitle}>{s.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {importDetail?.warnings?.length ? (
+                <ul className={styles.syncWarn} data-import-warnings="1">
+                  {importDetail.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <p className={styles.syncLine}>
+                <button
+                  type="button"
+                  className="btn btnSecondary btnSm"
+                  onClick={() => {
+                    setImportMsg("");
+                    setImportDetail(null);
+                  }}
+                >
+                  收起
+                </button>
+                <span className="meta" style={{ marginLeft: 10 }}>
+                  去「Agent 蒸馏」页重新蒸馏，这份数据就会进入综合画像。
+                </span>
+              </p>
+            </div>
+          ) : null}
 
           {/* 知乎同步：进度与结果。数据来自真实开放平台接口，不是占位 */}
           {syncMsg ? (
@@ -997,6 +1119,16 @@ export default function PersonaClient({
         result={sbtiResultOpen ? sbtiResult : null}
         onClose={() => setSbtiResultOpen(false)}
       />
+
+      {/* 手动导入弹窗：打开即弹出系统文件选择窗口（微信 / QQ / 飞书 / 钉钉） */}
+      {importSource ? (
+        <ImportDataDialog
+          source={importSource}
+          personaId={board.id}
+          onClose={() => setImportSource(null)}
+          onImported={onImported}
+        />
+      ) : null}
     </>
   );
 }

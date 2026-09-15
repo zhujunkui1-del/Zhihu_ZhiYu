@@ -47,6 +47,8 @@ export interface FacetView {
   values: Record<string, number>;
   /** 该源只有标题、没有正文（依赖文本长度的维度因此缺失） */
   titleOnly: boolean;
+  /** 缺维的人话原因（解析层给出，组件照原样念） */
+  partialReason: string | null;
   /** 该源是**本人自评**（SBTI），不是观察数据 */
   selfReport: boolean;
 }
@@ -145,19 +147,21 @@ export default function SourceFacets({
                 </p>
               ) : null}
 
-              {/* 哪些维度这个源给不出，如实说明（不让人以为漏了） */}
+              {/* 哪些维度这个源给不出，如实说明（不让人以为漏了）。
+                  原因由解析层给（`partialReason`），组件不自己猜 ——
+                  缺维的理由不止"只有标题"一种：手动导入的聊天/文档缺的是
+                  「学习成长」与「社交连接」，原因完全不同。 */}
               {dims.length < VALUE_KEYS.length ? (
                 <p className={styles.missing}>
                   未覆盖：
                   {VALUE_KEYS.filter((k) => typeof f.values[k] !== "number")
                     .map((k) => VALUE_LABEL[k] ?? k)
                     .join("、")}
-                  {/* 说清"为什么给不出"。否则用户看到缺维会以为是 bug
-                      —— 实际是数据源本身只给标题（如知乎开放平台），
-                      依赖文本长度的维度无从计算。 */}
-                  {f.titleOnly
-                    ? "（该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算）"
-                    : ""}
+                  {f.partialReason
+                    ? `（${f.partialReason}）`
+                    : f.titleOnly
+                      ? "（该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算）"
+                      : ""}
                 </p>
               ) : null}
             </article>

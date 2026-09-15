@@ -1,0 +1,324 @@
+/* 「导入数据」弹窗（微信 / QQ / 飞书 / 钉钉手动导入） */
+
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(38, 32, 26, 0.42);
+  backdrop-filter: blur(2px);
+}
+.dialog {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  padding: 26px 28px 22px;
+  border: 1.8px solid var(--line-soft);
+  border-radius: var(--r-hand-lg);
+  background: var(--paper, #fffdf6);
+  box-shadow: 0 24px 60px rgba(40, 30, 20, 0.24);
+}
+.close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 253, 246, 0.9);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.close:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-hand);
+  font-size: 21px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.hint {
+  margin: 0 0 18px;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 系统文件选择窗口由它触发 —— 视觉上藏起来，但保留可访问性 */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.drop {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 26px 18px;
+  border: 2px dashed var(--line-soft);
+  border-radius: var(--r-hand-lg);
+  background: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropOn {
+  border-color: var(--accent);
+  background: rgba(226, 102, 79, 0.07);
+}
+.dropBig {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.dropNote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.fileBox {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+.fileName {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  word-break: break-all;
+}
+.fileMeta {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.reselect {
+  margin-top: 6px;
+  padding: 3px 12px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+.reselect:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.field {
+  display: block;
+  margin: 16px 0 0;
+}
+.fieldLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.fieldLabel em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.6px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: #fff;
+  color: var(--fg);
+  font-size: 13.5px;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.details {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.72);
+  font-size: 12.5px;
+  color: var(--fg);
+}
+.details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.formatList {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.formatList li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.formatList b {
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.steps {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+.steps li {
+  margin-bottom: 2px;
+  word-break: break-all;
+}
+
+.error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #c9503a;
+  border-radius: 5px;
+  background: rgba(201, 80, 58, 0.08);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+.result,
+.resultBad {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--r-hand);
+  font-size: 12.5px;
+  line-height: 1.85;
+}
+.result {
+  border: 1.5px solid rgba(90, 140, 80, 0.45);
+  background: rgba(120, 170, 110, 0.08);
+}
+.resultBad {
+  border: 1.5px solid rgba(201, 80, 58, 0.4);
+  background: rgba(201, 80, 58, 0.07);
+}
+.resultHead {
+  margin: 0;
+  color: var(--fg);
+}
+.resultHead b {
+  font-family: var(--font-mono);
+}
+.resultMeta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.resultTags {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+.resultTags :global(.badge) {
+  margin-left: 5px;
+}
+
+.dims {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 7px;
+}
+.dimsHead {
+  margin: 0 0 2px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.dimRow {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 9px;
+}
+.dimLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dimVal {
+  text-align: right;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.samples {
+  margin: 12px 0 0;
+}
+.samples ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.samples li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sampleText {
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.warns {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}

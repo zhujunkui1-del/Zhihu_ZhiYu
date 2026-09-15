@@ -128,6 +128,8 @@ export interface PersonaBoard {
     values: Record<string, number>;
     /** 该源只有标题、没有正文（依赖文本长度的维度因此缺失） */
     titleOnly: boolean;
+    /** 缺维的**人话原因**（由解析层给出，界面照原样念，不自己猜） */
+    partialReason: string | null;
     /** 该源是**本人自评**（SBTI），不是观察数据 —— 界面要标出来 */
     selfReport: boolean;
   }[];
@@ -281,6 +283,7 @@ export async function buildPersonaBoard(
         Object.entries(f.values).filter(([, v]) => typeof v === "number") as [string, number][],
       ),
       titleOnly: f.titleOnly === true,
+      partialReason: f.partialReason ?? null,
       selfReport: (facets?.selfReportSources ?? []).includes(f.source),
     })),
     selfReport: facets?.selfReport ?? null,

@@ -339,6 +339,15 @@ export interface SourceFacet {
    * 因为标题长度不携带表达特征 —— 缺就如实缺着，不用噪声凑数。
    */
   titleOnly?: boolean;
+  /**
+   * 缺维的**人话原因**（展示在「未覆盖」旁边）。
+   *
+   * 为什么单独一个字段：缺维的原因不止"只有标题"一种。
+   * 手动导入的聊天/文档走 `profile: "im"`，缺的是"学习成长"与"社交连接"，
+   * 原因和标题无关。把原因写成数据，界面照原样念出来，
+   * 比在组件里按 `titleOnly` 猜一句话要诚实。
+   */
+  partialReason?: string;
 }
 
 /** 某个源的一条内容（正文 + 互动量），用于按源解析 */
@@ -397,7 +406,7 @@ export const interestFromContents = interestsFromTexts;
  * 每一维都由可观测信号推断：
  *   learning   ← 平均字数（表达密度）　　　※ 仅标题时**不可用**
  *   creation   ← 长文比例　　　　　　　　　※ 仅标题时**不可用**
- *   social     ← 平均互动（连接强度）
+ *   social     ← 平均互动（连接强度）　　　※ **没有互动量的源不可用**
  *   stability  ← **内容一致性**（篇幅是否稳定）※ 仅标题时**不可用**
  *   autonomy   ← 领域集中度（聚焦 vs 泛化）
  *   career     ← 不推断（公开内容看不出职业取向）
@@ -409,14 +418,36 @@ export const interestFromContents = interestsFromTexts;
  *   creation 恒定，最终 24 个判型里 19 个挤在同一型。
  *   所以标记为仅标题时，这三维**留空**，由别的源去补，而不是编一个值。
  *
+ * ⚠️ `noHeat` 的意义（手动导入的微信/QQ/飞书/钉钉必须传 true）：
+ *   私域聊天与工作文档**没有公开互动量**。不标记的话 `heat` 全按 0 算，
+ *   于是所有人的 `social` 都是 1%（"社交连接极弱"）——
+ *   这跟"用标题长度冒充正文"是同一类错误：把"量不到"当成了"量出来很低"。
+ *   标记后该维留空，由知乎（有点赞数）或 SBTI 去补。
+ *
+ * ⚠️ `profile` 的意义（聊天/文档必须传 `"im"`）：
+ *   默认 `"long-form"` 是按**知乎长文**校准的：`learning = 平均字数/600`、
+ *   `creation = 长文(≥120字)比例`。直接套到聊天记录上会出两类问题：
+ *     ① 中文聊天消息天然十几到几十字，`shortRatio` 恒 ≥0.8，
+ *        触发"只有标题"的自动判定 → 三维被整组丢掉（实测就是这么丢的）；
+ *     ② 就算不丢，`平均字数/600` 量到的是"聊天习惯"而不是"学习倾向"。
+ *   所以聊天/文档改用 `"im"`：口径与 distilly 一致（长消息 = >50 字），
+ *   并且**只算量得准的维度**：
+ *     creation  = 1 - 内容重复率（"在说新东西"还是"复读"，无阈值、可比）
+ *     stability = 篇幅一致性（CV，尺度无关）
+ *     autonomy  = 领域集中度
+ *     learning  **留空** —— 需要长文才量得准，聊天里没有这个信号
+ *     social    **留空** —— 见 noHeat
+ *
  * @param contents 该源的内容；条数为 0 时返回 null（**不编造**）
  * @param opts.titleOnly 是否只有标题（缺正文）
+ * @param opts.noHeat 该源是否没有互动量这类连接强度信号
+ * @param opts.profile 内容形态：`long-form`（长文，默认）| `im`（聊天/文档）
  */
 export function facetFromContents(
   source: string,
   label: string,
   contents: SourceContent[],
-  opts: { titleOnly?: boolean } = {},
+  opts: { titleOnly?: boolean; noHeat?: boolean; profile?: "long-form" | "im" } = {},
 ): SourceFacet | null {
   if (contents.length === 0) return null;
 
@@ -441,19 +472,42 @@ export function facetFromContents(
    * 于是又用标题长度算出了 learning=0.03 这种噪声值。
    */
   const looksLikeTitlesOnly = opts.titleOnly === true || shortRatio >= 0.8;
+  const hasHeatSignal = opts.noHeat !== true;
+  const isIm = opts.profile === "im";
+  /**
+   * 对外回报的 `titleOnly`。
+   *
+   * im 口径下恒为 false：聊天消息天然短，`shortRatio` 必然很高，
+   * 那是**正常的聊天习惯**，不是"只拿到了标题"。若照实回报 true，
+   * 界面会念出"该源只提供标题、没有正文"这种错话。
+   */
+  const titleOnlyOut = isIm ? false : looksLikeTitlesOnly;
 
-  const values: Partial<Record<ValueKey, number>> = {
-    /* 与"文本长度"有关的三维：只有确认拿到正文才算，否则留空 */
-    ...(looksLikeTitlesOnly
-      ? {}
-      : {
-          learning: clampDisplay(avgChars / 600),
-          creation: clampDisplay(1 - shortRatio),
-          stability: contentConsistency(lens, avgChars),
-        }),
-    social: clampDisplay(avgHeat / 300),
-    autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
-  };
+  /* 内容重复率：聊天/文档里"复读"占比。无阈值、尺度无关，比"平均字数"可靠 */
+  const repeatRatio =
+    1 - new Set(contents.map((c) => c.text.trim())).size / Math.max(1, n);
+
+  const values: Partial<Record<ValueKey, number>> = isIm
+    ? {
+        /* 说新东西 vs 复读 —— "创造表达"在聊天场景下唯一量得准的代理 */
+        creation: clampDisplay(1 - repeatRatio),
+        stability: contentConsistency(lens, avgChars),
+        ...(hasHeatSignal ? { social: clampDisplay(avgHeat / 300) } : {}),
+        autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+      }
+    : {
+        /* 与"文本长度"有关的三维：只有确认拿到正文才算，否则留空 */
+        ...(looksLikeTitlesOnly
+          ? {}
+          : {
+              learning: clampDisplay(avgChars / 600),
+              creation: clampDisplay(1 - shortRatio),
+              stability: contentConsistency(lens, avgChars),
+            }),
+        /* 没互动量的源（聊天记录 / 工作文档）留空，而不是按 0 算成"社交极弱" */
+        ...(hasHeatSignal ? { social: clampDisplay(avgHeat / 300) } : {}),
+        autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+      };
 
   const top = domains.slice(0, 3);
   /* 结论里出现的百分比同样要收进 [1,99]（产品要求界面不出现 0% / 100%）。
@@ -461,14 +515,44 @@ export function facetFromContents(
      但**旧数据里存着按老逻辑算出的 "100% 为短内容"** —— 加上收口后，
      即使将来阈值调整也不会再写出越界文案。 */
   const shortPct = clampPercent(Math.round(shortRatio * 100)) ?? 50;
-  const summary = looksLikeTitlesOnly
-    ? `${n} 条内容（只有标题、无正文），平均互动 ${Math.round(avgHeat)}；` +
-      `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
-      `表达密度与长文比例需要正文，该源无法提供。`
-    : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${shortPct}% 为短内容）；` +
-      `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
+  const repeatPct = clampPercent(Math.round(repeatRatio * 100)) ?? 50;
 
-  return { source, label, values, itemCount: n, summary, titleOnly: looksLikeTitlesOnly };
+  let summary: string;
+  let partialReason: string | undefined;
+
+  if (isIm) {
+    /* 聊天/文档：把**实际量了什么**写清楚，而不是只给一个维度名 */
+    summary =
+      `${n} 条内容，平均 ${Math.round(avgChars)} 字；` +
+      `其中 ${shortPct}% 是短消息，内容重复率 ${repeatPct}%。` +
+      `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
+    partialReason =
+      "聊天与工作文档天然是短文本：'学习成长'需要长文才量得准，" +
+      "'社交连接'需要互动量（点赞/转发）—— 这两维在私域数据里没有可靠信号，" +
+      "故留空，由知乎或 SBTI 补充。";
+  } else {
+    summary = looksLikeTitlesOnly
+      ? `${n} 条内容（只有标题、无正文），平均互动 ${Math.round(avgHeat)}；` +
+        `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
+        `表达密度与长文比例需要正文，该源无法提供。`
+      : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${shortPct}% 为短内容）；` +
+        `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
+        (hasHeatSignal ? "" : "该源没有互动量，社交连接强度由其它源补充。");
+    if (looksLikeTitlesOnly && !isIm) {
+      partialReason =
+        "该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算。";
+    }
+  }
+
+  return {
+    source,
+    label,
+    values,
+    itemCount: n,
+    summary,
+    titleOnly: titleOnlyOut,
+    ...(partialReason ? { partialReason } : {}),
+  };
 }
 
 /**
