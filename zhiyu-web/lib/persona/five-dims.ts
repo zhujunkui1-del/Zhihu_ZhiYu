@@ -201,7 +201,15 @@ export function dimsFromSbti(
   const unit = (v: { score?: number } | number | undefined): number | null => {
     const score = typeof v === "number" ? v : typeof v?.score === "number" ? v.score : null;
     if (score === null) return null;
-    return Math.max(0.01, Math.min(0.99, (score - 2) / 4));
+    /**
+     * ⚠️ 这里**不做 [0.01, 0.99] 收口**。
+     *
+     * 以前收口了，于是"自评最低档"（原始分 2）被写成 0.01，界面显示「1%」——
+     * 用户的原话是"你不让写 0/100 就整 99 和 1"。那不是数据，那是收口算法。
+     * 现在如实给 0 / 1，由展示层写成「<1%」/「>99%」：
+     * 既不出现绝对化的 0% / 100%，也不假装那一格存在。
+     */
+    return Math.max(0, Math.min(1, (score - 2) / 4));
   };
 
   const values: Partial<Record<DimKey, number>> = {};
@@ -213,9 +221,9 @@ export function dimsFromSbti(
       .filter((x): x is number => x !== null);
     if (!picked.length) continue;
     any = true;
-    /* 自评用**均值**：不放大单题波动 */
+    /* 自评用**均值**：不放大单题波动。同样不收口 —— 如实给 0 / 1 */
     const avg = picked.reduce((s, x) => s + x, 0) / picked.length;
-    values[key] = Math.max(0.01, Math.min(0.99, avg));
+    values[key] = Math.max(0, Math.min(1, avg));
     evidence[key] = `SBTI ${SBTI_TO_DIM[key].join("/")} 折算`;
   }
   return any ? { source: "sbti", values, evidence, unavailable: [] } : null;

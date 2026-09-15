@@ -269,16 +269,44 @@ export default function ImportDataDialog({
 
   const totalSize = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
 
-  const submit = useCallback(async () => {
-    if (files.length === 0) return;
-    setBusy(true);
-    setLocalError("");
-    try {
+  /**
+   * 单次请求的体积上限。
+   *
+   * ⚠️ 为什么是 3.5MB 而不是服务端那个 4MB：**Vercel 单体函数的请求体硬上限是
+   * 4.5MB**（含 multipart 边界与头），而且这个限制在**我们的代码之前**就生效 ——
+   * 超了直接返回纯文本 413 `FUNCTION_PAYLOAD_TOO_LARGE`，
+   * 我们写在 route 里的"合计超过 4MB，请分批导入"根本来不及执行
+   * （实测用户看到的就是那句 `服务器返回的不是 JSON（HTTP 413）`）。
+   * 所以客户端必须自己先卡住，并且留出 multipart 开销余量。
+   */
+  const UPLOAD_BUDGET = 3.5 * 1024 * 1024;
+
+  /** 把一批文件按体积切成多批（每批 ≤ 预算），保持原顺序 */
+  const planBatches = useCallback((list: File[]): File[][] => {
+    const batches: File[][] = [];
+    let cur: File[] = [];
+    let size = 0;
+    for (const f of list) {
+      if (cur.length && size + f.size > UPLOAD_BUDGET) {
+        batches.push(cur);
+        cur = [];
+        size = 0;
+      }
+      cur.push(f);
+      size += f.size;
+    }
+    if (cur.length) batches.push(cur);
+    return batches;
+  }, []);
+
+  /** 单批上传（抽出来是为了分批时复用同一段容错逻辑） */
+  const uploadBatch = useCallback(
+    async (batch: File[], batchMode: "replace" | "append"): Promise<ImportFileResult> => {
       const fd = new FormData();
       fd.append("source", source);
       fd.append("personaId", personaId);
-      fd.append("mode", mode);
-      for (const f of files) fd.append("file", f);
+      fd.append("mode", batchMode);
+      for (const f of batch) fd.append("file", f);
       if (selfName.trim()) fd.append("selfName", selfName.trim());
 
       const res = await fetch("/api/import", {
@@ -290,35 +318,84 @@ export default function ImportDataDialog({
       /**
        * ⚠️ 先取文本再解析，不能直接 `res.json()`。
        *
-       * 实测：serverless/route handler 抛未捕获异常或请求被平台拦下时，
-       * 响应体**是空的**，`res.json()` 只会抛
-       * "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
-       * —— 用户看到的就是这行英文，完全不知道发生了什么。
-       * 这里把状态码与响应片段如实带出来，至少能定位。
+       * 实测：serverless/route handler 抛未捕获异常、或请求被平台拦下时，
+       * 响应体**是空的或纯文本**，`res.json()` 只会抛
+       * "Unexpected end of JSON input" —— 用户看到一行英文，完全不知道发生了什么。
        */
       const raw = await res.text();
-      let r: ImportFileResult;
+
+      /* 413 单独翻成人话：这是**平台**拦下的，不是我们拒的 */
+      if (res.status === 413) {
+        const mb = (batch.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(1);
+        return {
+          ok: false,
+          error:
+            `这一批 ${mb}MB，超过单次请求上限（Vercel 函数 4.5MB）。` +
+            `数据未写入。请减少文件数量、或先把大导出按月/按会话拆分再导入。`,
+        };
+      }
+
       if (!raw) {
-        r = {
+        return {
           ok: false,
           error:
             `服务器返回了空响应（HTTP ${res.status}）—— ` +
             `通常是文件太大、处理超时或服务端出错。数据未写入，可以重试；` +
             `若文件很大，请先按月/按会话拆分再导入。`,
         };
-      } else {
-        try {
-          r = JSON.parse(raw) as ImportFileResult;
-        } catch {
-          r = {
-            ok: false,
-            error: `服务器返回的不是 JSON（HTTP ${res.status}）：${raw.slice(0, 160)}`,
-          };
+      }
+      try {
+        return JSON.parse(raw) as ImportFileResult;
+      } catch {
+        return {
+          ok: false,
+          error:
+            `服务器返回的不是 JSON（HTTP ${res.status}）：${raw.slice(0, 160)}` +
+            (res.status >= 500 ? "。数据未写入，可以重试。" : ""),
+        };
+      }
+    },
+    [source, personaId, selfName],
+  );
+
+  const submit = useCallback(async () => {
+    if (files.length === 0) return;
+    setBusy(true);
+    setLocalError("");
+    try {
+      const batches = planBatches(files);
+      /**
+       * 多批时，**第一批用用户选的 mode、后续一律 append**：
+       * replace 的语义是"先删该源旧证据再写新的"，跑到第二批就会把第一批刚写进去的
+       * 删掉（这正是 append 存在的意义 —— 只加不删）。界面会如实告知分了几批。
+       */
+      let last: ImportFileResult | null = null;
+      for (let i = 0; i < batches.length; i += 1) {
+        const isFirst = i === 0;
+        const r = await uploadBatch(batches[i], isFirst ? mode : "append");
+        if (!r.ok) {
+          /* 中途失败：把已经写进去的批次数说清楚，不让用户以为全丢了 */
+          setResult({
+            ...r,
+            error:
+              (i > 0 ? `已完成 ${i}/${batches.length} 批。` : "") + (r.error ?? "导入失败"),
+          } as ImportFileResult);
+          setBusy(false);
+          return;
         }
+        last = r;
       }
 
-      setResult(r);
-      if (r.ok) onImported(r);
+      setResult(last);
+      if (last?.ok) {
+        if (batches.length > 1) {
+          setLocalError(
+            `文件较大，已自动分成 ${batches.length} 批导入（全部成功）。` +
+              `后 ${batches.length - 1} 批按"追加"写入，不会覆盖前面的数据。`,
+          );
+        }
+        onImported(last);
+      }
     } catch (e) {
       setLocalError(`上传失败：${(e as Error).message}`);
     } finally {

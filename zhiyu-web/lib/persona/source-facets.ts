@@ -370,7 +370,29 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
   }
   for (const [source, items] of evidenceBySource) {
     const set = dimsFromItems(source, items);
-    if (set) dimSets.push(set);
+    if (!set) continue;
+    /**
+     * 从库里现算时**拿不到发送方向**（证据表只存了我发的内容），所以
+     * 执行力/主动性本来会是空的。但同一个源可能已经存了 `behavior:<source>`
+     * —— 那份是导入时用**双方 + 时间戳**算的，正好能补这两维。
+     *
+     * 实测：食堂泼辣酱的 wechat 有 `behavior.initiative = 92/233 段`，
+     * 但五维里主动性却显示 1%（只有 SBTI 自评在说话）—— 就是缺了这一步。
+     */
+    const b = behaviorFacets.find((f) => f.source === source);
+    if (b) {
+      if (typeof b.variables.initiative === "number" && typeof set.values.initiative !== "number") {
+        set.values.initiative = b.variables.initiative;
+        set.evidence.initiative = b.evidence.initiative ?? "导入时的对话段统计";
+        set.unavailable = set.unavailable.filter((u) => u.key !== "initiative");
+      }
+      if (typeof b.variables.activeDays === "number" && typeof set.values.execution !== "number") {
+        set.values.execution = b.variables.activeDays;
+        set.evidence.execution = b.evidence.activeDays ?? "导入时的活跃天统计";
+        set.unavailable = set.unavailable.filter((u) => u.key !== "execution");
+      }
+    }
+    dimSets.push(set);
   }
 
   const sbtiDims = dimsFromSbti(
