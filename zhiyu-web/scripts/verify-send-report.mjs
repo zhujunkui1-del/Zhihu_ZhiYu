@@ -253,6 +253,22 @@ try {
     );
     rec("第二次送出回报 alreadySent（幂等，不堆通知）", res.second?.alreadySent === true, JSON.stringify(res.second));
     rec("收件箱里仍然只有 1 条", delivered.length === 1);
+
+    /* 收件人点开这条通知时，服务端必须能给出**以他为视角**的报告
+       （否则对方点「查看」会看到"我是对方"或直接 404）。这里直接调装配函数验。 */
+    const { buildReportView } = await import("../lib/agent-match.ts");
+    const asRecipient = await buildReportView(tmpMatch.id, other.id);
+    rec(
+      "以**收件人**视角装配报告：me 是他、counterpart 是发件人",
+      asRecipient?.me?.id === other.id && asRecipient?.counterpart?.id === demo.personaId,
+      asRecipient ? `me=${asRecipient.me.displayName} counterpart=${asRecipient.counterpart.displayName}` : "拿不到报告",
+    );
+    const asSender = await buildReportView(tmpMatch.id, demo.personaId);
+    rec(
+      "以**发件人**视角装配报告：方向相反（同一条匹配不会两处显示同一个人）",
+      asSender?.me?.id === demo.personaId && asSender?.counterpart?.id === other.id,
+      asSender ? `me=${asSender.me.displayName} counterpart=${asSender.counterpart.displayName}` : "拿不到报告",
+    );
   }
 
   /* ── ③ 收件人视角：造一条投递给"我"，检查通知页两个标签 + 弹窗无按钮 ── */
