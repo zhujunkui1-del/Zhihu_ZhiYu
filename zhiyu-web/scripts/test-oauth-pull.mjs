@@ -200,6 +200,47 @@ rec(
   [...new Set(fd.items.map((i) => i.trait))].join(" ｜ "),
 );
 
+/* ── ②b 飞书私聊：用户给的 oc_ 会话 ID 也要一起拉 ───────────────────── */
+console.log("\n== ②b 飞书私聊（官方文档：/im/v1/messages 对单聊同样有效）==");
+routes.length = 0;
+calls.length = 0;
+
+on("/im/v1/chats", { data: { items: [{ chat_id: "oc_group", name: "产品组" }] } });
+const msgsFor = (text) => ({
+  data: {
+    items: [
+      {
+        msg_type: "text",
+        sender: { id: "ou_me", sender_type: "user" },
+        body: { content: JSON.stringify({ text }) },
+      },
+    ],
+    has_more: false,
+  },
+});
+on("container_id=oc_group", msgsFor("群里的发言，够长可以当证据用的一句话"));
+on("container_id=oc_p2pAAA111", msgsFor("私聊里的发言，也够长可以当证据用的一句话"));
+on("container_id=oc_p2pBBB222", msgsFor("另一个私聊的发言，同样够长可以当证据的一句话"));
+
+const withP2p = await feishuPullMessages("tok", "ou_me", {
+  /* 真实 chat_id 是 oc_ + 字母数字（不含下划线），测试数据照真实形状来 */
+  extraChatIds: ["oc_p2pAAA111", "oc_p2pBBB222", "  垃圾输入  ", "oc_p2pAAA111"],
+});
+rec("私聊会话也被遍历到了", withP2p.p2p === 2, `p2p=${withP2p.p2p}`);
+rec(
+  "私聊的发言确实进了证据，并标注为「私聊」",
+  withP2p.items.filter((i) => i.trait.includes("私聊")).length === 2,
+  withP2p.items.map((i) => i.trait).join(" ｜ "),
+);
+rec(
+  "非法输入（不是 oc_ 开头）被丢掉、重复的只算一次",
+  withP2p.p2p === 2,
+);
+rec(
+  "群聊那一份也照常拉到（没有因为加私聊而漏掉）",
+  withP2p.items.some((i) => i.trait.includes("产品组")),
+);
+
 /* ── ③ 钉钉：文档 + 多维表格 ───────────────────────────────────────── */
 console.log("\n== ③ 钉钉：文档正文 + 多维表格（之前完全没做这块）==");
 routes.length = 0;
@@ -311,12 +352,17 @@ rec(
   PROVIDER_META.feishu.capability.canPull.join("；"),
 );
 rec(
-  "⚠️ 飞书**不再声称含私聊**，并如实写明私聊拉不到及原因",
-  !PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("含私聊")) &&
-    PROVIDER_META.feishu.capability.cannotPull.some((c) => c.what.includes("私聊")),
-  PROVIDER_META.feishu.capability.cannotPull.map((c) => c.what).join("；"),
+  "⚠️ 飞书能力声明已更新为「私聊也能拉，但要你从飞书客户端复制会话 ID」",
+  PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("私聊")) &&
+    PROVIDER_META.feishu.capability.cannotPull.length === 0,
+  PROVIDER_META.feishu.capability.canPull.join("；"),
 );
 rec(
+  "⚠️ scope 含用户身份读消息的两个补充权限（漏了就「授权成功但读不到」）",
+  PROVIDER_META.feishu.scope.includes("im:message.group_msg:get_as_user") &&
+    PROVIDER_META.feishu.scope.includes("im:message.p2p_msg:get_as_user"),
+  PROVIDER_META.feishu.scope,
+);rec(
   "钉钉如实声明「消息拉不到」",
   PROVIDER_META.dingtalk.capability.cannotPull.some((c) => c.what.includes("消息")),
 );

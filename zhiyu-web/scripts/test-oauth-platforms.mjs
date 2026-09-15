@@ -40,10 +40,14 @@ console.log("\n== 能力声明：能拉什么、拉不到什么，必须写清�
 for (const p of OAUTH_PROVIDERS) {
   const m = PROVIDER_META[p];
   rec(`${p} 声明了能拉到的数据`, m.capability.canPull.length > 0, m.capability.canPull.join("；"));
+  /* "拉不到什么"不必强行非空：飞书现在**五项全都能拉**（群聊/私聊/文档/Wiki/表格），
+     硬凑一条假的限制反而是另一种不诚实。这里改成"只要写了就得说清原因"。 */
   rec(
-    `${p} 声明了"拉不到什么"（不隐瞒才是真引导）`,
-    m.capability.cannotPull.length > 0,
-    m.capability.cannotPull.map((c) => c.what).join("；"),
+    `${p} 若声明了限制，必须给出原因（不隐瞒也不硬凑）`,
+    m.capability.cannotPull.every((c) => c.what && c.why && c.why.length > 10),
+    m.capability.cannotPull.length
+      ? m.capability.cannotPull.map((c) => c.what).join("；")
+      : "（飞书无限制项）",
   );
   rec(`${p} 给了配置步骤`, m.setupSteps.length >= 3, `${m.setupSteps.length} 步`);
   rec(
@@ -67,15 +71,16 @@ rec(
   PROVIDER_META.feishu.capability.canPull.join("；"),
 );
 rec(
-  "⚠️ 飞书如实声明「私聊拉不到」并给出原因（不再写「含私聊」这种假话）",
-  PROVIDER_META.feishu.capability.cannotPull.some((c) => c.what.includes("私聊")) &&
-    !PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("含私聊")),
-  PROVIDER_META.feishu.capability.cannotPull.map((c) => c.what).join("；"),
+  "⚠️ 飞书声明**私聊也能拉**（官方文档：/im/v1/messages 支持单聊），并说明要用户提供会话 ID",
+  PROVIDER_META.feishu.capability.canPull.some(
+    (x) => x.includes("私聊") && x.includes("会话 ID"),
+  ) && !PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("含私聊")),
+  PROVIDER_META.feishu.capability.canPull.join("；"),
 );
 rec(
-  "飞书 scope 覆盖本轮新增的云文档能力",
-  ["docx:document", "wiki:wiki", "bitable:app"].every((s) =>
-    PROVIDER_META.feishu.scope.includes(s),
+  "飞书 scope 覆盖云文档 + 用户身份读消息的两个补充权限",
+  ["docx:document", "wiki:wiki", "bitable:app", "im:message.group_msg:get_as_user", "im:message.p2p_msg:get_as_user"].every(
+    (s) => PROVIDER_META.feishu.scope.includes(s),
   ),
   PROVIDER_META.feishu.scope,
 );

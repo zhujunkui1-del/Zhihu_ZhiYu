@@ -20,7 +20,7 @@ import {
   type PulledItem,
 } from "./clients";
 import { PROVIDER_META, type OAuthProvider } from "./platforms";
-import { readAccessToken } from "./store";
+import { readAccessToken, readP2pChatIds } from "./store";
 import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
 import { topEvidence, type ImportItem, type ImportSource } from "@/lib/import/parse";
@@ -61,16 +61,18 @@ async function pull(
   token: string,
   externalId: string | null,
   displayName: string | null,
+  p2pChatIds: string[],
 ): Promise<{ items: PulledItem[]; detail: Record<string, unknown> }> {
   if (provider === "feishu") {
-    /* ① 群聊消息（私聊飞书不提供列表接口，见 platforms.ts 的说明）
+    /* ① 消息：群聊（/im/v1/chats）+ 用户提供了 ID 的私聊
        ② 云文档：文档 / Wiki / 多维表格 —— 调用链与 distilly 一致 */
-    const msgs = await feishuPullMessages(token, externalId ?? "");
+    const msgs = await feishuPullMessages(token, externalId ?? "", { extraChatIds: p2pChatIds });
     const docs = await feishuPullDocs(token, externalId ?? "", displayName ?? "");
     return {
       items: [...msgs.items, ...docs.items],
       detail: {
         chats: msgs.chats,
+        p2p: msgs.p2p,
         scanned: msgs.scanned,
         messages: msgs.items.length,
         docs: docs.docs,
@@ -143,10 +145,13 @@ export async function syncProvider(
     );
   }
 
+  /* 用户手工提供的私聊会话 ID（飞书专属；没有就是空数组） */
+  const p2pChatIds = await readP2pChatIds(userId, provider);
+
   let pulled: PulledItem[];
   let detail: Record<string, unknown>;
   try {
-    const r = await pull(provider, auth.token, auth.externalId, auth.displayName);
+    const r = await pull(provider, auth.token, externalId, displayName, p2pChatIds);
     pulled = r.items;
     detail = r.detail;
   } catch (e) {

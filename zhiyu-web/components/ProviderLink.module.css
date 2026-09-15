@@ -26,3 +26,59 @@
   overflow: hidden;
   word-break: break-word;
 }
+
+/* 「私聊」入口：平时只是一个文字链接，不占版面 */
+.linkBtn {
+  order: 1;
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 2px 8px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.linkBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+/* 私聊会话 ID 的输入面板：整行 */
+.p2p {
+  order: 3;
+  flex: 1 0 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 253, 246, 0.8);
+}
+.p2pHint {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.p2pInput {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  resize: vertical;
+}
+.p2pInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.p2pBtns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

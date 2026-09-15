@@ -159,23 +159,32 @@ function feishuMessageText(body: unknown): string {
 }
 
 /**
- * 拉取飞书**群聊**消息。
+ * 拉取飞书消息（群聊 + 用户指定的私聊）。
  *
  * 只留**我自己发的**消息：`sender.sender_type === "user"` 且 `sender.id` 等于我的 open_id。
- * 群里别人的话不算我的人格（与手动导入只留自己发的内容同一口径）。
+ * 别人的话不算我的人格（与手动导入只留自己发的内容同一口径）。
  *
- * ⚠️ 这里**只覆盖群聊**。`GET /im/v1/chats` 不返回私聊会话（飞书平台限制，
- * distilly 的注释里也写着这一点），私聊需要"发消息换 chat_id"的打扰式做法，
- * 本站不做 —— 见 lib/oauth/platforms.ts 的 cannotPull 说明。
+ * ── 群聊 ──
+ * 从 `GET /im/v1/chats` 拿会话列表。
+ * ⚠️ 该接口**只返回群聊**，不返回私聊（飞书平台限制）。
  *
- * 分页按 distilly 的默认量级取（`--msg-limit 1000`）：之前只取
- * 10 个会话 × 50 条，样本太小、人格画像会失真。
+ * ── 私聊 ──
+ * 官方文档《群 ID 说明》给了两条取 chat_id 的路：
+ *   ① 飞书客户端（≥7.60）打开该私聊 → 右上角设置 → 直接看/复制群 ID；
+ *   ② 让机器人给对方发一条消息，从响应里拿 chat_id（会在对方聊天框留痕）。
+ * 本站走 ①：用户在页面上把 `oc_...` 粘进来，**零打扰**，也不需要机器人能力。
+ * 拿到 chat_id 后，`GET /im/v1/messages?container_id_type=chat&container_id=…`
+ * 对单聊同样有效（官方文档：「包括单聊、群组」）。
+ *
+ * ⚠️ 权限（官方文档明写，漏了就"授权成功但读不到"）：
+ *   基础 `im:message`；读群聊再加 `im:message.group_msg:get_as_user`；
+ *   读单聊再加 `im:message.p2p_msg:get_as_user`。
  */
 export async function feishuPullMessages(
   accessToken: string,
   myOpenId: string,
-  opts: { maxChats?: number; maxTotalMessages?: number } = {},
-): Promise<{ items: PulledItem[]; chats: number; scanned: number }> {
+  opts: { maxChats?: number; maxTotalMessages?: number; extraChatIds?: string[] } = {},
+): Promise<{ items: PulledItem[]; chats: number; scanned: number; p2p: number }> {
   const maxChats = opts.maxChats ?? 20;
   /* 总量上限，与 distilly 的 --msg-limit 1000 对齐 */
   const maxTotal = opts.maxTotalMessages ?? 1000;
@@ -187,21 +196,32 @@ export async function feishuPullMessages(
   const chatList = ((chatsJson.data ?? {}) as Record<string, unknown>).items;
   const chats = Array.isArray(chatList) ? (chatList as Record<string, unknown>[]) : [];
 
+  /* 群聊 + 用户给的私聊，统一成 {id, label} 列表后一起翻页 */
+  const targets: { id: string; label: string; isP2p: boolean }[] = [];
+  for (const c of chats.slice(0, maxChats)) {
+    const id = pickStr(c, "chat_id");
+    if (id) targets.push({ id, label: `群「${pickStr(c, "name") || "会话"}」`, isP2p: false });
+  }
+  const extra = (opts.extraChatIds ?? [])
+    .map((s) => s.trim())
+    .filter((s) => /^oc_[A-Za-z0-9]+$/.test(s));
+  for (const id of [...new Set(extra)]) {
+    targets.push({ id, label: "私聊", isP2p: true });
+  }
+
   const items: PulledItem[] = [];
   let scanned = 0;
+  let p2p = 0;
 
-  for (const c of chats.slice(0, maxChats)) {
-    const chatId = pickStr(c, "chat_id");
-    if (!chatId) continue;
-    const name = pickStr(c, "name") || "会话";
-
-    /* 逐页翻，直到取满本会话配额或没有下一页 */
+  for (const t of targets) {
+    if (t.isP2p) p2p += 1;
+    /* 逐页翻，直到取满总配额或没有下一页 */
     let pageToken = "";
-    let got = 0;
     while (scanned < maxTotal) {
       const url =
-        `${FEISHU_BASE}/im/v1/messages?container_id_type=chat&container_id=${encodeURIComponent(chatId)}` +
-        `&page_size=${PAGE}${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ""}`;
+        `${FEISHU_BASE}/im/v1/messages?container_id_type=chat&container_id=${encodeURIComponent(t.id)}` +
+        `&page_size=${PAGE}&sort_type=ByCreateTimeDesc` +
+        `${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ""}`;
       const msgRes = await fetch(url, { headers });
       const msgJson = await readJson(msgRes);
       const data = (msgJson.data ?? {}) as Record<string, unknown>;
@@ -218,18 +238,16 @@ export async function feishuPullMessages(
         if (msgType && msgType !== "text" && msgType !== "post") continue;
         const text = feishuMessageText(m.body).trim();
         if (text.length < 2) continue;
-        items.push({ text, trait: `飞书 · 群「${name}」`.slice(0, 40), url: null });
-        got += 1;
+        items.push({ text, trait: `飞书 · ${t.label}`.slice(0, 40), url: null });
       }
 
       const hasMore = data.has_more === true;
       pageToken = pickStr(data, "page_token");
       if (!hasMore || !pageToken) break;
-      void got;
     }
   }
 
-  return { items, chats: chats.length, scanned };
+  return { items, chats: chats.length, scanned, p2p };
 }
 
 /* ── 飞书云文档（文档 / Wiki / 多维表格）────────────────────────────────

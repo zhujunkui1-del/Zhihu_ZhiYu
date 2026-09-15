@@ -62,20 +62,15 @@ export const PROVIDER_META: Record<OAuthProvider, ProviderMeta> = {
     provider: "feishu",
     label: "飞书",
     connectLabel: "授权飞书并同步",
-    summary: "授权后，网站会以你自己的身份读取你的飞书群聊消息与云文档，用于生成你的人格画像。",
+    summary: "授权后，网站会以你自己的身份读取你的飞书群聊、私聊与云文档，用于生成你的人格画像。",
     capability: {
       canPull: [
         "你所在**群聊**里你发出的消息",
+        "你指定的**私聊**里你发出的消息（需要你从飞书客户端复制会话 ID）",
         "你的飞书文档与 Wiki 正文",
         "你的多维表格记录",
       ],
-      cannotPull: [
-        {
-          what: "**私聊**消息",
-          why:
-            "飞书没有「列出我的私聊」接口 —— `GET /im/v1/chats` 只返回群聊，这是平台限制。distilly 的办法是「向对方发一条消息、从返回值里取 chat_id」，那会在对方聊天框里留痕，属于打扰行为，本站不擅自做。",
-        },
-      ],
+      cannotPull: [],
     },
     setupSteps: [
       "打开飞书开放平台 → 开发者后台 → 创建「企业自建应用」",
@@ -89,8 +84,16 @@ export const PROVIDER_META: Record<OAuthProvider, ProviderMeta> = {
       redirectUri: "FEISHU_OAUTH_REDIRECT_URI",
     },
     consoleUrl: "https://open.feishu.cn/app",
+    /**
+     * ⚠️ 用户身份读消息必须带"补充权限"，这是官方文档明写的：
+     *   · 基础：im:message（或 im:message:readonly）
+     *   · 读**群聊**消息：+ im:message.group_msg:get_as_user
+     *   · 读**单聊**消息：+ im:message.p2p_msg:get_as_user
+     * 漏了补充权限的表现就是"授权成功但读不到消息"（我第一版就漏了）。
+     */
     scope:
-      "im:message im:chat search:message docx:document:readonly wiki:wiki:readonly bitable:app:readonly",
+      "im:message im:message.group_msg:get_as_user im:message.p2p_msg:get_as_user " +
+      "im:chat search:message docx:document:readonly wiki:wiki:readonly bitable:app:readonly",
   },
   dingtalk: {
     provider: "dingtalk",

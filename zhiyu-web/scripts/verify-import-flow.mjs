@@ -922,6 +922,64 @@ rec(
   `${wizard?.chars} 字`,
 );
 
+/* ── 飞书「私聊」入口：粘贴 oc_ 会话 ID（官方文档给的零打扰取法）── */
+const p2pUi = await page.evaluate(async () => {
+  const btn = document.querySelector('[data-provider-link="feishu"] [data-provider-p2p]');
+  if (!btn) return { exists: false };
+  btn.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const panel = document.querySelector("[data-provider-p2p-panel]");
+  const input = document.querySelector("[data-provider-p2p-input]");
+  const save = document.querySelector("[data-provider-p2p-save]");
+  return {
+    exists: true,
+    label: btn.textContent.trim(),
+    panel: Boolean(panel),
+    hint: panel?.textContent?.replace(/\s+/g, " ").trim().slice(0, 60) ?? "",
+    input: Boolean(input),
+    save: Boolean(save),
+  };
+});
+rec("飞书卡片有「私聊」入口", p2pUi.exists, p2pUi.label);
+rec(
+  "点开是极简输入面板（一句提示 + 输入框 + 保存）",
+  p2pUi.panel && p2pUi.input && p2pUi.save,
+  p2pUi.hint,
+);
+rec(
+  "提示写明了从哪取（飞书客户端 → 右上角设置 → 群 ID）",
+  p2pUi.hint.includes("右上角") || p2pUi.hint.includes("群 ID"),
+  p2pUi.hint,
+);
+
+/* 保存私聊 ID：本地演示用户**没有**飞书授权，所以预期是明确的 NOT_LINKED，
+   而不是 500 空响应（那正是上一版的问题：前端只报 "Unexpected end of JSON input"）。 */
+const p2pSave = await page.evaluate(async () => {
+  const r = await fetch("/api/oauth/feishu/p2p", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: ["不是ID", "oc_selftestAAA111"] }),
+  });
+  const text = await r.text();
+  let j = null;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    /* 保留 text 供断言打印 */
+  }
+  return { status: r.status, body: j, raw: text.slice(0, 120) };
+});
+rec(
+  "⚠️ 未授权时保存私聊 ID：返回**明确错误**而不是空响应",
+  p2pSave.status === 409 && p2pSave.body?.code === "NOT_LINKED",
+  `HTTP ${p2pSave.status} ${p2pSave.body?.error ?? p2pSave.raw}`,
+);
+rec(
+  "错误文案告诉用户下一步做什么（先授权）",
+  String(p2pSave.body?.error ?? "").includes("授权"),
+  p2pSave.body?.error,
+);
+
 /* 填了凭证要能存下来（存完会自动跳授权，这里只验证保存接口本身） */
 const saveRes = await page.evaluate(async () => {
   const r = await fetch("/api/oauth/app", {

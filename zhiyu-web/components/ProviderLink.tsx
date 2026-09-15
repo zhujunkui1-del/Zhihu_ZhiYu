@@ -47,7 +47,12 @@ export default function ProviderLink({
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  /** 飞书：私聊会话 ID 的输入面板（可选，不填就只同步群聊） */
+  const [p2pOpen, setP2pOpen] = useState(false);
+  const [p2pText, setP2pText] = useState("");
+  const [p2pSaved, setP2pSaved] = useState<string[]>([]);
 
+  /** 读"配没配 / 授权没授权"（决定按钮点下去是弹向导、跳授权页还是直接同步） */
   const load = useCallback(async () => {
     try {
       const r = (await fetch("/api/oauth/status").then((x) => x.json())) as {
@@ -60,9 +65,67 @@ export default function ProviderLink({
     }
   }, [provider]);
 
+  const loadP2p = useCallback(async () => {
+    if (provider !== "feishu") return;
+    try {
+      const r = (await fetch("/api/oauth/feishu/p2p").then((x) => x.json())) as {
+        ok: boolean;
+        p2pChatIds?: string[];
+      };
+      if (r.ok) {
+        setP2pSaved(r.p2pChatIds ?? []);
+        setP2pText((r.p2pChatIds ?? []).join("\n"));
+      }
+    } catch {
+      /* 拿不到就不显示这块，不影响主流程 */
+    }
+  }, [provider]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadP2p();
+  }, [load, loadP2p]);
+
+  const saveP2p = useCallback(async () => {
+    setBusy(true);
+    try {
+      const ids = p2pText
+        .split(/[\s,，;；]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const r = (await fetch("/api/oauth/feishu/p2p", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
+        body: JSON.stringify({ ids }),
+      }).then((x) => x.json())) as {
+        ok: boolean;
+        error?: string;
+        p2pChatIds?: string[];
+        dropped?: string[];
+      };
+
+      /* 未授权时后端回 409 NOT_LINKED —— 要把那句话原样说给用户，
+         不能显示成"已保存 0 个"（那等于骗人）。 */
+      if (!r.ok) {
+        setNote(r.error ?? "保存失败");
+        return;
+      }
+
+      const saved = r.p2pChatIds ?? [];
+      setP2pSaved(saved);
+      setP2pText(saved.join("\n"));
+      setNote(
+        r.dropped?.length
+          ? `已保存 ${saved.length} 个；有 ${r.dropped.length} 个格式不对被忽略（要是 oc_ 开头）`
+          : `已保存 ${saved.length} 个私聊会话`,
+      );
+      setP2pOpen(false);
+    } catch (e) {
+      setNote(`保存失败：${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [p2pText]);
 
   /* 授权回来时带上结果（callback 会顺手同步），直接展示，省一次点击 */
   useEffect(() => {
@@ -168,9 +231,57 @@ export default function ProviderLink({
       >
         {busy ? "同步中…" : "同步数据"}
       </button>
-      <span className={styles.state} data-provider-state-text="1">
+
+      {/* 飞书：私聊会话 ID（可选）。平时只占一个字链接，点开才出现输入框 */}
+      {provider === "feishu" ? (
+        <button
+          type="button"
+          className={styles.linkBtn}
+          data-provider-p2p="1"
+          onClick={() => setP2pOpen((v) => !v)}
+        >
+          私聊{p2pSaved.length ? ` ${p2pSaved.length}` : ""}
+        </button>
+      ) : null}
+
+      <span className={styles.state} data-provider-state-text="1" title={note || state}>
         {note || state}
       </span>
+
+      {p2pOpen ? (
+        <div className={styles.p2p} data-provider-p2p-panel="1">
+          <p className={styles.p2pHint}>
+            飞书里打开那个私聊 → 右上角设置 → 复制「群 ID」，粘到这里（一行一个）
+          </p>
+          <textarea
+            className={styles.p2pInput}
+            rows={3}
+            placeholder="oc_xxxxxxxxxxxxxxxx"
+            value={p2pText}
+            onChange={(e) => setP2pText(e.target.value)}
+            data-provider-p2p-input="1"
+          />
+          <span className={styles.p2pBtns}>
+            <button
+              type="button"
+              className="btn btnSecondary btnSm"
+              onClick={() => setP2pOpen(false)}
+              disabled={busy}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="btn btnPrimary btnSm"
+              onClick={() => void saveP2p()}
+              disabled={busy}
+              data-provider-p2p-save="1"
+            >
+              保存
+            </button>
+          </span>
+        </div>
+      ) : null}
     </span>
   );
 }
