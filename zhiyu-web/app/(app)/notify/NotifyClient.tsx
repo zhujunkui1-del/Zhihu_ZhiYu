@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { NotifyData, NotifyCategory } from "@/lib/notify";
 import { formatListTime } from "@/lib/datetime";
 import { reportError, reportSuccess } from "@/lib/client/error-bus";
+import MatchReportModal from "@/components/MatchReportModal";
 import styles from "./notify.module.css";
 
 type Tab = "all" | NotifyCategory;
@@ -36,11 +36,12 @@ export default function NotifyClient({
   userId: string;
   personaId: string;
 }) {
-  const router = useRouter();
   const [tab, setTab] = useState<Tab>("all");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [markedAll, setMarkedAll] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** 要就地打开哪一场匹配报告；null = 不显示弹窗 */
+  const [reportMatchId, setReportMatchId] = useState<string | null>(null);
 
   const isRead = (id: string, read: boolean) => read || markedAll || readIds.has(id);
 
@@ -53,11 +54,19 @@ export default function NotifyClient({
     ? 0
     : data.items.filter((i) => !i.read && !readIds.has(i.id)).length;
 
-  /** 打开一条：先标为已读（本地即时反馈），再跳转 */
+  /**
+   * 点一条通知。
+   *
+   * ⚠️ **不跳页**（用户强调过）：以前这里 `router.push("/agent-match?matchId=…")`，
+   * 点「再看一次」会跳走。现在改为**在当前页面就地弹出该场匹配报告**。
+   *
+   * 通知里只有 matchId，没有报告内容，所以交给 MatchReportModal 按 id 自己拉
+   * （复用与 Agent 匹配页同一份报告装配逻辑，数字与理由不会两处不一致）。
+   */
   const open = async (id: string, matchId: string | null) => {
     setReadIds((s) => new Set(s).add(id));
     if (!matchId) return;
-    router.push(`/agent-match?matchId=${matchId}&personaId=${personaId}`);
+    setReportMatchId(matchId);
   };
 
   const markAll = async () => {
@@ -217,6 +226,13 @@ export default function NotifyClient({
           这里只出现两类：你发起的 Agent 对话完成，以及别人（在你允许的前提下）发来的匹配报告。
         </div>
       </section>
+
+      {/* 就地打开匹配报告（不跳「Agent 匹配」页）。
+          点「再看一次」时用 matchId 拉取，复用与那页同一份装配逻辑。 */}
+      <MatchReportModal
+        matchId={reportMatchId}
+        onClose={() => setReportMatchId(null)}
+      />
     </>
   );
 }

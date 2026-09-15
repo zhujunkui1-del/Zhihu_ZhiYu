@@ -191,6 +191,12 @@ export interface SourceFacet {
   itemCount: number;
   /** 该源的一句话结论 */
   summary: string;
+  /**
+   * 是否只有标题、没有正文。
+   * 为 true 时 `values` 里不含依赖文本长度的那几维（学习/创造/稳定），
+   * 因为标题长度不携带表达特征 —— 缺就如实缺着，不用噪声凑数。
+   */
+  titleOnly?: boolean;
 }
 
 /** 某个源的一条内容（正文 + 互动量），用于按源解析 */
@@ -235,26 +241,29 @@ export const interestFromContents = interestsFromTexts;
 /**
  * 从**一批内容**按源解析出该源的六维与结论。
  *
- * 每一维都由可观测信号推断，不是打分拍的：
- *   learning   ← 平均字数（表达密度）
- *   creation   ← 长文比例（原创长文 vs 转发短评）
- *   social     ← 平均互动（与人连接的强度）
- *   stability  ← **内容一致性**（篇幅是否稳定），见下方说明
+ * 每一维都由可观测信号推断：
+ *   learning   ← 平均字数（表达密度）　　　※ 仅标题时**不可用**
+ *   creation   ← 长文比例　　　　　　　　　※ 仅标题时**不可用**
+ *   social     ← 平均互动（连接强度）
+ *   stability  ← **内容一致性**（篇幅是否稳定）※ 仅标题时**不可用**
  *   autonomy   ← 领域集中度（聚焦 vs 泛化）
- *   career     ← 不推断（公开内容看不出职业取向），留空由别的源补
+ *   career     ← 不推断（公开内容看不出职业取向）
  *
- * ⚠️ `stability` 曾经写成"条数 / 20"，实测**严重饱和**：26 个真实用户里
- * 22 个都拿到 1.00（因为抓取上限就是 30 条，人人一样），这一维等于没有信息，
- * 还把判定结果整体推向原型里 stability 最高的「务实执行型」。
- * 改成量**内容一致性**：篇幅忽长忽短的用 1 个标准差衡量。
- * 它才是"稳定输出"的可观测代理，而且不随抓取条数上限变化。
+ * ⚠️ `titleOnly` 的意义（知乎源必须传 true）：
+ *   开放平台的 `contents` 只返回标题，**没有正文**。若拿标题长度去算
+ *   "表达密度/长文比例/内容一致性"，量到的是标题长度（几乎恒定），
+ *   等于用噪声当特征 —— 实测就出过这个事故：所有人的 learning 都是 0.03、
+ *   creation 恒定，最终 24 个判型里 19 个挤在同一型。
+ *   所以标记为仅标题时，这三维**留空**，由别的源去补，而不是编一个值。
  *
  * @param contents 该源的内容；条数为 0 时返回 null（**不编造**）
+ * @param opts.titleOnly 是否只有标题（缺正文）
  */
 export function facetFromContents(
   source: string,
   label: string,
   contents: SourceContent[],
+  opts: { titleOnly?: boolean } = {},
 ): SourceFacet | null {
   if (contents.length === 0) return null;
 
@@ -266,32 +275,56 @@ export function facetFromContents(
   const avgHeat = heat.reduce((s, x) => s + x, 0) / n;
   const domains = interestsFromTexts(contents.map((c) => c.text));
 
-  /* 内容一致性：变异系数 CV = 标准差 / 均值。
-     CV 越小（篇幅越齐）→ 越稳定。CV≥1 视为很不稳定。
-     样本只有 1 条时无从谈波动，给中性 0.5（不假装知道）。 */
-  let stability: number;
-  if (n < 2 || avgChars <= 0) {
-    stability = 0.5;
-  } else {
-    const variance = lens.reduce((s, x) => s + (x - avgChars) ** 2, 0) / n;
-    const cv = Math.sqrt(variance) / avgChars;
-    stability = clamp01(1 - Math.min(cv, 1));
-  }
+  /**
+   * 是否"实际上只有标题"。
+   *
+   * 除了调用方显式声明（`titleOnly`），这里还做一次**自动判定**：
+   * 若绝大多数内容都很短，那它就不可能是正文 —— 要么数据源只给标题
+   * （知乎开放平台），要么上层把正文换成了标题写库。
+   * 两种情况下拿长度当特征都是错的，所以一并不算那三维。
+   *
+   * 自动判定的必要性：这个函数有两个调用方（应用内同步 + 离线回填脚本），
+   * 只靠"调用方记得传 flag"守不住 —— 实测就是脚本忘了传，
+   * 于是又用标题长度算出了 learning=0.03 这种噪声值。
+   */
+  const looksLikeTitlesOnly = opts.titleOnly === true || shortRatio >= 0.8;
 
   const values: Partial<Record<ValueKey, number>> = {
-    learning: clamp01(avgChars / 600),
-    creation: clamp01(1 - shortRatio),
+    /* 与"文本长度"有关的三维：只有确认拿到正文才算，否则留空 */
+    ...(looksLikeTitlesOnly
+      ? {}
+      : {
+          learning: clamp01(avgChars / 600),
+          creation: clamp01(1 - shortRatio),
+          stability: contentConsistency(lens, avgChars),
+        }),
     social: clamp01(avgHeat / 300),
-    stability,
     autonomy: clamp01(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
   };
 
   const top = domains.slice(0, 3);
-  const summary =
-    `${n} 条内容，平均 ${Math.round(avgChars)} 字（${(shortRatio * 100).toFixed(0)}% 为短内容）；` +
-    `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
+  const summary = looksLikeTitlesOnly
+    ? `${n} 条内容（只有标题、无正文），平均互动 ${Math.round(avgHeat)}；` +
+      `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
+      `表达密度与长文比例需要正文，该源无法提供。`
+    : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${(shortRatio * 100).toFixed(0)}% 为短内容）；` +
+      `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
 
-  return { source, label, values, itemCount: n, summary };
+  return { source, label, values, itemCount: n, summary, titleOnly: looksLikeTitlesOnly };
+}
+
+/**
+ * 内容一致性：篇幅变异系数 CV = 标准差 / 均值，越小越稳定。
+ *
+ * 为什么不用"条数"：条数受抓取上限影响（实测 26 人里 22 人都取满 30 条，
+ * 于是 stability 恒为 1.00，这一维完全没有信息量，还把判型整体推向
+ * 原型里 stability 最高的那一型）。CV 才是"输出是否稳定"的可观测代理。
+ */
+function contentConsistency(lens: number[], avgChars: number): number {
+  if (lens.length < 2 || avgChars <= 0) return 0.5; // 单条无从谈波动，给中性
+  const variance = lens.reduce((s, x) => s + (x - avgChars) ** 2, 0) / lens.length;
+  const cv = Math.sqrt(variance) / avgChars;
+  return clamp01(1 - Math.min(cv, 1));
 }
 
 /**

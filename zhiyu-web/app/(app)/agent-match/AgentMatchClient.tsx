@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Avatar from "@/components/radar/Avatar";
 import PersonaRadar from "@/components/PersonaRadar";
+import MatchReportModal from "@/components/MatchReportModal";
 import type { AgentMatchData, ReportView, SessionView } from "@/lib/agent-match";
 import { formatListTime } from "@/lib/datetime";
 import styles from "./agent-match.module.css";
@@ -322,115 +323,15 @@ export default function AgentMatchClient({
         </div>
       ) : null}
 
-      {/* ── 报告弹窗 ── */}
-      {openReport ? (
-        <div className="modal" role="dialog" aria-modal="true" aria-label="匹配报告">
-          <div className="modalBackdrop" onClick={() => setOpenReport(null)} />
-          <div className={`modalDialog modalDialogWide ${styles.chatDialog}`}>
-            <button
-              type="button"
-              className="modalClose"
-              onClick={() => setOpenReport(null)}
-              aria-label="关闭"
-            >
-              ✕
-            </button>
-
-            <div className={styles.repHead}>
-              <div>
-                <p className="panelEyebrow">匹配报告 · 综合匹配度</p>
-                <h3 className={styles.dlgTitle}>
-                  你 × {openReport.counterpart.displayName}
-                </h3>
-              </div>
-              <div className={styles.repScore}>
-                <span className={styles.scoreBig}>
-                  {openReport.overall}
-                  <small>%</small>
-                </span>
-              </div>
-            </div>
-
-            {openReport.demoMode ? (
-              <div className={styles.demoNote}>
-                本报告由<b>确定性规则</b>产生（演示模式），不是真实 LLM 的判断。
-                {openReport.llmError ? `（LLM 调用失败：${openReport.llmError}）` : ""}
-              </div>
-            ) : null}
-
-            <div className={styles.repGrid}>
-              <PersonaRadar
-                axes={openReport.dimensions.map((d) => ({
-                  label: d.label,
-                  value: d.value == null ? null : d.value / 100,
-                }))}
-                emptyTip="等待 Judge"
-              />
-
-              <div className={styles.dimList}>
-                {openReport.dimensions.map((d) => (
-                  <div key={d.key} className={styles.dimRow}>
-                    <span className={styles.dimLabel}>{d.label}</span>
-                    <span className="track">
-                      <i
-                        className="trackFill"
-                        style={{ width: `${d.value ?? 0}%` }}
-                      />
-                    </span>
-                    <span className={`num ${styles.dimVal}`}>
-                      {d.value == null ? "—" : `${d.value}%`}
-                    </span>
-                  </div>
-                ))}
-
-                {openReport.reasons.length ? (
-                  <div className={styles.reasons}>
-                    <p className={styles.reasonsHead}>为什么推荐你们认识？</p>
-                    <ul>
-                      {openReport.reasons.map((x, i) => (
-                        <li key={i}>{x}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {openReport.summary ? (
-              <blockquote className={styles.repSummary}>{openReport.summary}</blockquote>
-            ) : null}
-
-            <div className={styles.featBlock}>
-              <p className={styles.reasonsHead}>Agent 对话摘录</p>
-              <Rounds
-                rounds={openReport.rounds}
-                meName="你的 Agent"
-                otherName={`${openReport.counterpart.displayName} 的 Agent`}
-                meSeed={openReport.me.id}
-                otherSeed={openReport.counterpart.id}
-              />
-            </div>
-
-            <div className="modalActions">
-              <Link className="btn btnSecondary" href={`/persona?id=${openReport.counterpart.id}`}>
-                查看 TA 的人格卡
-              </Link>
-              <button
-                type="button"
-                className="btn btnPrimary"
-                onClick={() => setOpenReport(null)}
-              >
-                关闭
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* ── 报告弹窗 ──
+          用共用组件：它内部的「查看 TA 的人格卡」是**弹窗**打开对方人格卡，
+          不再跳 /persona（用户反复强调过三次的问题）。 */}
+      <MatchReportModal report={openReport} onClose={() => setOpenReport(null)} />
     </>
   );
 }
 
-/** 对话流：按轮次渲染「问题 → A 答 → B 答」 */
+/** 对话流：按轮次渲染「问题 → A 答 → B 答」（报告弹窗内已迁到 MatchReportModal） */
 function Rounds({
   rounds,
   meName,

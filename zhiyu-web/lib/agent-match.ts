@@ -117,6 +117,73 @@ function toRounds(
     .map(([round, v]) => ({ round, question: v.q, aReply: v.a, bReply: v.b }));
 }
 
+/**
+ * 装配**单场** match 的报告视图。
+ *
+ * 抽出来是为了让「通知页点『再看一次』就地打开报告」也能复用同一份逻辑 ——
+ * 通知里只有 matchId，需要现查一次。若两处各写一遍，报告的数字/理由
+ * 早晚会不一致。
+ *
+ * @param matchId 目标 match
+ * @param viewerPersonaId 以谁的视角看（决定"对方"是谁、"我"是谁）
+ * @returns 报告视图；match 不存在或还没有报告时返回 null
+ */
+export async function buildReportView(
+  matchId: string,
+  viewerPersonaId: string,
+): Promise<ReportView | null> {
+  const m = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: {
+      personaA: { select: { id: true, displayName: true, kind: true } },
+      personaB: { select: { id: true, displayName: true, kind: true } },
+      report: true,
+      sessions: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { messages: { orderBy: [{ round: "asc" }, { createdAt: "asc" }] } },
+      },
+    },
+  });
+  if (!m?.report) return null;
+
+  const isA = m.personaAId === viewerPersonaId;
+  const counterpart = isA ? m.personaB : m.personaA;
+  const me = isA ? m.personaA : m.personaB;
+  const sessionRounds = m.sessions[0] ? toRounds(m.sessions[0].messages) : [];
+
+  const result = (m.report.result ?? {}) as Record<string, unknown>;
+  return {
+    matchId: m.id,
+    overall: toPercent(m.report.overallScore) ?? 0,
+    summary: m.report.summary ?? "",
+    dimensions: toDimensions(result.dimensions),
+    reasons: Array.isArray(result.reasons)
+      ? result.reasons.filter((x): x is string => typeof x === "string")
+      : [],
+    demoMode: result.demoMode === true,
+    llmError: str(result.llmError) || null,
+    createdAt: m.report.createdAt,
+    counterpart,
+    me,
+    rounds: (() => {
+      const r = result.rounds;
+      if (!Array.isArray(r)) return sessionRounds;
+      return r
+        .map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return {
+            round: typeof o.round === "number" ? o.round : 0,
+            question: str(o.question),
+            aReply: str(o.aReply),
+            bReply: str(o.bReply),
+          };
+        })
+        .filter((x) => x.question || x.aReply || x.bReply);
+    })(),
+  };
+}
+
 export async function buildAgentMatch(personaId: string): Promise<AgentMatchData> {
   const matches = await prisma.match.findMany({
     where: { OR: [{ personaAId: personaId }, { personaBId: personaId }] },

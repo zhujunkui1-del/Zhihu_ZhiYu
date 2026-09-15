@@ -19,6 +19,11 @@
 import { prisma } from "@/lib/db";
 import { chatCompletion, type ChatMessage } from "@/lib/llm/chat";
 import { encryptionStatus } from "@/lib/crypto-box";
+import {
+  facetFromContents,
+  isObservedSource,
+} from "@/lib/persona/fusion";
+import { persistSourceFacet } from "@/lib/persona/source-facets";
 
 export interface EvidenceItem {
   /** 来源类型：zhihu / sbti / wechat / qq / feishu / dingtalk */
@@ -424,6 +429,30 @@ export async function distillPersona(
       written += 1;
     }
   });
+
+  /**
+   * 刷新**分源解析**（facet）。
+   *
+   * ⚠️ 这一步以前**只在我的离线回填脚本里做过，应用内从来不做**。
+   * 后果正是用户反馈的"发了新想法、重新蒸馏，人格卡却没变化"：
+   * 人格卡上的「分源解析」与「综合画像」读的是持久化的 facet，
+   * 而应用内的同步/蒸馏只写 evidence 与 values，facet 始终是旧的那一份
+   * （或者干脆没有），所以卡片看起来永远不变。
+   *
+   * 这里按源把**这次的证据包**重新算一遍并落库 —— 蒸馏本来就是"重新看一遍
+   * 所有数据"，顺手刷新每个源的解析最自然，也保证与综合画像同源。
+   */
+  const bySource = new Map<string, { text: string; heat?: number }[]>();
+  for (const it of items) {
+    if (!isObservedSource(it.source)) continue;
+    const list = bySource.get(it.source) ?? [];
+    list.push({ text: it.text, heat: it.weight });
+    bySource.set(it.source, list);
+  }
+  for (const [source, contents] of bySource) {
+    const facet = facetFromContents(source, SOURCE_LABELS[source] ?? source, contents);
+    if (facet) await persistSourceFacet(personaId, facet);
+  }
 
   return {
     ok: true,

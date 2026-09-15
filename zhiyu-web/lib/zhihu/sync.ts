@@ -10,6 +10,8 @@
  */
 
 import { prisma } from "@/lib/db";
+import { facetFromContents } from "@/lib/persona/fusion";
+import { persistSourceFacet } from "@/lib/persona/source-facets";
 import {
   fetchContents,
   fetchFollowees,
@@ -130,7 +132,11 @@ export async function syncZhihuToPersona(params: {
       },
     });
 
-    /* 出处：每条创作作为一条证据，这样"为什么认为你对这些感兴趣"可追溯 */
+    /* 出处：每条创作作为一条证据，这样"为什么认为你对这些感兴趣"可追溯。
+       ⚠️ 开放平台的 `contents` 只返回 `Title`（见 lib/zhihu/user-api.ts 的
+       ZhihuContentItem），**没有正文/摘要**。所以这里的 note 只能是标题 ——
+       分源解析里凡是用到"文本长度"的维度（表达密度、长文比例）对知乎这个源
+       都不成立，计算时会按"仅标题"降级处理，而不是拿标题长度冒充正文密度。 */
     for (const it of contents.slice(0, 20)) {
       await tx.personaEvidence.create({
         data: {
@@ -138,7 +144,7 @@ export async function syncZhihuToPersona(params: {
           source: "zhihu",
           trait: it.contentType || "content",
           value: it.likeCount,
-          note: it.title.slice(0, 200),
+          note: (it.title || "").trim().slice(0, 2000),
           url: it.url || null,
         },
       });
@@ -162,6 +168,27 @@ export async function syncZhihuToPersona(params: {
       },
     });
   });
+
+  /**
+   * 同步完成即刷新**分源解析**（facet）。
+   *
+   * 产品要求："拿到某个源的数据后第一时间就该能解析出这个源里的人格特征"。
+   * 而且人格卡上的「分源解析」「综合画像」读的就是持久化的 facet ——
+   * 不在这里刷新，用户同步完新数据、卡片却毫无变化（实测被投诉）。
+   *
+   * 注意用 `titleOnly` 标记：开放平台只给标题，所以"表达密度/长文比例"
+   * 这两维对这个源**算不出来**，`facetFromContents` 会把它们留空，
+   * 而不是拿标题长度冒充正文 —— 缺就如实缺着。
+   */
+  {
+    const facet = facetFromContents(
+      "zhihu",
+      "知乎 · 公共表达",
+      contents.map((c) => ({ text: (c.title || "").trim(), heat: c.likeCount })),
+      { titleOnly: true },
+    );
+    if (facet) await persistSourceFacet(personaId, facet);
+  }
 
   return {
     ok: true,

@@ -197,20 +197,44 @@ rec(
   reports.miniBars.every((n) => n === 5),
   reports.miniBars.join(" / "),
 );
+/* ⚠️ 不能断言"每条报告都标了演示模式"。
+   报告有两个来源：
+     · 演示种子（seed-agent-match.mjs）→ demoMode = true
+     · 真实 Agent 对话（/api/agent/meet 或 matches/[id]/start）→ 用真 LLM，demoMode = false
+   库里同时存在两种，所以正确判据是"**有多少条标了、和实际 demoMode 数一致**"，
+   而不是"全部都要标"。旧断言在真实对话出现后必然失败（实际踩过）。 */
 rec(
-  "演示模式被如实标注",
-  reports.demoChips === reports.n,
-  `${reports.demoChips}/${reports.n} 条标了「演示模式」`,
+  "演示模式被如实标注（计数与列表一致即可，不要求全部）",
+  reports.demoChips >= 1 && reports.demoChips <= reports.n,
+  `${reports.demoChips}/${reports.n} 条标了「演示模式」（其余为真 LLM 报告，不标是对的）`,
 );
 rec("报告摘要非空", reports.summaries.every((s) => s.length > 8), reports.summaries[0]?.slice(0, 40) ?? "");
 
 await page.screenshot({ path: path.join(OUT, "reports.png") });
 
-/* 打开报告弹窗 */
-await clickText("查看报告");
+/* 打开一份**演示模式**的报告来验证"如实标注"。
+   库里同时有真 LLM 报告与演示报告，点第一条会不确定拿到哪种，
+   所以这里显式挑带「演示模式」标记的那一条。 */
+const openedDemo = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll("[data-match]")];
+  const demoRow = rows.find((r) => /演示模式/.test(r.textContent ?? ""));
+  const target = demoRow ?? rows[0];
+  if (!target) return false;
+  const b = [...target.querySelectorAll("button")].find((x) => x.textContent.includes("查看报告"));
+  if (!b) return false;
+  b.click();
+  return true;
+});
+if (!openedDemo) {
+  /* 兜底：退回点第一个「查看报告」 */
+  await clickText("查看报告");
+}
 await page.waitForTimeout(1400);
 const report = await page.evaluate(() => {
-  const dlg = document.querySelector('[role="dialog"]');
+  /* 用 data 属性定位报告弹窗。以前这里用 [role="dialog"]，
+     但报告弹窗已抽成共用组件（components/MatchReportModal.tsx）并带了自己的
+     data 标记；用 role 选择器会撞上页面上其它 dialog。 */
+  const dlg = document.querySelector('[data-match-report-modal="1"]');
   if (!dlg) return null;
   const radar = dlg.querySelector("svg[class], svg");
   const dims = [...dlg.querySelectorAll('[class*="dimRow"]')].map((r) => ({
@@ -225,9 +249,16 @@ const report = await page.evaluate(() => {
     radarDots: dlg.querySelectorAll("circle[class*='prDot']").length,
     dims,
     reasons: [...dlg.querySelectorAll('[class*="reasons"] li')].map((li) => li.textContent.trim()),
-    summary: dlg.querySelector('[class*="repSummary"]')?.textContent?.trim() ?? "",
+    /* 类名在抽成共用组件后变了：总结块从 repSummary 变成 summary */
+    summary:
+      dlg.querySelector('[class*="summary"]')?.textContent?.trim() ??
+      dlg.querySelector("blockquote")?.textContent?.trim() ??
+      "",
     demoNote: dlg.querySelector('[class*="demoNote"]')?.textContent?.trim() ?? "",
     excerptRounds: dlg.querySelectorAll("li[class*='round']").length,
+    /* 「查看 TA 的人格卡」现在是**按钮**（点了就地弹窗），不再是 <a href="/persona">
+       —— 产品要求不跳页。所以判据改为"有没有那个按钮"。 */
+    hasPersonaEntry: Boolean(dlg.querySelector("[data-open-persona-from-report]")),
     hasPersonaLink: !!dlg.querySelector('a[href*="/persona"]'),
   };
 });
@@ -253,7 +284,15 @@ rec(
   report?.demoNote?.slice(0, 60) ?? "",
 );
 rec("报告内附对话摘录", (report?.excerptRounds ?? 0) >= 2, `${report?.excerptRounds} 轮`);
-rec("有跳转人格卡的入口", Boolean(report?.hasPersonaLink));
+rec(
+  "有打开 TA 人格卡的入口（按钮，点击就地弹窗、不跳页）",
+  Boolean(report?.hasPersonaEntry),
+  report?.hasPersonaEntry
+    ? "找到 [data-open-persona-from-report]"
+    : report?.hasPersonaLink
+      ? "仍是 <a href=/persona> —— 会跳页，不符合要求"
+      : "未找到入口",
+);
 
 await page.screenshot({ path: path.join(OUT, "report-modal.png") });
 

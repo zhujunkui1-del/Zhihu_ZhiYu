@@ -88,14 +88,22 @@ export default function HomeClient({
   const sbti = board.sbti;
   const hasData = board.injectedCount > 0;
 
-  const personaTitle = sbti?.type
-    ? `你的人格倾向是「${sbti.typeTitle ?? sbti.type}」。`
+  /**
+   * 首页标题用**综合画像**（多源融合判定的六型倾向），与「我的人格」页一致。
+   *
+   * ⚠️ 这里曾经直接显示 `sbti.typeTitle` —— 那是 SBTI **自评**的结果，
+   * 不是综合画像。首页与人格页因此显示两套不同的"人格倾向"（实测被投诉）。
+   * 综合画像不可用时才退回"数据已就位/先接来源"的引导语。
+   */
+  const personaTitle = board.fused
+    ? `你的人格倾向是「${board.fused.type}」。`
     : hasData
       ? "数据已就位，等待一次蒸馏。"
       : "还没有人格数据，先接入一个来源。";
 
-  /* 五轴来自 SBTI 的 15 维聚合（见 lib/sbti/axes.ts）。未做 SBTI 时全为 null，
-     BoardRadar 会显示"等待蒸馏"而不是编造分数。 */
+  /* 五轴与人格页同源：都取「多源融合」的那一组（axesSource 会标明来源）。
+     未做 SBTI 且没有观察数据时全为 null，BoardRadar 显示"等待蒸馏"，
+     不编造分数。 */
   const axes = board.axes.map((a) => ({ label: a.label, value: a.value ?? 0 }));
   const axesReady = board.axes.some((a) => a.value != null);
 
@@ -144,13 +152,28 @@ export default function HomeClient({
                 </p>
               </div>
 
-              {sbti?.type ? (
-                <p className="meta" style={{ marginTop: 14 }}>
-                  SBTI：{sbti.typeTitle ?? sbti.type}
-                  {sbti.codes ? `（${sbti.codes}）` : ""}
+              {/* 综合画像：与人格页同一套判定（六型倾向 + 匹配度） */}
+              {board.fused ? (
+                <p className="meta" style={{ marginTop: 14 }} data-home-fused="1">
+                  综合画像：<b>{board.fused.type}</b>（匹配度 {board.fused.similarity}%）
+                  <br />
+                  {board.fused.blurb}
                 </p>
               ) : (
                 <p className="meta" style={{ marginTop: 14 }}>
+                  还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉）后，
+                  这里会给出由多源融合判定的人格倾向。
+                </p>
+              )}
+
+              {/* SBTI 是**自评**那一面，与综合画像并列但不混为一谈 */}
+              {sbti?.type ? (
+                <p className="meta" style={{ marginTop: 8 }} data-home-sbti="1">
+                  SBTI 自评：{sbti.typeTitle ?? sbti.type}
+                  {sbti.codes ? `（${sbti.codes}）` : ""}
+                </p>
+              ) : (
+                <p className="meta" style={{ marginTop: 8 }}>
                   还没有 SBTI 数据，去「我的人格」完成测试。
                 </p>
               )}
