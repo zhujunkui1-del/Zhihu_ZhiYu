@@ -559,7 +559,7 @@ export default function ImportDataDialog({
             type="text"
             className={styles.input}
             data-import-selfname="1"
-            placeholder="例如：小明 / 你的微信昵称"
+            placeholder="例如：小明 / 你的微信|QQ昵称"
             value={selfName}
             onChange={(e) => setSelfName(e.target.value)}
             disabled={busy}
