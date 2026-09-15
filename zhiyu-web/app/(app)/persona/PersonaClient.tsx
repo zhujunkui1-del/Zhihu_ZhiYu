@@ -61,7 +61,7 @@ const SOURCE_META: Record<
   qq: {
     title: "QQ 聊天记录",
     dim: "私域人格 · 本地文件导入",
-    action: "导入导出文件",
+    action: "导入聊天记录",
     note: "支持 QCE / TIM 导出的 TXT、JSON、CSV，可一次选多份。只提取你发的内容，群聊私聊都行。",
   },
   feishu: {
