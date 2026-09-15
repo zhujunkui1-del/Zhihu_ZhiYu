@@ -134,11 +134,5 @@
   color: var(--fg);
   font-size: 12px;
 }
-.missing {
-  margin: 10px 0 0;
-  padding-top: 9px;
-  border-top: 1px dashed var(--line-soft);
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.7;
-}
+/* .missing（「未覆盖：…」那行）已按用户要求删除：
+   缺维由"算不出来就不画那根条"表达，不再写文字解释自己做不到什么。 */

@@ -150,6 +150,25 @@ rec(
   facetInfo.bars.length > 0 && facetInfo.bars.every((n) => n > 0),
   `各卡进度条数：${facetInfo.bars.join(", ")}`,
 );
+/* 用户要求删掉"未覆盖：…（该源只提供标题、没有正文…）"那行：
+   缺维由"算不出来就不画那根条"表达，不再写字解释自己做不到什么。 */
+const missingLine = await page.evaluate(() => {
+  const t = document.body.innerText;
+  return {
+    hasMissing: t.includes("未覆盖"),
+    hasPartial: t.includes("需要正文") || t.includes("无法提供") || t.includes("表达密度"),
+  };
+});
+rec(
+  "分源卡里不再出现「未覆盖」字样",
+  !missingLine.hasMissing,
+  missingLine.hasMissing ? "页面上仍有「未覆盖」" : "已删除",
+);
+rec(
+  "也不再出现「该源无法提供 / 需要正文」这类自曝短板的文案",
+  !missingLine.hasPartial,
+  missingLine.hasPartial ? "仍有解释缺维的文字" : "已删除",
+);
 if (facetInfo.texts.length) {
   console.log("      卡片内容示例：");
   for (const t of facetInfo.texts.slice(0, 3)) console.log(`        · ${t}`);

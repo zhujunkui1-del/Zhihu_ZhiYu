@@ -147,23 +147,11 @@ export default function SourceFacets({
                 </p>
               ) : null}
 
-              {/* 哪些维度这个源给不出，如实说明（不让人以为漏了）。
-                  原因由解析层给（`partialReason`），组件不自己猜 ——
-                  缺维的理由不止"只有标题"一种：手动导入的聊天/文档缺的是
-                  「学习成长」与「社交连接」，原因完全不同。 */}
-              {dims.length < VALUE_KEYS.length ? (
-                <p className={styles.missing}>
-                  未覆盖：
-                  {VALUE_KEYS.filter((k) => typeof f.values[k] !== "number")
-                    .map((k) => VALUE_LABEL[k] ?? k)
-                    .join("、")}
-                  {f.partialReason
-                    ? `（${f.partialReason}）`
-                    : f.titleOnly
-                      ? "（该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算）"
-                      : ""}
-                </p>
-              ) : null}
+              {/* ⚠️ 这里以前有一行「未覆盖：…（该源只提供标题、没有正文，表达密度…）」。
+                  用户明确要求删掉，理由成立：
+                    · 那是**讲自己做不到什么**的文字，用户不看，还降低产品观感；
+                    · 缺维本来就该由"算不出来就不画那根条"来表达，不需要解释；
+                    · 原因（partialReason）仍留在数据层，诊断脚本与解析层照旧用它。 */}
             </article>
           );
         })}
