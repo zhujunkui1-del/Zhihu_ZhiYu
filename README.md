@@ -9,7 +9,8 @@
 </p>
 
 <p align="center">
-  知乎黑客松 2026 · 赛道「灵魂匹配局：社区连接与兴趣社交」
+  知乎黑客松 2026 · 赛道「灵魂匹配局：社区连接与兴趣社交」<br>
+  线上：<b>https://www.zhiyuapp.site</b>
 </p>
 
 ---
@@ -58,40 +59,91 @@
 
 | 步骤 | 做什么 |
 |---|---|
-| **1. 把「我」交给 Agent** | 六源人格输入，任选其一：知乎（表达的我）、微信/QQ（真实的我）、飞书/钉钉（工作中的我）、SBTI（认识的我） |
-| **2. 生成我的 Agent** | 不是贴标签，而是理解你为什么喜欢、怎么思考、和谁聊得来 |
+| **1. 把「我」交给 Agent** | 六源人格输入：知乎（表达的我）、微信/QQ（真实的我）、飞书/钉钉（工作中的我）、SBTI（认识的我） |
+| **2. 生成我的 Agent** | 分源解析 → 多源融合 → 判型（带原话依据），不是贴标签 |
 | **3. 两级匹配** | 先规则算分（秒级、零成本），再让 Agent 真实对话（只对少数候选） |
 | **4. 后台进行** | 点「让我的 Agent 先聊聊」后**不跳页不阻塞**，侧栏小圆点提示进度 |
-| **5. 拿到报告** | 五维评分 + 综合分 + **为什么推荐你们认识** |
+| **5. 拿到报告** | 五维评分 + 综合分 + **为什么推荐你们认识**；可一键「给TA送去报告」 |
 
 ### 七个页面
 
 ```
-/               登录页（知乎授权 / 演示登录）
+/               登录页（知乎授权）
 /home           首页：人格总览 + 进行中的 Agent 匹配 + 发现预览
 /find           发现页：卡片视图 / 相遇雷达
 /persona        我的人格：人格卡 + 六源注入 + SBTI 测试
 /agent-match    Agent 匹配：认识中 / 匹配报告
-/notify         通知中心
+/notify         通知中心（含「发来的报告」）
 /settings       设置：身份与数据源 / 沟通偏好 / BYOK 大模型接入
 ```
+
+---
+
+## 人格数据管线（这一版的重点）
+
+人格数据从「注入」到「上屏」要过四道工序，每一道都有可复现的口径：
+
+```
+六个数据源 ──► ① 分源解析 ──► ② 数据体检 ──► ③ 五维融合 ──► ④ 判型
+              facet           sanity           five-dims       type-source
+```
+
+### ① 分源解析：口径只有一张表
+
+`lib/persona/facet-opts.ts` 是**唯一事实来源**：知乎只有标题（`titleOnly`）、微信/QQ/飞书/钉钉是聊天与文档（`profile: "im"` + `noHeat`）、SBTI 不走内容解析（由 15 维问卷现算）。
+
+
+### ② 数据体检：挡住"看着有数、其实没信息"的值
+
+`lib/persona/sanity.ts` 两道闸门：
+
+- **零区分度自评不进融合** —— 实测某份 SBTI 全 M 作答，15 维原始分全是 4，折算出的五个维度**全是 50%**（标准差 0）。它不是"测得准"，是"每题都给了同一档"。
+- **跨源同值整维留空** —— 知乎/微信/QQ 的社交连接曾**全是 1%**（三边都没有互动量，`heat/300` 一律算成 0）。多个源给出同一个数不构成印证，恰恰证明这个信号没量到。
+
+### ③ 五维画像：写死的五个词，全站同一个坐标系
+
+**思考深度 · 表达力 · 共情力 · 执行力 · 主动性**
+
+自己的人格页、首页模块、**别人的人格卡**画的都是这一组，每个源都喂得动：
+
+| 维度 | 问什么 | 知乎 | 聊天 | SBTI |
+|---|---|---|---|---|
+| 思考深度 | 多少内容在解释、推理、追问 | 标题里的疑问/求知词 | 长消息 + 推理词 | A1/A3/S2 |
+| 表达力 | 用词丰不丰富 | 标题用词多样性 | 全文用词多样性 | So3/A2 |
+| 共情力 | 对他人情绪的注意力 | 情绪/关系词占比 | 同上 | E1/E2/E3 |
+| 执行力 | 输出是否持续 | 发布时间（没存 → 留空） | 有输出的天数占比 | Ac3/Ac1/S1 |
+| 主动性 | 是不是主动开口的一方 | 无方向 → 留空 | 我先开口的对话段占比 | So1/A2 |
+
+
+**纪律：量不到就留空**（界面 `—`），不给 0、不给 0.5；真实的 0 写 `<1%` 而不是假装成 `1%`。
+
+### ④ 判型：LLM 读懂证据后给结论，必须带依据
+
+`lib/persona/type-source.ts` 是倾向型的**唯一取值口径**：判型 → 六维兜底 → SBTI → 无。
+
+
+口径收敛之后，「首页说务实执行型、人格页说深度思考型」这类事故从结构上不会再发生。
+
+### 顺带保留的：可数行为变量
+
+`lib/persona/behavior.ts` 另算七个**聊天场景专有**的指标（主动发起率、回应速度、活跃天占比、深夜活跃、表达丰富度、提问求知、话题集中）+ 三个事实行（互动平衡、单段消息数、连续交流天数），用在「分源解析」的卡片上。它们不进五维雷达——因为它们只对有对话、有时间戳的源成立。
 
 ---
 
 ## 技术方案
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Next.js（App Router）· 单体 · Vercel            │
-│                                                 │
-│  Server Component ── 取数与鉴权（首屏带数据）      │
-│  Client 岛屿 ────── 交互（雷达 / 筛选 / 弹窗）     │
-│  Route Handlers ─── 20 个 API                    │
-└──────────────────┬──────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  Next.js（App Router）· 单体 · Vercel             │
+│                                                  │
+│  Server Component ── 取数与鉴权（首屏带数据）       │
+│  Client 岛屿 ────── 交互（雷达 / 筛选 / 弹窗）      │
+│  Route Handlers ─── 30 个 API                     │
+└──────────────────┬───────────────────────────────┘
                    │
         ┌──────────┴──────────┐
         │  PostgreSQL (Neon)  │
-        │  14 个模型 / 4 个迁移 │
+        │  16 个模型 / 5 个迁移 │
         └─────────────────────┘
                    │
     ┌──────────────┼──────────────┐
@@ -102,7 +154,7 @@
 
 7 个页面中 **6 个是 Server Component**（取数与鉴权在服务端完成，首屏即带完整数据），只有登录页与各页的交互部分是 Client Component。
 
-**技术栈**：Next.js 16 · React 19 · TypeScript · Prisma 7 · PostgreSQL (Neon) · 部署在 Vercel。
+**技术栈**：Next.js 16.3 · React 19.2 · TypeScript 5 · Prisma 7.10 · PostgreSQL (Neon, ap-southeast-1) · 部署在 Vercel。
 
 ### 最关键的一个架构判断：Agent 不常驻
 
@@ -112,25 +164,27 @@
 海量 Persona Index → 向量召回 1000 → 规则精排 100 → 推荐 10 → Agent 对话 1~3
 ```
 
-**LLM 只在最后一公里调用。**
 
-因此我们不会说「我们拥有上亿个 Agent」，正确的表述是：构建大规模 Persona Index，把海量人格信息结构化、向量化；**Agent 不常驻**，而是在用户触发深度匹配时按需实例化。
+### 六个数据源怎么进
 
-### 知乎数据接入
-
-| 能力 | 接口 | 状态 |
+| 源 | 进法 | 状态 |
 |---|---|---|
-| OAuth 登录 | `openapi.zhihu.com/authorize` → `/access_token` → `/user` | 代码完成，待部署后联调 |
-| 用户数据 | `developer.zhihu.com/api/v1/user/*`（创作 / 关注 / 收藏夹 / 收藏夹内容 / 近期收藏） | **已用真实凭证跑通** |
+| 知乎 | OAuth 授权 → 开放平台用户数据 API（创作/关注/收藏夹） | **实网跑通** |
+| 微信 / QQ | 本地导出文件（WeFlow / qq-chat-exporter 等）拖进「导入数据」 | 可用 |
+| 飞书 | OAuth 授权 → 消息 / 文档 / Wiki / 多维表格 | 可用（**需在飞书后台启用机器人能力并发布版本**） |
+| 钉钉 | OAuth 授权 → 文档 / 多维表格（官方无历史消息接口） | 可用 |
+| SBTI | 站内 30 题自评 | 可用 |
 
-**工程要点**（都是实测踩出来的）：`uid` 是 18~19 位十进制数，超过 JavaScript 安全整数范围，直接 `JSON.parse` 会**静默舍入**（`904491330657081871` → `904491330657081900`，无任何报错），必须做文本预处理；回调参数是 `authorization_code` 而非标准 OAuth 的 `code`，但换 token 的表单字段仍用 `code`；成功判定看 `access_token` 是否存在，不把业务码 `20000` 当错误。
 
 ### 身份与安全
 
 - 会话是**服务端 `AuthSession` 表 + HttpOnly Cookie**（Vercel 多实例，进程内存储不可用）
-- `access_token` 用 AES-256-GCM 加密落库，**浏览器永远拿不到**
+- `access_token` 用 AES-256-GCM 加密落库，**浏览器永远拿不到**；密钥按用途做 HKDF 域隔离
 - 所有密钥只存在于环境变量；源码中零明文（有断言）
-- 页面身份统一由 `resolveIdentity()` 解析：优先会话；**生产环境忽略 `?userId=`**，否则带上别人的 id 就能读到对方数据
+- 页面身份统一由 `resolveIdentity()` 解析：优先会话；**生产环境忽略 `?userId=`**
+- **外发前脱敏**（`lib/privacy/redact.ts`）：手机号、身份证（带校验位）、银行卡（Luhn）、邮箱、密钥、长凭据串在送进大模型前替换成占位符，**只改外发文本、库里原文不动**，蒸馏完成会如实告知替换了几处
+
+
 
 ---
 
@@ -141,12 +195,15 @@ cd zhiyu-web
 npm install
 cp .env.example .env        # 填入 DATABASE_URL 等（见下）
 npx prisma migrate deploy   # 建表
+npx prisma generate
 node --env-file=.env scripts/seed-demo.mjs         # 16 位示例人物
 node --env-file=.env scripts/seed-agent-match.mjs  # 演示用的 Agent 匹配
 npm run dev
 ```
 
-打开 http://localhost:3000，点「演示登录」即可完整体验（不需要知乎凭证）。
+打开 http://localhost:3000，点「演示登录」即可完整体验（不需要知乎凭证；**生产环境禁用演示登录**）。
+
+> ⚠️ 改完 `prisma/schema.prisma` 一定要**重启 dev server** —— 否则跑着的进程还用旧 Prisma client，`prisma.<新模型>` 会是 undefined，接口 500 且响应体为空。
 
 ### 环境变量
 
@@ -154,55 +211,44 @@ npm run dev
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL 连接串（Neon 池化连接） |
 | `AUTH_ENC_KEY` | 生产必需 | 32 字节 base64，会话与 OAuth Token 加密主密钥 |
-| `ZHIHU_APP_ID` / `ZHIHU_OAUTH_APP_KEY` | 可选 | 知乎 OAuth；未配置时自动回退演示登录 |
+| `ZHIHU_APP_ID` / `ZHIHU_OAUTH_APP_KEY` | 可选 | 知乎 OAuth；未配置时回退演示登录 |
 | `ZHIHU_OAUTH_REDIRECT_URI` | 可选 | 必须与知乎开放平台登记值**逐字一致** |
 | `ZHIHU_ACCESS_SECRET` | 可选 | 读用户创作 / 关注 / 收藏 |
 | `USER_LLM_KEY_ENC` | 可选 | BYOK 密钥加密（未设时用 `AUTH_ENC_KEY` 派生） |
+| `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | 可选 | 平台默认大模型（人格蒸馏与 Judge 用） |
 
 > 生产环境**必须**配置 `AUTH_ENC_KEY`，否则启动即报错；开发环境会自动回落，方便本地开箱可用。
 
 ---
 
-## 部署
-
-**唯一目标平台是 Vercel（单体）**，硬约束：
-
-1. **必须绑定自有域名，不能以 `*.vercel.app` 作为对外入口。** 实测（中国大陆网络）`*.vercel.app` 子域被 DNS 污染并 TCP 443 超时，而 Vercel 上的自定义域名可达 119–500 ms。
-2. **自托管全部静态资源**——不引入 Google Fonts、境外 CDN、外部统计。
-3. **不使用反向代理 / CDN 套在 Vercel 前面**（Vercel 有明确反代政策）。
-4. **不采用境内服务器**（需 ICP 备案）。
-
-部署后到知乎开放平台登记 `https://<你的域名>/api/auth/zhihu/callback`，并填入 `ZHIHU_OAUTH_REDIRECT_URI`。`/api/auth/zhihu` 会自动从「回退演示登录」切换到「跳转知乎授权页」，**不需要改代码**。
-
 ---
 
 ## 验证
 
-不是「写完就算」——每个关键行为都有自动化断言：
+不是「写完就算」——每个关键行为都有自动化断言。`zhiyu-web/scripts/` 下有 **90 个脚本**（测试 / 端到端 / 诊断 / 回填），常用这些：
 
 ```bash
-# 页面与组件（根目录）
-node RECON/verify-web-foundation.mjs     # 6 路由结构 / 主题 / 侧栏
-node RECON/verify-web-login.mjs          # 登录页
-node RECON/verify-web-home.mjs           # 首页
-node RECON/verify-web-discover.mjs       # 发现页 + 雷达
-node RECON/verify-web-persona.mjs        # 我的人格（含完整 SBTI 流程）
-node RECON/test-radar-layout.mjs         # 雷达布局（穷举 1~40 人零重叠）
-
-# 接口与安全（zhiyu-web）
 cd zhiyu-web
-node --env-file=.env scripts/verify-auth-identity.mjs   # 身份与 HttpOnly 会话
-node --env-file=.env scripts/verify-settings.mjs        # 设置 + 通知
-node --env-file=.env scripts/verify-agent-match.mjs     # Agent 匹配
-node --env-file=.env scripts/verify-zhihu-sync.mjs      # 知乎数据同步（真实接口）
-node --env-file=.env scripts/test-oauth-mock.mjs        # OAuth 协议层 Mock
-node --env-file=.env scripts/test-crypto-box.mjs        # 加密与密钥域隔离
+
+# 人格数据管线（纯函数 + 真实数据 fixture）
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-five-dims.mjs     # 五维（含 6083 条真实聊天）
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-sanity.mjs       # 体检闸门 / 无信号留空
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-facet-opts.mjs   # 分源解析口径一致性
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-behavior.mjs     # 可数行为变量
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-import-parse.mjs # 各家导出格式解析
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-redact.mjs       # 外发脱敏
+node --no-warnings --import ./scripts/ts-resolve.mjs scripts/test-zhihu-links.mjs  # 知乎链接修正
+
+# 端到端（需要 dev server + DATABASE_URL）
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-behavior-flow.mjs   # 导入→落库→页面
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-distill-type.mjs    # 真跑蒸馏 + 判型落库
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-send-report.mjs     # 送报告 + 收件箱可见
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-fusion-ui.mjs       # 人格页
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-no-jump-and-sync.mjs # 首页与人格页同源
+node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-login-instant.mjs   # 手机端登录可用性
+node scripts/verify-live-deploy.mjs https://www.zhiyuapp.site                                          # 线上（只读）
 ```
 
-其中一些断言是把踩过的坑固化下来的，例如：雷达布局零重叠（早期算法在 16 人时有 7 组重叠）、缩放时光标下世界坐标零漂移、沟通偏好开关**服务端真的落库**、响应体不含任何凭证。
-
-> ⚠️ 注意：`verify-web-persona.mjs` 会跑完 30 题 SBTI（全选 A 得到「死者/DEAD」），
-> **它会覆盖演示用户的 SBTI 结果**。演示或截图前请先跑一次 `scripts/seed-demo.mjs` 重置。
 
 ---
 
@@ -210,17 +256,23 @@ node --env-file=.env scripts/test-crypto-box.mjs        # 加密与密钥域隔�
 
 ```
 ├── zhiyu-web/                单体 Next.js 应用（部署目标）
-│   ├── app/                  7 个页面 + 20 个 API
-│   ├── components/           AppShell / 相遇雷达 / 头像 / 人格雷达
-│   ├── lib/                  匹配算法 / 人格装配 / 知乎接入 / 会话
-│   ├── prisma/               schema + 4 个迁移
-│   └── scripts/              seed 与验证脚本
+│   ├── app/                  7 个页面 + 30 个 API
+│   ├── components/           AppShell / 相遇雷达 / 人格卡与弹窗 / 导入弹窗
+│   ├── lib/
+│   │   ├── persona/          人格管线：fusion / five-dims / sanity /
+│   │   │                     type-source / behavior / facet-opts / distill
+│   │   ├── privacy/          外发脱敏
+│   │   ├── zhihu/            知乎 OAuth 用户 API / 公开端点回填 / 链接修正
+│   │   ├── oauth/            飞书 / 钉钉 授权、拉取与同步
+│   │   ├── import/           文件解析（微信/QQ/飞书/钉钉导出）
+│   │   ├── agent/            Agent 对话与 Judge
+│   │   └── auth/             会话 / CSRF / 身份
+│   ├── prisma/               schema（16 模型）+ 5 个迁移
+│   └── scripts/              90 个测试 / 端到端 / 诊断 / 回填脚本
 ├── 产品方案/                 产品与开发规范（唯一事实来源）
-│   ├── 知遇_AI_Agent_产品理解与开发规范_v2.0_Next.js_Vercel.md
-│   ├── 知遇_产品说明与计划书.md
-│   └── 知遇_产品计划书_简版.md
 ├── 前端UI/                   静态视觉原型（视觉唯一事实来源）
 ├── RECON/                    页面验证脚本与踩坑记录（RESKIN.md）
+├── 开源项目/                 参考实现（distilly / WeFlow / qq-chat-exporter 等）
 └── AGENTS.md                 部署硬约束
 ```
 
@@ -228,9 +280,15 @@ node --env-file=.env scripts/test-crypto-box.mjs        # 加密与密钥域隔�
 
 ## 当前状态
 
-**已完成**：7 个页面 · 六源人格框架 · 两级匹配 · 相遇雷达 · Agent 对话 + Judge · 知乎五个用户数据接口真实接入 · 知乎 OAuth 完整代码 · 300+ 项验证
+**已完成并上线**（https://www.zhiyuapp.site，自有域名 + Vercel 单体）：
 
-**待完成**：知乎 OAuth 实网联调（需部署并登记公网回调）· 微信/QQ/飞书/钉钉接入 · 人格蒸馏管线 · 向量检索召回
+- 7 个页面 · 30 个 API · 16 个数据模型
+- **六源接入**：知乎 OAuth 实网跑通；微信/QQ/飞书/钉钉文件导入；飞书/钉钉 OAuth 授权同步；SBTI 自评
+- **人格管线**：分源解析（口径唯一表）→ 数据体检（两道闸门）→ 五维融合 → LLM 判型（带原话依据）
+- **Agent 匹配**：定向提问对话 + Judge 五维评分 + 报告弹窗 + **给TA送去报告**（收件方在「通知 → 发来的报告」可见）
+- **安全**：HttpOnly 会话、Token 加密落库、外发前脱敏、生产环境忽略 `?userId=`
+- **可达性**：自有域名、资源自托管、纸纹转 WebP（登录页传输量 1.5MB → 284KB）
+
 
 ---
 
