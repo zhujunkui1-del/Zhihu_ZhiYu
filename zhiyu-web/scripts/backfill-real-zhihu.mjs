@@ -220,7 +220,12 @@ for (const r of rows) {
 
     /* ①c 分源解析结果**在这里算并存下来**。
            此刻手上有完整正文与真实热度（note 会被截断，之后再也算不准），
-           所以 facet 必须在写入时算 —— 见 lib/persona/source-facets.ts 的说明。 */
+           所以 facet 必须在写入时算 —— 见 lib/persona/source-facets.ts 的说明。
+
+           ⚠️ 这里**故意不套用 `facetOptionsFor("zhihu")`**：应用内同步拿到的是
+           开放平台的 `contents`（**只有标题**，所以标 titleOnly），而本脚本回填的是
+           pin 的 `title + text` 完整正文。口径取决于**数据长什么样**，不是源叫什么，
+           所以这里用默认的长文口径（带真实点赞数）。 */
     const facet = facetFromContents("zhihu", "知乎 · 公共表达", pins.map((p) => ({
       text: `${p.title || ""}\n${p.text || ""}`.trim(),
       heat: p.likeCount,

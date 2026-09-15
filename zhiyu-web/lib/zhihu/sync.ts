@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/db";
 import { facetFromContents } from "@/lib/persona/fusion";
+import { facetOptionsFor } from "@/lib/persona/facet-opts";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
 import {
   fetchContents,
@@ -185,7 +186,7 @@ export async function syncZhihuToPersona(params: {
       "zhihu",
       "知乎 · 公共表达",
       contents.map((c) => ({ text: (c.title || "").trim(), heat: c.likeCount })),
-      { titleOnly: true },
+      facetOptionsFor("zhihu"),
     );
     if (facet) await persistSourceFacet(personaId, facet);
   }

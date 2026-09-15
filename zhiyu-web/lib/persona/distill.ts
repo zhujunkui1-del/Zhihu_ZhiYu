@@ -25,14 +25,19 @@ import {
   isObservedSource,
 } from "@/lib/persona/fusion";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
+import { facetOptionsFor, isContentFacetSource } from "@/lib/persona/facet-opts";
 
 export interface EvidenceItem {
   /** 来源类型：zhihu / sbti / wechat / qq / feishu / dingtalk */
   source: string;
   /** 人类可读的来源标签 */
   sourceLabel: string;
-  /** 这条证据是什么 */
-  kind: "content" | "profile" | "test" | "tag";
+  /**
+   * 这条证据是什么。
+   * `marker` = 「已注入 N 条」这类**源标记**：它说明"这个源参与过"，
+   * 但**不是内容**，因此不能进分源解析的 itemCount（否则条数会虚高一条）。
+   */
+  kind: "content" | "profile" | "test" | "tag" | "marker";
   text: string;
   /** 可点的原文链接（若有） */
   url?: string | null;
@@ -158,7 +163,10 @@ export async function collectEvidence(personaId: string): Promise<{
     items.push({
       source: s.type,
       sourceLabel: label,
-      kind: "profile",
+      /* ⚠️ 这类"已注入 X 条"是**源标记**，不是内容。
+         它只该出现在给 LLM 的证据包里；分源解析必须把它排除，
+         否则 itemCount 会多算一条（实测：微信显示 201 条而实际 200）。 */
+      kind: "marker",
       text: `已注入${bits.length ? `（${bits.join("，")}）` : ""}`,
       url: null,
     });
@@ -477,18 +485,29 @@ export async function distillPersona(
    * 而应用内的同步/蒸馏只写 evidence 与 values，facet 始终是旧的那一份
    * （或者干脆没有），所以卡片看起来永远不变。
    *
-   * 这里按源把**这次的证据包**重新算一遍并落库 —— 蒸馏本来就是"重新看一遍
-   * 所有数据"，顺手刷新每个源的解析最自然，也保证与综合画像同源。
+   * 所以这里必须继续刷新 —— 但**必须用正确的材料与口径**。之前踩了三个坑，
+   * 同一批微信聊天被算成「社交连接 1%」+「（只有标题、无正文）」就是它们造成的：
+   *   ① 材料用的是**证据包里截断到 160 字的文本**（`it.text`），
+   *      而不是库里那份完整 note（导入时最多存 2000 字）；
+   *   ② 没传 opts → 聊天记录按知乎长文口径算 → 短消息占比 ≥0.8 →
+   *      判定"只有标题" → 三维整组丢掉、social 按 0/300 算成 1%；
+   *   ③ 把「已注入 N 条」这类**源标记**和 SBTI 的类型标记也当成内容条目。
+   * 现在：材料从库里按源重读、口径走 `facetOptionsFor`、只取真正的行为源。
    */
-  const bySource = new Map<string, { text: string; heat?: number }[]>();
-  for (const it of items) {
-    if (!isObservedSource(it.source)) continue;
-    const list = bySource.get(it.source) ?? [];
-    list.push({ text: it.text, heat: it.weight });
-    bySource.set(it.source, list);
-  }
-  for (const [source, contents] of bySource) {
-    const facet = facetFromContents(source, SOURCE_LABELS[source] ?? source, contents);
+  const facetSources = [...new Set(items.map((it) => it.source))].filter(
+    (s) => isObservedSource(s) && isContentFacetSource(s),
+  );
+  for (const source of facetSources) {
+    const rows = await prisma.personaEvidence.findMany({
+      where: { personaId, source },
+      select: { note: true, value: true },
+    });
+    const contents = rows
+      .map((r) => ({ text: (r.note ?? "").trim(), heat: r.value ?? undefined }))
+      .filter((c) => c.text.length > 0);
+    const facet = facetFromContents(source, SOURCE_LABELS[source] ?? source, contents, {
+      ...facetOptionsFor(source),
+    });
     if (facet) await persistSourceFacet(personaId, facet);
   }
 

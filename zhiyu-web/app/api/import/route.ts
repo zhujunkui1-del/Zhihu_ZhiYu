@@ -15,6 +15,7 @@ import {
   type SessionInfo,
 } from "@/lib/import/parse";
 import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
+import { facetOptionsFor } from "@/lib/persona/facet-opts";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
 
 export const dynamic = "force-dynamic";
@@ -405,8 +406,7 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
     .map((r) => ({ text: (r.note ?? "").trim(), heat: r.value ?? undefined }))
     .filter((c) => c.text.length > 0);
   const facet = facetFromContents(source, IMPORT_SOURCE_LABEL[source], facetContents, {
-    noHeat: true,
-    profile: "im",
+    ...facetOptionsFor(source),
   });
   if (facet) {
     try {

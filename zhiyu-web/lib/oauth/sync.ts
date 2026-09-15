@@ -22,6 +22,7 @@ import {
 import { PROVIDER_META, type OAuthProvider } from "./platforms";
 import { readAccessToken, readP2pChatIds } from "./store";
 import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
+import { facetOptionsFor } from "@/lib/persona/facet-opts";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
 import { topEvidence, type ImportItem, type ImportSource } from "@/lib/import/parse";
 
@@ -286,7 +287,7 @@ export async function syncProvider(
     source,
     LABEL_OF[provider],
     all.map((r) => ({ text: (r.note ?? "").trim() })).filter((c) => c.text.length > 0),
-    { noHeat: true, profile: "im" },
+    facetOptionsFor(source),
   );
   if (facet) await persistSourceFacet(personaId, facet);
 
