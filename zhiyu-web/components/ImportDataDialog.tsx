@@ -470,26 +470,7 @@ export default function ImportDataDialog({
           )}
         </p>
 
-        <p className={styles.replaceNote} data-import-replace-note="1">
-          想要哪个效果，关掉这个窗口后选对按钮就行：
-          「覆盖」= 换成新的，「添加」= 保留旧的再加。
-          <button
-            type="button"
-            className={styles.moreLink}
-            onClick={() => setShowReplaceNote((v) => !v)}
-          >
-            {showReplaceNote ? "收起" : "多个聊天记录怎么一次全导入？"}
-          </button>
-        </p>
-        {showReplaceNote ? (
-          <p className={styles.replaceMore}>
-            把要保留的聊天记录<b>一次全选进来</b>（按住 Ctrl / Shift 多选，或分几次
-            「继续添加文件」），它们会合并成这个源的数据。
-            <br />
-            已经导入过的记录想继续保留：用<b>「添加」</b>按钮；想整体换成新的一批：
-            用<b>「覆盖」</b>按钮。
-          </p>
-        ) : null}
+        
 
         {/* ② 昵称：只蒸馏"我"说的话 */}
         <label className={styles.field}>
