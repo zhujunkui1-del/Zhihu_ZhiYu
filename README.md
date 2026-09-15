@@ -271,8 +271,6 @@ node scripts/verify-live-deploy.mjs https://www.zhiyuapp.site                   
 │   └── scripts/              90 个测试 / 端到端 / 诊断 / 回填脚本
 ├── 产品方案/                 产品与开发规范（唯一事实来源）
 ├── 前端UI/                   静态视觉原型（视觉唯一事实来源）
-├── RECON/                    页面验证脚本与踩坑记录（RESKIN.md）
-├── 开源项目/                 参考实现（distilly / WeFlow / qq-chat-exporter 等）
 └── AGENTS.md                 部署硬约束
 ```
 
