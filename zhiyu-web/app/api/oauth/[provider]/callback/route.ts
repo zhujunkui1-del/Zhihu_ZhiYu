@@ -2,27 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveIdentity } from "@/lib/auth/current-user";
 import { consumeState } from "@/lib/auth/session";
 import { exchangeCode, OAuthApiError } from "@/lib/oauth/clients";
-import { isOAuthProvider, readProviderEnv, type OAuthProvider } from "@/lib/oauth/platforms";
+import { redirectUriFor, resolveProviderEnv } from "@/lib/oauth/apps";
+import { isOAuthProvider, type OAuthProvider } from "@/lib/oauth/platforms";
 import { saveLinkedAccount } from "@/lib/oauth/store";
+import { syncProvider } from "@/lib/oauth/sync";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ provider: string }> };
 
 /**
- * 第三方平台授权回调。
+ * 第三方平台授权回调 —— 一步到位：换 token → 落库 → **立刻拉数据** → 跳回。
  *
- * 流程：校验并原子消费 state → 授权码换 token → 加密落库 → 跳回「我的人格」。
- * 失败一律跳回并带 `?link=<原因>`，**不把 token / secret 放进 URL 或日志**。
+ * 为什么不把"拉数据"留给用户再点一次：用户要的是「能不让用户动手就不要让用户做」。
+ * 他在平台上点完"同意"，回来就该看到数据已经进来了。
+ * 拉取失败也不影响授权本身（token 已保存），跳回时带上失败原因。
  *
- * 注意：这里**只完成授权**，不顺手拉数据 —— 拉数据放在
- * `POST /api/oauth/<provider>/sync`，这样用户能先看到"授权成功"再决定同步，
- * 也让同步失败时不会把授权状态一起搞乱。
+ * 全程**不把 token / secret 放进 URL 或日志**。
  */
 export async function GET(req: NextRequest, { params }: Params) {
   const { provider: raw } = await params;
   const origin = req.nextUrl.origin;
-  const params2 = req.nextUrl.searchParams;
+  const q = req.nextUrl.searchParams;
 
   const fail = (reason: string) => {
     const back = new URL("/persona", origin);
@@ -37,17 +39,16 @@ export async function GET(req: NextRequest, { params }: Params) {
   const me = await resolveIdentity();
   if (!me?.userId) return fail("unauthenticated");
 
-  const env = readProviderEnv(provider);
-  if (!env) return fail(`${provider}_unconfigured`);
+  const stored = await resolveProviderEnv(provider);
+  if (!stored) return fail(`${provider}_unconfigured`);
+  const env = { ...stored, redirectUri: redirectUriFor(provider, origin) };
 
-  /* 用户点了"拒绝"或平台直接回错误 */
-  const errParam = params2.get("error") ?? params2.get("error_code");
-  if (errParam) return fail("denied");
+  if (q.get("error") || q.get("error_code")) return fail("denied");
 
-  const check = await consumeState(params2.get("state"));
+  const check = await consumeState(q.get("state"));
   if (!check.ok && check.reason !== "missing") return fail(`state_${check.reason}`);
 
-  const code = params2.get("code") ?? params2.get("authCode") ?? params2.get("authorization_code");
+  const code = q.get("code") ?? q.get("authCode") ?? q.get("authorization_code");
   if (!code) return fail("code_missing");
 
   try {
@@ -59,7 +60,19 @@ export async function GET(req: NextRequest, { params }: Params) {
     return fail(`exchange_failed_${code2}`);
   }
 
-  const back = new URL(check.ok ? (check.returnTo ?? "/persona") : "/persona", origin);
-  back.searchParams.set("linked", provider);
+  /* ── 授权成功，立刻拉数据（用户不用再点第二次）── */
+  const back = new URL("/persona", origin);
+  back.searchParams.set("tab", "sources");
+  try {
+    const r = await syncProvider(me.userId, me.ownPersonaId ?? "", provider, "append");
+    back.searchParams.set("linked", provider);
+    back.searchParams.set("pulled", String(r.pulled));
+    back.searchParams.set("total", String(r.total));
+  } catch (e) {
+    /* 授权本身是成功的，只是这次没拉到数据 —— 如实告知，不假装成功 */
+    console.error(`[oauth/${provider}] 授权后自动同步失败`, e);
+    back.searchParams.set("linked", provider);
+    back.searchParams.set("syncFailed", (e as Error).message.slice(0, 120));
+  }
   return NextResponse.redirect(back);
 }

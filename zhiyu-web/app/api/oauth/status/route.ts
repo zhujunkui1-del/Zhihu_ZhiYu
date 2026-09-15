@@ -1,52 +1,54 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { resolveIdentity } from "@/lib/auth/current-user";
-import {
-  OAUTH_PROVIDERS,
-  PROVIDER_META,
-  providerConfigStatus,
-  type OAuthProvider,
-} from "@/lib/oauth/platforms";
+import { platformAppStatus, redirectUriFor } from "@/lib/oauth/apps";
+import { isOAuthProvider, PROVIDER_META, type OAuthProvider } from "@/lib/oauth/platforms";
 import { listLinkedAccounts } from "@/lib/oauth/store";
 
 export const dynamic = "force-dynamic";
 
 /**
- * 授权状态查询（给「我的人格 → 注入数据」页用）。
+ * 「同步数据」按钮要的状态：配没配凭证、授权没授权。
  *
- * 返回三样东西，界面据此决定显示"引导配置"还是"授权按钮"还是"同步按钮"：
- *   · capability —— 这个平台授权后能拉到什么、**拉不到**什么（照实展示）
- *   · configured —— 服务端有没有配好应用凭证（没配就展示申请步骤，而不是死按钮）
- *   · linked     —— 当前用户是否已授权、是否过期
- *
- * **绝不返回 app_secret / access_token**：只有"配没配"和回调地址（不是秘密）。
+ * **只回状态，不回任何秘密**（App ID 不是秘密，回调地址也不是）。
+ * 界面据此决定：直接跳授权页 / 打开发配置向导 / 直接同步。
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const me = await resolveIdentity();
-  const configured = providerConfigStatus();
+  const apps = await platformAppStatus(req.nextUrl.origin);
   const linked = me?.userId ? await listLinkedAccounts(me.userId) : [];
   const byProvider = new Map(linked.map((l) => [l.provider, l] as const));
 
   const providers = {} as Record<
     OAuthProvider,
     {
-      meta: (typeof PROVIDER_META)[OAuthProvider];
+      provider: OAuthProvider;
+      label: string;
       configured: boolean;
+      /** App ID（非秘密），配置向导里回显用 */
+      appId: string | null;
+      /** 用户要复制到平台后台的回调地址 */
       redirectUri: string;
-      envKeys: { appId: string; appSecret: string; redirectUri: string };
+      /** 平台开放平台入口 */
+      consoleUrl: string;
+      scope: string;
       linked: { displayName: string | null; expired: boolean } | null;
     }
   >;
 
-  for (const p of OAUTH_PROVIDERS) {
+  for (const p of ["feishu", "dingtalk"] as OAuthProvider[]) {
     const l = byProvider.get(p);
     providers[p] = {
-      meta: PROVIDER_META[p],
-      configured: configured[p].configured,
-      redirectUri: configured[p].redirectUri,
-      envKeys: configured[p].envKeys,
+      provider: p,
+      label: PROVIDER_META[p].label,
+      configured: apps[p].configured,
+      appId: apps[p].appId,
+      redirectUri: redirectUriFor(p, req.nextUrl.origin),
+      consoleUrl: PROVIDER_META[p].consoleUrl,
+      scope: PROVIDER_META[p].scope,
       linked: l ? { displayName: l.displayName, expired: l.expired } : null,
     };
   }
 
+  void isOAuthProvider;
   return NextResponse.json({ ok: true, providers });
 }

@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { resolveIdentity } from "@/lib/auth/current-user";
 import { issueState, SESSION_COOKIE } from "@/lib/auth/session";
+import { redirectUriFor, resolveProviderEnv } from "@/lib/oauth/apps";
 import {
   buildAuthorizeUrl,
   isOAuthProvider,
-  readProviderEnv,
-  PROVIDER_META,
   type OAuthProvider,
 } from "@/lib/oauth/platforms";
 
@@ -15,13 +14,10 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ provider: string }> };
 
 /**
- * 发起第三方平台授权（飞书 / 钉钉）。
+ * 发起第三方平台授权（飞书 / 钉钉）—— 「同步数据」按钮点下去就到这里。
  *
- * 与知乎授权同一套骨架：生成 state → 落库（防 CSRF / 重放）→ 跳平台授权页。
- *
- * 未配置应用凭证时**不报错**，而是回到「我的人格」页并带上 `?link=<provider>_unconfigured`，
- * 由页面展示**申请与配置步骤** —— 这是用户明确要求的"引导"：
- * 没配凭证时不能只给一个点了没反应的按钮。
+ * 配置好之后这里**一步直达平台授权页**：用户只需在平台上点一次"同意"，
+ * 回来（callback）就自动拉数据，不需要再点第二次。
  */
 export async function GET(req: NextRequest, { params }: Params) {
   const { provider: raw } = await params;
@@ -40,12 +36,14 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.redirect(back);
   }
 
-  const env = readProviderEnv(provider);
-  if (!env) {
-    /* 没配置就把需要配的东西告诉用户（环境变量名 + 控制台入口） */
+  const stored = await resolveProviderEnv(provider);
+  if (!stored) {
+    /* 还没配应用凭证 → 回到「我的人格」并打开配置向导（不是一堆文字） */
     back.searchParams.set("link", `${provider}_unconfigured`);
     return NextResponse.redirect(back);
   }
+  /* 回调地址以当前站点为准（库里存的可能是别的域名） */
+  const env = { ...stored, redirectUri: redirectUriFor(provider, req.nextUrl.origin) };
 
   const jar = await cookies();
   const state = await issueState({
@@ -53,6 +51,5 @@ export async function GET(req: NextRequest, { params }: Params) {
     returnTo: `/persona?tab=sources&linked=${provider}`,
   });
 
-  void PROVIDER_META[provider];
   return NextResponse.redirect(buildAuthorizeUrl(provider, env, state));
 }

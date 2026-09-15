@@ -158,6 +158,24 @@ model Persona {
   @@index([city])
 }
 
+/// 站点级的第三方平台应用凭证（飞书 / 钉钉）。
+///
+/// 为什么不只用环境变量：环境变量要用户去 Vercel 后台加，多一步、易错。
+/// 这里让**运营者在本站设置页填一次**，服务端加密存库 ——
+/// 之后所有访客点「同步数据」都能直接走授权，不用再碰任何配置文件。
+/// app_secret 加密落库（lib/crypto.ts），**永不回传前端**。
+model PlatformApp {
+  id             String   @id @default(cuid())
+  /// provider：feishu | dingtalk
+  provider       String   @unique
+  appId          String
+  appSecretEnc   String
+  /// 回调地址（用户填到平台后台的那个），存下来便于一键复制与自检
+  redirectUri    String?
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+}
+
 /// 已授权的第三方账号（飞书 / 钉钉）。
 ///
 /// 为什么要单独一张表而不是复用 AuthSession.zhihuTokenEnc：

@@ -696,40 +696,52 @@ rec(
   (noContent.body?.warnings ?? []).join(" ⏐ ").slice(0, 120),
 );
 
-/* ───────── ⑩ 按钮三态 + 添加模式 + 授权引导 ───────── */
-console.log("\n== ⑩ 按钮三态（未注入一个 / 已注入两个）==");
+/* ───────── ⑩ 按钮形态 ───────── */
+console.log("\n== ⑩ 按钮形态（首次一个 / 已注入两个 / 平台源多一个同步）==");
 
-/* 先把钉钉清成"未注入"，才能验证首次使用时的单按钮形态 */
+/* 先把钉钉清成"未注入"，才能验证平台源的按钮形态 */
 await prisma.personaEvidence.deleteMany({ where: { personaId, source: "dingtalk" } });
 await prisma.personaSource.updateMany({
   where: { personaId, type: "dingtalk" },
   data: { status: "not_injected" },
 });
 await gotoSources();
-const firstTime = await page.evaluate(() => {
+
+const platCard = await page.evaluate(() => {
   const card = document.querySelector('[data-open-import="dingtalk"]')?.closest("article");
-  const buttons = [...(card?.querySelectorAll("button") ?? [])].map((b) => b.textContent.trim());
-  return { buttons, text: card?.textContent ?? "" };
+  return {
+    buttons: [...(card?.querySelectorAll("button") ?? [])].map((b) => b.textContent.trim()),
+    text: (card?.textContent ?? "").replace(/\s+/g, " ").trim(),
+    sync: Boolean(card?.querySelector("[data-provider-sync]")),
+    appendMode: card
+      ?.querySelector('[data-open-import="dingtalk"]')
+      ?.getAttribute("data-import-mode"),
+  };
 });
 rec(
-  "未注入时只有**一个**导入按钮，文案「导入钉钉数据」",
-  firstTime.buttons.filter((b) => b.includes("导入") || b.includes("覆盖") || b.includes("添加")).length === 1 &&
-    firstTime.buttons.some((b) => b === "导入钉钉数据"),
-  firstTime.buttons.join(" ｜ "),
+  "飞书/钉钉卡片有「同步数据」按钮",
+  platCard.sync && platCard.buttons.some((b) => b === "同步数据"),
+  platCard.buttons.join(" ｜ "),
+);
+rec(
+  "飞书/钉钉卡片有「手动导入数据」按钮，且是**只加不删**（append）",
+  platCard.buttons.includes("手动导入数据") && platCard.appendMode === "append",
+  `data-import-mode=${platCard.appendMode}`,
+);
+rec(
+  "⚠️ 卡片上没有大段文字说明（用户要求删掉）",
+  platCard.text.length < 160,
+  `${platCard.text.length} 字：${platCard.text.slice(0, 120)}`,
 );
 
-/* 已注入的源（微信）应当是两个按钮 */
 const injected = await page.evaluate(() => {
   const card = document.querySelector('[data-open-import="wechat"]')?.closest("article");
   return [...(card?.querySelectorAll("button") ?? [])]
-    .map((b) => ({
-      text: b.textContent.trim(),
-      mode: b.getAttribute("data-import-mode"),
-    }))
+    .map((b) => ({ text: b.textContent.trim(), mode: b.getAttribute("data-import-mode") }))
     .filter((b) => b.mode);
 });
 rec(
-  "已注入时有**两个**按钮：「覆盖聊天记录」+「添加聊天记录」",
+  "微信（已注入）是两个按钮：「覆盖聊天记录」+「添加聊天记录」",
   injected.length === 2 &&
     injected.some((b) => b.text === "覆盖聊天记录" && b.mode === "replace") &&
     injected.some((b) => b.text === "添加聊天记录" && b.mode === "append"),
@@ -772,67 +784,91 @@ const oldStillThere = await prisma.personaEvidence.count({
 });
 rec("上次导入的内容（「技术债」那条）还在", oldStillThere > 0, `${oldStillThere} 条`);
 
-/* 授权引导区块 */
-console.log("\n== ⑫ 飞书 / 钉钉：必须引导用户授权（而不是只给手动导入）==");
+/* 授权引导 */
+console.log("\n== ⑫ 「同步数据」的配置向导（三步跳转，无大段文字）==");
 await page.evaluate(() => {
   document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
 });
 await page.waitForTimeout(400);
 await gotoSources();
-const linkBlocks = await page.evaluate(() =>
-  ["feishu", "dingtalk"].map((p) => {
-    const el = document.querySelector(`[data-provider-link="${p}"]`);
-    return {
-      p,
-      exists: Boolean(el),
-      text: el?.textContent ?? "",
-      setup: Boolean(el?.querySelector("[data-provider-setup]")),
-      cannot: [...(el?.querySelectorAll("[data-cannot-pull]") ?? [])].map((x) =>
-        x.textContent.trim(),
-      ),
-    };
-  }),
-);
-for (const b of linkBlocks) {
-  rec(`${b.p} 卡片里有「授权自动同步」区块`, b.exists, b.text.replace(/\s+/g, " ").slice(0, 80));
-  rec(
-    `${b.p} 区块写明了「读不到什么」（不隐瞒才叫引导）`,
-    b.cannot.length > 0,
-    b.cannot.map((x) => x.slice(0, 60)).join(" ｜ "),
-  );
-}
-rec(
-  "未配置凭证时展示**配置步骤**而不是死按钮",
-  linkBlocks.every((b) => b.setup),
-  linkBlocks.map((b) => `${b.p}=${b.setup}`).join(" "),
-);
-const setupDetail = await page.evaluate(async () => {
-  const btn = document
-    .querySelector('[data-provider-link="feishu"] [data-provider-setup] button');
-  btn?.click();
-  await new Promise((r) => setTimeout(r, 300));
-  const el = document.querySelector('[data-provider-link="feishu"]');
-  return el?.textContent ?? "";
+
+/* 未配置凭证时点「同步数据」应弹出三步向导 */
+await clickSel('[data-provider-link="feishu"] [data-provider-sync]');
+await page.waitForTimeout(900);
+const wizard = await page.evaluate(() => {
+  const w = document.querySelector("[data-sync-setup]");
+  if (!w) return null;
+  const steps = [...w.querySelectorAll("[data-step]")].map((s) => ({
+    n: s.getAttribute("data-step"),
+    text: s.textContent.replace(/\s+/g, " ").trim(),
+  }));
+  return {
+    provider: w.getAttribute("data-sync-setup"),
+    steps,
+    consoleLink: w.querySelector("[data-setup-open-console]")?.getAttribute("href") ?? "",
+    redirect: w.querySelector("[data-setup-redirect]")?.textContent?.trim() ?? "",
+    hasCopy: Boolean(w.querySelector("[data-setup-copy]")),
+    hasAppId: Boolean(w.querySelector("[data-setup-appid]")),
+    hasSecret: Boolean(w.querySelector("[data-setup-secret]")),
+    chars: (w.textContent ?? "").replace(/\s+/g, " ").trim().length,
+  };
 });
+rec("点「同步数据」弹出配置向导", Boolean(wizard), wizard ? `provider=${wizard.provider}` : "(没弹出)");
+rec("向导是三步", wizard?.steps.length === 3, wizard?.steps.map((s) => s.n).join(","));
 rec(
-  "展开后有环境变量名与回调地址（用户照着就能配）",
-  setupDetail.includes("FEISHU_APP_ID") &&
-    setupDetail.includes("FEISHU_APP_SECRET") &&
-    setupDetail.includes("FEISHU_OAUTH_REDIRECT_URI"),
-  setupDetail.replace(/\s+/g, " ").match(/FEISHU[^）]{0,120}/)?.[0] ?? "(没找到)",
+  "第 1 步直接跳平台开放平台（新标签打开）",
+  wizard?.consoleLink.startsWith("https://open."),
+  wizard?.consoleLink,
 );
 rec(
-  "并说明配好之前仍可手动导入（给出退路）",
-  setupDetail.includes("手动导入"),
-  setupDetail.replace(/\s+/g, " ").slice(-120),
+  "第 2 步给出**本站的**回调地址 + 一键复制",
+  Boolean(wizard?.redirect.includes("/api/oauth/feishu/callback")) && wizard?.hasCopy === true,
+  wizard?.redirect,
 );
 rec(
-  "钉钉区块写明了「聊天消息拉不到」（钉钉 API 限制，不能瞒）",
-  linkBlocks
-    .find((b) => b.p === "dingtalk")
-    ?.text.includes("消息"),
-  linkBlocks.find((b) => b.p === "dingtalk")?.cannot.join(" ｜ ").slice(0, 100),
+  "第 3 步就是两个输入框（App ID / Secret），不用去 Vercel 配环境变量",
+  wizard?.hasAppId === true && wizard?.hasSecret === true,
 );
+rec(
+  "⚠️ 向导总字数很少（不搞大段说明）",
+  (wizard?.chars ?? 9999) < 260,
+  `${wizard?.chars} 字`,
+);
+
+/* 填了凭证要能存下来（存完会自动跳授权，这里只验证保存接口本身） */
+const saveRes = await page.evaluate(async () => {
+  const r = await fetch("/api/oauth/app", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "feishu",
+      appId: "cli_selftest_only",
+      appSecret: "selftest_secret_not_real",
+    }),
+  });
+  const status = await fetch("/api/oauth/status").then((x) => x.json());
+  return {
+    save: await r.json(),
+    configured: status.providers?.feishu?.configured,
+    appId: status.providers?.feishu?.appId,
+    leak: JSON.stringify(status).includes("selftest_secret_not_real"),
+  };
+});
+rec("凭证能保存（存本站，不用配环境变量）", saveRes.save?.ok === true, JSON.stringify(saveRes.save).slice(0, 90));
+rec("保存后状态变为已配置", saveRes.configured === true, `appId=${saveRes.appId}`);
+rec("⚠️ 状态接口**不回传 secret**", saveRes.leak === false);
+
+/* 收尾：把这把自测凭证删掉，恢复"未配置"（否则线上会带着假凭证） */
+const cleaned = await page.evaluate(async () => {
+  const r = await fetch("/api/oauth/app", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "feishu", appId: "", appSecret: "" }),
+  });
+  const status = await fetch("/api/oauth/status").then((x) => x.json());
+  return { ok: (await r.json()).ok, configured: status.providers?.feishu?.configured };
+});
+rec("自测凭证已清除，恢复未配置", cleaned.ok === true && cleaned.configured === false);
 
 rec("无 JS 报错", errs.length === 0, errs.slice(0, 3).join(" ⏐ "));
 

@@ -1,0 +1,131 @@
+/* 「同步数据」首次配置向导：三步、每步一句话 + 一个按钮 */
+
+.wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(38, 32, 26, 0.42);
+  backdrop-filter: blur(2px);
+}
+.dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 24px 24px 18px;
+  border: 1.8px solid var(--line-soft);
+  border-radius: var(--r-hand-lg);
+  background: var(--paper, #fffdf6);
+  box-shadow: 0 24px 60px rgba(40, 30, 20, 0.24);
+}
+.close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.title {
+  margin: 0 0 4px;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--fg);
+}
+.sub {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+.steps li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: center;
+}
+.num {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.stepText {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--fg);
+}
+.steps li > a,
+.steps li > .copyRow,
+.steps li > .inputs {
+  grid-column: 2;
+}
+.copyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.uri {
+  flex: 1 1 240px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+.inputs {
+  display: grid;
+  gap: 6px;
+}
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: #fff;
+  color: var(--fg);
+  font-size: 13px;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.msg {
+  margin: 12px 0 0;
+  color: #a8371f;
+  font-size: 12.5px;
+}
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}

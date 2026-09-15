@@ -2,46 +2,33 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { OAuthProvider } from "@/lib/oauth/platforms";
-import { reportError, reportSuccess } from "@/lib/client/error-bus";
+import { reportError } from "@/lib/client/error-bus";
+import SyncSetup from "./SyncSetup";
 import styles from "./ProviderLink.module.css";
 
 /**
- * 「授权平台自动同步」区块（飞书 / 钉钉）。
+ * 「同步数据」按钮 —— 飞书 / 钉钉卡片上那一个。
  *
  * ── 需求（用户原话）────────────────────────────────────────────────────
- *   「你要引导用户允许授权网站使用他们的飞书、钉钉账号的数据呀。」
+ *   「按钮分成两个，一个"同步数据"…一步步跳转网页，一步步引导用户操作，
+ *     能不让用户动手就不要让用户做。」
+ *   「不要搞一大堆文字说明！！！」
  *
- * 所以这个区块在**三种状态下都给得出下一步**，绝不出现"点了没反应"：
- *   ① 服务端还没配应用凭证 → 展示**申请与配置步骤**（含环境变量名与控制台入口），
- *      并如实说明"配好之后这里会变成授权按钮"
- *   ② 配好了但用户没授权 → 「授权飞书并同步」，点进平台授权页
- *   ③ 已授权 → 「同步」/「追加同步」，另有"重新授权"与"解除授权"
- *
- * 并且无论哪种状态，都先把**会读什么、读不到什么**写在按钮上方 ——
- * 让用户在点"同意"之前就知道自己交出去的是什么。
+ * 所以这里**只有一行状态 + 一个按钮**，点下去自动分流：
+ *   未配置凭证 → 弹三步向导（点按钮跳平台、复制回调地址、粘 App ID/Secret）
+ *   已配置未授权 → 直接跳平台授权页（回来即自动同步）
+ *   已授权 → 直接同步（只加不删）
  */
 
 interface ProviderStatus {
-  meta: {
-    provider: OAuthProvider;
-    label: string;
-    connectLabel: string;
-    summary: string;
-    capability: { canPull: string[]; cannotPull: { what: string; why: string }[] };
-    setupSteps: string[];
-    envKeys: { appId: string; appSecret: string; redirectUri: string };
-    consoleUrl: string;
-    scope: string;
-  };
+  provider: OAuthProvider;
+  label: string;
   configured: boolean;
-  redirectUri: string;
-  envKeys: { appId: string; appSecret: string; redirectUri: string };
   linked: { displayName: string | null; expired: boolean } | null;
 }
 
 export default function ProviderLink({
   provider,
-  /** 同步成功后通知父组件刷新服务端数据 */
   onSynced,
 }: {
   provider: OAuthProvider;
@@ -49,8 +36,8 @@ export default function ProviderLink({
 }) {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [showSteps, setShowSteps] = useState(false);
+  const [note, setNote] = useState("");
+  const [wizard, setWizard] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -58,9 +45,9 @@ export default function ProviderLink({
         ok: boolean;
         providers: Record<string, ProviderStatus>;
       };
-      if (r.ok) setStatus(r.providers[provider] ?? null);
+      if (r.ok) setStatus(r.providers?.[provider] ?? null);
     } catch {
-      /* 查不到就不显示这个区块，不打断主流程 */
+      /* 查不到就不显示按钮，不打断主流程 */
     }
   }, [provider]);
 
@@ -68,180 +55,107 @@ export default function ProviderLink({
     void load();
   }, [load]);
 
-  const sync = useCallback(
-    async (mode: "replace" | "append") => {
-      setBusy(true);
-      setMsg("");
-      try {
-        const r = (await fetch(`/api/oauth/${provider}/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-silent-error": "1" },
-          body: JSON.stringify({ mode }),
-        }).then((x) => x.json())) as {
-          ok: boolean;
-          error?: string;
-          code?: string;
-          counts?: { pulled: number; evidence: number; total: number };
-          warning?: string;
-        };
-        if (!r.ok) {
-          setMsg(r.error ?? "同步失败");
-          reportError(new Error(r.error ?? "同步失败"), { title: `${status?.meta.label ?? ""}同步失败` });
+  /* 授权回来时带上结果（callback 会顺手同步），直接展示，省一次点击 */
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).toString();
+    if (!q.includes(`linked=${provider}`)) return;
+    const sp = new URLSearchParams(q);
+    const pulled = sp.get("pulled");
+    const failed = sp.get("syncFailed");
+    if (pulled) setNote(`已同步 ${pulled} 条`);
+    else if (failed) setNote(`已授权，但同步失败：${failed}`);
+  }, [provider]);
+
+  const sync = useCallback(async () => {
+    setBusy(true);
+    setNote("");
+    try {
+      const r = (await fetch(`/api/oauth/${provider}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-silent-error": "1" },
+        body: JSON.stringify({ mode: "append" }),
+      }).then((x) => x.json())) as {
+        ok: boolean;
+        error?: string;
+        code?: string;
+        counts?: { pulled: number; written: number; total: number };
+      };
+
+      if (!r.ok) {
+        /* 授权过期 / 没授权 → 直接推去授权，不让用户自己判断 */
+        if (r.code === "NOT_LINKED" || r.code === "TOKEN_EXPIRED") {
+          window.location.href = `/api/oauth/${provider}`;
           return;
         }
-        setMsg(
-          `同步完成：拉到 ${r.counts?.pulled ?? 0} 条，写入证据 ${r.counts?.evidence ?? 0} 条` +
-            `（该源现有 ${r.counts?.total ?? 0} 条）。`,
-        );
-        reportSuccess(`${status?.meta.label ?? ""}数据已同步`);
-        onSynced();
-      } catch (e) {
-        setMsg(`同步失败：${(e as Error).message}`);
-        reportError(e, { title: "同步失败" });
-      } finally {
-        setBusy(false);
+        setNote(r.error ?? "同步失败");
+        reportError(new Error(r.error ?? "同步失败"), { title: "同步失败" });
+        return;
       }
-    },
-    [onSynced, provider, status?.meta.label],
-  );
+      setNote(
+        `新增 ${r.counts?.written ?? 0} 条（读到 ${r.counts?.pulled ?? 0} 条，共 ${
+          r.counts?.total ?? 0
+        } 条）`,
+      );
+      onSynced();
+    } catch (e) {
+      setNote(`同步失败：${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [onSynced, provider]);
+
+  const onClick = useCallback(() => {
+    if (!status) return;
+    /* 没配凭证 → 向导；配了但没授权 → 直接跳授权页；都好了 → 同步 */
+    if (!status.configured) {
+      setWizard(true);
+      return;
+    }
+    if (!status.linked || status.linked.expired) {
+      window.location.href = `/api/oauth/${provider}`;
+      return;
+    }
+    void sync();
+  }, [status, sync, provider]);
 
   if (!status) return null;
-  const { meta, configured, linked } = status;
-  /* 授权地址就在本站，用 location 跳转（后端会 302 到平台授权页） */
-  const authorizeHref = `/api/oauth/${provider}?returnTo=${encodeURIComponent(
-    "/persona?tab=sources",
-  )}`;
+
+  const state = !status.configured
+    ? "未配置"
+    : status.linked && !status.linked.expired
+      ? status.linked.displayName
+        ? `已连接 ${status.linked.displayName}`
+        : "已连接"
+      : "未授权";
 
   return (
-    <div className={styles.wrap} data-provider-link={provider}>
-      <p className={styles.head}>
-        <span className={styles.badge}>授权自动同步</span>
-        {linked && !linked.expired ? (
-          <span className={styles.linked}>
-            已授权{linked.displayName ? `（${linked.displayName}）` : ""}
-          </span>
-        ) : linked ? (
-          <span className={styles.expired}>授权已过期，请重新授权</span>
-        ) : (
-          <span className={styles.unlinked}>{configured ? "尚未授权" : "功能待配置"}</span>
-        )}
-      </p>
+    <span className={styles.row} data-provider-link={provider}>
+      <button
+        type="button"
+        className="btn btnPrimary btnSm"
+        onClick={onClick}
+        disabled={busy}
+        data-provider-sync="1"
+        data-provider-state={state}
+      >
+        {busy ? "同步中…" : "同步数据"}
+      </button>
+      <span className={styles.state} data-provider-state-text="1">
+        {note || state}
+      </span>
 
-      {/* 会读什么 / 读不到什么 —— 点"同意"之前就该看到 */}
-      <p className={styles.summary}>{meta.summary}</p>
-      <ul className={styles.can}>
-        {meta.capability.canPull.map((x) => (
-          <li key={x}>
-            <b>可读取</b>
-            {x}
-          </li>
-        ))}
-        {meta.capability.cannotPull.map((c) => (
-          <li key={c.what} data-cannot-pull="1">
-            <b>读不到</b>
-            {c.what} —— {c.why}
-          </li>
-        ))}
-      </ul>
-
-      {configured ? (
-        <div className={styles.actions}>
-          {linked && !linked.expired ? (
-            <>
-              <button
-                type="button"
-                className="btn btnPrimary btnSm"
-                data-provider-sync="replace"
-                onClick={() => void sync("replace")}
-                disabled={busy}
-              >
-                {busy ? "同步中…" : "同步（覆盖）"}
-              </button>
-              <button
-                type="button"
-                className="btn btnSecondary btnSm"
-                data-provider-sync="append"
-                onClick={() => void sync("append")}
-                disabled={busy}
-              >
-                追加同步
-              </button>
-              <a className={styles.relink} href={authorizeHref}>
-                重新授权
-              </a>
-            </>
-          ) : (
-            <a
-              className="btn btnPrimary btnSm"
-              data-provider-authorize="1"
-              href={authorizeHref}
-            >
-              {meta.connectLabel}
-            </a>
-          )}
-        </div>
-      ) : (
-        <div className={styles.setup} data-provider-setup="1">
-          <p className={styles.setupLead}>
-            本站还没有配置{meta.label}应用凭证，所以自动同步暂时不可用 ——
-            自动同步需要你先在{meta.label}开放平台注册一个应用，
-            把凭证交给本站使用（本站只读取上面列出的数据，不会写、不会改）。
-          </p>
-          <button
-            type="button"
-            className={styles.stepsToggle}
-            onClick={() => setShowSteps((v) => !v)}
-          >
-            {showSteps ? "收起配置步骤" : `查看配置步骤（${meta.setupSteps.length} 步）`}
-          </button>
-          {showSteps ? (
-            <div className={styles.steps}>
-              <ol>
-                {meta.setupSteps.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-              <ul className={styles.envList}>
-                <li>
-                  <code>{status.envKeys.appId}</code>
-                </li>
-                <li>
-                  <code>{status.envKeys.appSecret}</code>
-                </li>
-                <li>
-                  <code>{status.envKeys.redirectUri}</code>
-                  {status.redirectUri ? ` = ${status.redirectUri}` : ""}
-                </li>
-              </ul>
-              {status.redirectUri ? (
-                <p className={styles.redirectNote}>
-                  回调地址就是这个（填到平台后台的「重定向 URL / 回调域名」里）：
-                  <code>{status.redirectUri}</code>
-                </p>
-              ) : null}
-              <p className={styles.consoleNote}>
-                申请入口：
-                <a href={meta.consoleUrl} target="_blank" rel="noreferrer noopener">
-                  {meta.consoleUrl} ↗
-                </a>
-                <br />
-                需要的权限：<code>{meta.scope}</code>
-              </p>
-              <p className={styles.fallbackNote}>
-                在配好之前，{meta.label}的数据仍可用下方的
-                <b>手动导入</b>
-                提供（用 distilly 在本机采集，或平台自带的导出功能）。
-              </p>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {msg ? (
-        <p className={styles.msg} data-provider-msg="1">
-          {msg}
-        </p>
+      {wizard ? (
+        <SyncSetup
+          provider={provider}
+          onClose={() => setWizard(false)}
+          onSaved={() => {
+            setWizard(false);
+            void load();
+            /* 存完凭证直接推去授权 —— 用户不需要再点一次 */
+            window.location.href = `/api/oauth/${provider}`;
+          }}
+        />
       ) : null}
-    </div>
+    </span>
   );
 }

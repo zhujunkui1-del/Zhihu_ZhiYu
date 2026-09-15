@@ -24,9 +24,15 @@ import styles from "./persona.module.css";
 const IMPORT_LABEL: Record<string, { first: string; replace: string; append: string }> = {
   wechat: { first: "导入聊天记录", replace: "覆盖聊天记录", append: "添加聊天记录" },
   qq: { first: "导入聊天记录", replace: "覆盖聊天记录", append: "添加聊天记录" },
-  feishu: { first: "导入飞书数据", replace: "覆盖飞书数据", append: "添加飞书数据" },
-  dingtalk: { first: "导入钉钉数据", replace: "覆盖钉钉数据", append: "添加钉钉数据" },
+  feishu: { first: "手动导入数据", replace: "覆盖数据", append: "手动导入数据" },
+  dingtalk: { first: "手动导入数据", replace: "覆盖数据", append: "手动导入数据" },
 };
+
+/** 支持「同步数据」的两个平台源（授权后自动拉，不用手动导文件） */
+const PLATFORM_SOURCES = ["feishu", "dingtalk"] as const;
+function isPlatformSource(t: string): t is (typeof PLATFORM_SOURCES)[number] {
+  return (PLATFORM_SOURCES as readonly string[]).includes(t);
+}
 
 type Tab = "card" | "sources" | "distill";
 
@@ -66,37 +72,37 @@ const SOURCE_META: Record<
     title: "微信聊天记录",
     dim: "私域人格 · 本地文件导入",
     action: "导入聊天记录",
-    note: "上传导出的聊天 JSON / TXT / CSV，可一次选多份（会合并）。重新导入会替换这个源上一次的数据，其它源不受影响。",
+    note: "",
   },
   qq: {
     title: "QQ 聊天记录",
     dim: "私域人格 · 本地文件导入",
     action: "导入聊天记录",
-    note: "支持 QCE / TIM 导出的 TXT、JSON、CSV，可一次选多份。只提取你发的内容，群聊私聊都行。",
+    note: "",
   },
   feishu: {
     title: "飞书工作数据",
-    dim: "职场人格 · 消息导出 / distilly",
-    action: "导入飞书数据",
-    note: "支持飞书官方消息导出 JSON，以及 distilly 采集脚本产出的 messages.txt / docs.txt。可一次选多份。",
+    dim: "职场人格 · 授权同步 / 手动导入",
+    action: "手动导入数据",
+    note: "",
   },
   dingtalk: {
     title: "钉钉工作数据",
-    dim: "职场人格 · 文档 + 消息导入",
-    action: "导入钉钉数据",
-    note: "支持 distilly 钉钉采集脚本产出的 docs.txt / bitables.txt / messages.txt。可一次选多份。",
+    dim: "职场人格 · 授权同步 / 手动导入",
+    action: "手动导入数据",
+    note: "",
   },
   zhihu: {
     title: "知乎公开数据",
     dim: "公共人格 · OAuth 授权",
     action: "连接知乎",
-    note: "读取你的公开回答、想法与关注，用于推断「表达的我」。",
+    note: "",
   },
   sbti: {
     title: "SBTI 四维自评",
     dim: "显性人格 · 产品内置",
     action: "去完成 SBTI",
-    note: "30 题、约 3 分钟。它记录的是「你眼中的自己」。",
+    note: "",
   },
 };
 
@@ -637,16 +643,7 @@ export default function PersonaClient({
                     </span>
                   </div>
 
-                  <p className={styles.srcNote}>{meta.note}</p>
-
-                  {/* 飞书 / 钉钉：**授权自动同步**（用户要求"引导用户授权网站使用他们的账号数据"）。
-                      能授权就真授权；平台拉不到的部分（如钉钉的消息）如实写在区块里。 */}
-                  {isSelf && (c.type === "feishu" || c.type === "dingtalk") ? (
-                    <ProviderLink
-                      provider={c.type}
-                      onSynced={() => router.refresh()}
-                    />
-                  ) : null}
+                  {meta.note ? <p className={styles.srcNote}>{meta.note}</p> : null}
 
                   {c.injected && c.importedAt ? (
                     <ul className={styles.srcStats}>
@@ -679,10 +676,8 @@ export default function PersonaClient({
                         {c.injected ? "重新测试" : "去完成 SBTI"}
                       </button>
                     ) : isImportSource(c.type) ? (
-                      /* 微信 / QQ / 飞书 / 钉钉：手动导入本地文件（或授权平台自动同步）。
-                         按钮分三态（用户明确要求）：
-                           未注入 → 一个「导入X」
-                           已注入 → 「覆盖X」（删掉上次的）+ 「添加X」（保留上次的） */
+                      /* 微信 / QQ：手动导入（未注入一个按钮；已注入「覆盖」+「添加」）
+                         飞书 / 钉钉：多一个「同步数据」（授权后自动拉），手动导入只加不删 */
                       !isSelf ? (
                         <button
                           type="button"
@@ -692,6 +687,21 @@ export default function PersonaClient({
                         >
                           {meta.action}
                         </button>
+                      ) : isPlatformSource(c.type) ? (
+                        <>
+                          <ProviderLink provider={c.type} onSynced={() => router.refresh()} />
+                          <button
+                            type="button"
+                            className="btn btnSecondary btnSm"
+                            data-open-import={c.type}
+                            data-import-mode="append"
+                            onClick={() =>
+                              setImportState({ source: c.type as ImportSource, mode: "append" })
+                            }
+                          >
+                            手动导入数据
+                          </button>
+                        </>
                       ) : !c.injected ? (
                         <button
                           type="button"
