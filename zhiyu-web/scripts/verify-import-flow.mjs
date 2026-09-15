@@ -571,9 +571,9 @@ const listState = await page.evaluate(() => ({
 }));
 rec("两个文件都列出来了", listState.items === 2, `${listState.items} 个（count=${listState.count}）`);
 rec(
-  "⚠️ 页面上常显「这批文件会整体替换」的说明（用户实际问过覆盖还是追加）",
-  listState.note.includes("整体替换"),
-  listState.note.slice(0, 80),
+  "弹窗里常显写入方式说明（覆盖=删旧的 / 添加=保留旧的）",
+  listState.note.includes("覆盖") && listState.note.includes("添加"),
+  listState.note.slice(0, 90),
 );
 
 await clickSel('[data-import-submit="1"]');
@@ -694,6 +694,144 @@ rec(
   "只有图片/表情的文件被拒，并给出可操作原因",
   noContent.status === 400 && noContent.body?.code === "NO_CONTENT",
   (noContent.body?.warnings ?? []).join(" ⏐ ").slice(0, 120),
+);
+
+/* ───────── ⑩ 按钮三态 + 添加模式 + 授权引导 ───────── */
+console.log("\n== ⑩ 按钮三态（未注入一个 / 已注入两个）==");
+
+/* 先把钉钉清成"未注入"，才能验证首次使用时的单按钮形态 */
+await prisma.personaEvidence.deleteMany({ where: { personaId, source: "dingtalk" } });
+await prisma.personaSource.updateMany({
+  where: { personaId, type: "dingtalk" },
+  data: { status: "not_injected" },
+});
+await gotoSources();
+const firstTime = await page.evaluate(() => {
+  const card = document.querySelector('[data-open-import="dingtalk"]')?.closest("article");
+  const buttons = [...(card?.querySelectorAll("button") ?? [])].map((b) => b.textContent.trim());
+  return { buttons, text: card?.textContent ?? "" };
+});
+rec(
+  "未注入时只有**一个**导入按钮，文案「导入钉钉数据」",
+  firstTime.buttons.filter((b) => b.includes("导入") || b.includes("覆盖") || b.includes("添加")).length === 1 &&
+    firstTime.buttons.some((b) => b === "导入钉钉数据"),
+  firstTime.buttons.join(" ｜ "),
+);
+
+/* 已注入的源（微信）应当是两个按钮 */
+const injected = await page.evaluate(() => {
+  const card = document.querySelector('[data-open-import="wechat"]')?.closest("article");
+  return [...(card?.querySelectorAll("button") ?? [])]
+    .map((b) => ({
+      text: b.textContent.trim(),
+      mode: b.getAttribute("data-import-mode"),
+    }))
+    .filter((b) => b.mode);
+});
+rec(
+  "已注入时有**两个**按钮：「覆盖聊天记录」+「添加聊天记录」",
+  injected.length === 2 &&
+    injected.some((b) => b.text === "覆盖聊天记录" && b.mode === "replace") &&
+    injected.some((b) => b.text === "添加聊天记录" && b.mode === "append"),
+  injected.map((b) => `${b.text}(${b.mode})`).join(" ｜ "),
+);
+
+/* 添加模式真的追加（不删旧的） */
+console.log("\n== ⑪ 「添加聊天记录」= 追加，不删旧的 ==");
+const beforeAdd = await evidenceCount("wechat");
+await clickSel('[data-open-import="wechat"][data-import-mode="append"]');
+await page.waitForTimeout(600);
+const appendDlg = await page.evaluate(() => {
+  /* ⚠️ 选择器要限定在弹窗内：源卡片上的按钮也带 data-import-mode，
+     不限定会选到按钮（它的文本是"添加聊天记录"，断言就会假失败） */
+  const banner = document.querySelector('[data-import-dialog] [data-import-mode]');
+  return {
+    mode: banner?.getAttribute("data-import-mode"),
+    banner: banner?.textContent?.trim() ?? "",
+    title: document.querySelector("[data-import-title]")?.textContent?.trim() ?? "",
+  };
+});
+rec(
+  "弹窗明确是「添加」模式（标题 + 横幅都写清了不会删旧数据）",
+  appendDlg.mode === "append" &&
+    appendDlg.title.includes("添加") &&
+    appendDlg.banner.includes("不会被删除"),
+  `${appendDlg.title} ｜ ${appendDlg.banner.slice(0, 60)}`,
+);
+await attachFile('[data-import-input="1"]', "add-more.json", CHAT_A);
+await clickSel('[data-import-submit="1"]');
+await waitFor(() => Boolean(document.querySelector('[data-import-result="ok"]')), 60000);
+const afterAdd = await evidenceCount("wechat");
+rec(
+  "追加后证据变多，且旧数据仍在（不是覆盖）",
+  afterAdd > beforeAdd,
+  `${beforeAdd} → ${afterAdd}`,
+);
+const oldStillThere = await prisma.personaEvidence.count({
+  where: { personaId, source: "wechat", note: { contains: "技术债" } },
+});
+rec("上次导入的内容（「技术债」那条）还在", oldStillThere > 0, `${oldStillThere} 条`);
+
+/* 授权引导区块 */
+console.log("\n== ⑫ 飞书 / 钉钉：必须引导用户授权（而不是只给手动导入）==");
+await page.evaluate(() => {
+  document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
+});
+await page.waitForTimeout(400);
+await gotoSources();
+const linkBlocks = await page.evaluate(() =>
+  ["feishu", "dingtalk"].map((p) => {
+    const el = document.querySelector(`[data-provider-link="${p}"]`);
+    return {
+      p,
+      exists: Boolean(el),
+      text: el?.textContent ?? "",
+      setup: Boolean(el?.querySelector("[data-provider-setup]")),
+      cannot: [...(el?.querySelectorAll("[data-cannot-pull]") ?? [])].map((x) =>
+        x.textContent.trim(),
+      ),
+    };
+  }),
+);
+for (const b of linkBlocks) {
+  rec(`${b.p} 卡片里有「授权自动同步」区块`, b.exists, b.text.replace(/\s+/g, " ").slice(0, 80));
+  rec(
+    `${b.p} 区块写明了「读不到什么」（不隐瞒才叫引导）`,
+    b.cannot.length > 0,
+    b.cannot.map((x) => x.slice(0, 60)).join(" ｜ "),
+  );
+}
+rec(
+  "未配置凭证时展示**配置步骤**而不是死按钮",
+  linkBlocks.every((b) => b.setup),
+  linkBlocks.map((b) => `${b.p}=${b.setup}`).join(" "),
+);
+const setupDetail = await page.evaluate(async () => {
+  const btn = document
+    .querySelector('[data-provider-link="feishu"] [data-provider-setup] button');
+  btn?.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const el = document.querySelector('[data-provider-link="feishu"]');
+  return el?.textContent ?? "";
+});
+rec(
+  "展开后有环境变量名与回调地址（用户照着就能配）",
+  setupDetail.includes("FEISHU_APP_ID") &&
+    setupDetail.includes("FEISHU_APP_SECRET") &&
+    setupDetail.includes("FEISHU_OAUTH_REDIRECT_URI"),
+  setupDetail.replace(/\s+/g, " ").match(/FEISHU[^）]{0,120}/)?.[0] ?? "(没找到)",
+);
+rec(
+  "并说明配好之前仍可手动导入（给出退路）",
+  setupDetail.includes("手动导入"),
+  setupDetail.replace(/\s+/g, " ").slice(-120),
+);
+rec(
+  "钉钉区块写明了「聊天消息拉不到」（钉钉 API 限制，不能瞒）",
+  linkBlocks
+    .find((b) => b.p === "dingtalk")
+    ?.text.includes("消息"),
+  linkBlocks.find((b) => b.p === "dingtalk")?.cannot.join(" ｜ ").slice(0, 100),
 );
 
 rec("无 JS 报错", errs.length === 0, errs.slice(0, 3).join(" ⏐ "));

@@ -40,6 +40,9 @@ interface ImportFileReport {
   mineDetectedBy: "flag" | "nickname" | "none";
 }
 
+/** 写入方式：覆盖 / 添加 */
+export type ImportMode = "replace" | "append";
+
 function bad(error: string, extra: Record<string, unknown> = {}, status = 400) {
   return NextResponse.json({ ok: false, error, ...extra }, { status });
 }
@@ -178,6 +181,15 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
 
   const selfName = String(form.get("selfName") ?? "").trim() || null;
 
+  /**
+   * 写入方式（用户明确要求分成两个按钮）：
+   *   · `replace` —— **删除该源上次注入的全部数据**，换成这一批（「覆盖聊天记录」）
+   *   · `append`  —— 追加到现有数据后面，**不删除**上次的（「添加聊天记录」）
+   * 默认 replace：首次导入时两者等价，而"我以为在追加、其实覆盖了"比反过来更糟。
+   */
+  const modeRaw = String(form.get("mode") ?? "");
+  const mode: ImportMode = modeRaw === "append" ? "append" : "replace";
+
   /* ── 解码 + 逐个解析，再合成一份 ── */
   const multi = files.length > 1;
   const items: ImportItem[] = [];
@@ -256,7 +268,7 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   });
   if (!persona) return bad("Persona 不存在", { code: "NO_PERSONA" }, 404);
 
-  /* ── 落库：替换该源旧证据 + 标记已注入 + 合并兴趣 ── */
+  /* ── 落库：替换/追加该源证据 + 标记已注入 + 合并兴趣 ── */
   const detectedInterests = interestsFromTexts(items.map((it) => it.text));
   const oldInterests = Array.isArray(persona.interests)
     ? (persona.interests as unknown[]).filter((x): x is string => typeof x === "string")
@@ -264,22 +276,69 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   const mergedInterests = [...new Set([...oldInterests, ...detectedInterests])].slice(0, 40);
   const addedInterests = detectedInterests.filter((x) => !oldInterests.includes(x));
 
+  /* 追加模式要跳过"库里已经有的一模一样的内容"，否则反复导入同一份
+     会把证据表堆满重复行（0/1 之外的另一种浪费）。 */
+  let toAppend = evidenceRows;
+  let skippedDuplicates = 0;
+  if (mode === "append") {
+    const existing = await prisma.personaEvidence.findMany({
+      where: { personaId, source },
+      select: { note: true },
+    });
+    const seen = new Set(existing.map((e) => (e.note ?? "").slice(0, 120)));
+    toAppend = evidenceRows.filter((it) => !seen.has(it.text.slice(0, 120)));
+    skippedDuplicates = evidenceRows.length - toAppend.length;
+  }
+
+  const prevMeta =
+    mode === "append"
+      ? (((await prisma.personaSource.findUnique({
+          where: { personaId_type: { personaId, type: source } },
+          select: { meta: true },
+        }))?.meta ?? null) as Record<string, unknown> | null)
+      : null;
+
+  const prevFiles = Array.isArray(prevMeta?.fileNames)
+    ? (prevMeta.fileNames as unknown[]).filter((x): x is string => typeof x === "string")
+    : [];
+  const prevCount =
+    typeof prevMeta?.evidenceRows === "number" ? (prevMeta.evidenceRows as number) : 0;
+
   const meta = {
-    files: files.length,
-    fileNames: fileReports.map((r) => r.name),
-    formats: [...new Set(fileReports.map((r) => r.format))],
-    rawCount: rawTotal,
-    items: items.length,
-    evidenceRows: evidenceRows.length,
-    chars: totalChars,
+    mode,
+    files: files.length + (mode === "append" ? prevFiles.length : 0),
+    fileNames: [...prevFiles, ...fileReports.map((r) => r.name)],
+    formats: [
+      ...new Set([
+        ...(Array.isArray(prevMeta?.formats)
+          ? (prevMeta.formats as unknown[]).filter((x): x is string => typeof x === "string")
+          : []),
+        ...fileReports.map((r) => r.format),
+      ]),
+    ],
+    /** 本次这批文件的统计（追加模式下不等于源总量） */
+    batch: {
+      rawCount: rawTotal,
+      items: items.length,
+      evidenceRows: evidenceRows.length,
+      chars: totalChars,
+    },
+    /** 源总量（追加时累加，覆盖时等于本批） */
+    rawCount: rawTotal + (mode === "append" ? Number(prevMeta?.rawCount ?? 0) : 0),
+    items: items.length + (mode === "append" ? Number(prevMeta?.items ?? 0) : 0),
+    evidenceRows: evidenceRows.length + (mode === "append" ? prevCount : 0),
+    chars: totalChars + (mode === "append" ? Number(prevMeta?.chars ?? 0) : 0),
     selfName,
+    lastImportedAt: new Date().toISOString(),
   };
 
   await prisma.$transaction(
     async (tx) => {
-      /* 重新导入 = 替换。累加会让"条数/平均字数"这类统计无限膨胀，
-         而文件本身就是这个源的事实来源。 */
-      await tx.personaEvidence.deleteMany({ where: { personaId, source } });
+      /* 覆盖 = 删掉这个源上次注入的全部数据；添加 = 一行都不删。
+         两者都**只动这一个源**，其它源不受影响。 */
+      if (mode === "replace") {
+        await tx.personaEvidence.deleteMany({ where: { personaId, source } });
+      }
 
       /**
        * ⚠️ 用 `createMany`（一条 SQL），**不要** for 循环逐条 create。
@@ -292,9 +351,9 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
        * "Unexpected end of JSON input"（用户报的就是这个）。
        * 小文件（3 条）测不出来，必须有大数据量的用例才暴露。
        */
-      if (evidenceRows.length) {
+      if (toAppend.length) {
         await tx.personaEvidence.createMany({
-          data: evidenceRows.map((it) => ({
+          data: toAppend.map((it) => ({
             personaId,
             source,
             trait: it.trait,
@@ -329,14 +388,23 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
 
   /* ── 刷新分源解析 ──
      产品要求："拿到某个源的数据后第一时间就该能解析出这个源里的人格特征"。
-     两个选项都是必须的，且都是踩过坑才加的：
+     三个要点都是踩过坑才有的：
+       · **用该源全部证据重算**，而不是只用本批 —— 追加模式下只算本批的话，
+         分源解析会"忘掉"以前导入的记录（明明数据还在库里）。
        · `noHeat: true` —— 聊天记录没有点赞数这类互动量。不标记的话
          `social` 会被算成"1%（社交连接极弱）"，把"量不到"当成"量出来很低"。
        · `profile: "im"` —— 默认口径是按知乎长文校准的。中文聊天消息天然只有
          十几到几十字，会触发"只有标题"的自动判定、把三个维度整组丢掉
          （实测就是这么丢的）；而且"平均字数/600"量到的是聊天习惯不是学习倾向。
          im 口径只算量得准的三维，缺的那两维在人话里说明原因。 */
-  const facet = facetFromContents(source, IMPORT_SOURCE_LABEL[source], contents, {
+  const allRows = await prisma.personaEvidence.findMany({
+    where: { personaId, source },
+    select: { note: true, value: true },
+  });
+  const facetContents = allRows
+    .map((r) => ({ text: (r.note ?? "").trim(), heat: r.value ?? undefined }))
+    .filter((c) => c.text.length > 0);
+  const facet = facetFromContents(source, IMPORT_SOURCE_LABEL[source], facetContents, {
     noHeat: true,
     profile: "im",
   });
@@ -350,17 +418,36 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  if (mode === "append" && skippedDuplicates > 0) {
+    warnings.push(
+      `追加时跳过 ${skippedDuplicates} 条与库里已有内容完全相同的证据（避免重复堆叠）。`,
+    );
+  }
+  if (mode === "append") {
+    warnings.push(
+      `本次是**添加**：上次导入的数据保留，现在这个源共有 ${allRows.length + toAppend.length} 条证据。`,
+    );
+  } else if (prevCount > 0) {
+    warnings.push(
+      `本次是**覆盖**：已删除该源上次的 ${prevCount} 条证据，换成这一批 ${toAppend.length} 条。其它数据源未受影响。`,
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     source,
-    /** 本次替换语义：这个源的旧证据被这一批文件整体替换 */
-    replaced: true,
+    /** 写入方式：replace=覆盖（删旧的）| append=添加（保留旧的） */
+    mode,
     counts: {
       raw: rawTotal,
       items: items.length,
-      evidence: evidenceRows.length,
+      evidence: toAppend.length,
       chars: totalChars,
     },
+    /** 覆盖模式下这是"被删掉的旧证据条数"，用于让用户确认覆盖了什么 */
+    replacedCount: mode === "replace" ? prevCount : 0,
+    totalEvidence: allRows.length + (mode === "replace" ? toAppend.length : 0),
+    skippedDuplicates,
     /* 多文件时逐份回报，用户才知道每份读到了什么 */
     files: fileReports,
     format: fileReports.length === 1 ? fileReports[0].format : `${fileReports.length} 个文件`,

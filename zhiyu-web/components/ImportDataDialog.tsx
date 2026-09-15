@@ -27,12 +27,23 @@ import styles from "./ImportDataDialog.module.css";
  * 没有常驻进程跑不了，所以给的是"在你自己电脑上跑 distilly → 把产物拖进来"。
  */
 
+/** 写入方式：覆盖（删掉上次的）/ 添加（保留上次的） */
+export type ImportMode = "replace" | "append";
+
 export interface ImportFileResult {
   ok: boolean;
   error?: string;
   code?: string;
   /** 成功时后端回报写入了哪个源 */
   source?: string;
+  /** 写入方式 */
+  mode?: ImportMode;
+  /** 覆盖模式下被删掉的旧证据条数 */
+  replacedCount?: number;
+  /** 写入后该源的证据总数 */
+  totalEvidence?: number;
+  /** 追加时因完全重复而跳过的条数 */
+  skippedDuplicates?: number;
   counts?: { raw: number; items: number; evidence: number; chars: number };
   format?: string;
   encoding?: string;
@@ -69,6 +80,8 @@ const GUIDE: Record<
   ImportSource,
   {
     title: string;
+    /** 数据的名词（聊天记录 / 飞书数据…），用来拼「覆盖X」「添加X」 */
+    noun: string;
     accept: string;
     hint: string;
     formats: { name: string; desc: string }[];
@@ -77,6 +90,7 @@ const GUIDE: Record<
 > = {
   wechat: {
     title: "导入微信聊天记录",
+    noun: "聊天记录",
     accept: ".json,.txt,.csv,.md,.log",
     hint: "只提取**你自己**发的内容 —— 别人的话不会算进你的人格。",
     formats: [
@@ -92,6 +106,7 @@ const GUIDE: Record<
   },
   qq: {
     title: "导入 QQ 聊天记录",
+    noun: "聊天记录",
     accept: ".json,.txt,.csv,.md,.log",
     hint: "支持 QCE / TIM 等工具导出的 txt 与 json，群聊私聊都可以。",
     formats: [
@@ -107,6 +122,7 @@ const GUIDE: Record<
   },
   feishu: {
     title: "导入飞书工作数据",
+    noun: "飞书数据",
     accept: ".json,.txt,.md,.csv,.log",
     hint: "格式与 distilly 的飞书解析器逐字对齐：官方消息导出 JSON、或整理好的 TXT。",
     formats: [
@@ -125,6 +141,7 @@ const GUIDE: Record<
   },
   dingtalk: {
     title: "导入钉钉工作数据",
+    noun: "钉钉数据",
     accept: ".json,.txt,.md,.csv,.log",
     hint: "格式与 distilly 的钉钉采集脚本产物逐字对齐：docs.txt / bitables.txt / messages.txt。",
     formats: [
@@ -158,11 +175,17 @@ function humanSize(bytes: number): string {
 export default function ImportDataDialog({
   source,
   personaId,
+  mode,
+  existingEvidence = 0,
   onClose,
   onImported,
 }: {
   source: ImportSource;
   personaId: string;
+  /** 覆盖 or 添加 —— 决定文案与提交时的 mode 字段 */
+  mode: ImportMode;
+  /** 该源当前已有多少条证据（覆盖时用来告诉用户"会删掉多少"） */
+  existingEvidence?: number;
   onClose: () => void;
   /** 导入成功后的回调（父组件据此刷新服务端数据） */
   onImported: (result: ImportFileResult) => void;
@@ -254,6 +277,7 @@ export default function ImportDataDialog({
       const fd = new FormData();
       fd.append("source", source);
       fd.append("personaId", personaId);
+      fd.append("mode", mode);
       for (const f of files) fd.append("file", f);
       if (selfName.trim()) fd.append("selfName", selfName.trim());
 
@@ -300,7 +324,7 @@ export default function ImportDataDialog({
     } finally {
       setBusy(false);
     }
-  }, [files, onImported, personaId, selfName, source]);
+  }, [files, mode, onImported, personaId, selfName, source]);
 
   const dims = useMemo(() => {
     const v = result?.facet?.values ?? {};
@@ -331,7 +355,7 @@ export default function ImportDataDialog({
 
         <p className={styles.eyebrow}>手动导入 · 本地文件</p>
         <h3 className={styles.title} data-import-title="1">
-          {guide.title}
+          {mode === "replace" ? `覆盖${guide.noun}` : mode === "append" ? `添加${guide.noun}` : guide.title}
         </h3>
         <p className={styles.hint}>{guide.hint}</p>
 
@@ -427,25 +451,43 @@ export default function ImportDataDialog({
           )}
         </div>
 
-        {/* 覆盖说明：这是替换语义，必须讲清楚（用户实际问过这个） */}
+        {/* 写入方式必须一眼看清：覆盖会删掉上次的数据，添加不会 */}
+        <p
+          className={mode === "replace" ? styles.modeReplace : styles.modeAppend}
+          data-import-mode={mode}
+        >
+          {mode === "replace" ? (
+            <>
+              <b>覆盖模式</b>：导入后会<u>删除</u>
+              {existingEvidence > 0 ? `这个源上次注入的 ${existingEvidence} 条数据` : "这个源上次注入的全部数据"}
+              ，换成你现在选的这批文件。其它数据源不受影响。
+            </>
+          ) : (
+            <>
+              <b>添加模式</b>：你现在选的这批文件会<b>追加</b>到已有数据后面，
+              上次导入的内容<b>不会被删除</b>。
+            </>
+          )}
+        </p>
+
         <p className={styles.replaceNote} data-import-replace-note="1">
-          这批文件会<b>整体替换</b>「{guide.title.replace(/^导入/, "")}」这个源上一次导入的数据
-          （其它数据源不受影响，兴趣标签只增不减）。
+          想要哪个效果，关掉这个窗口后选对按钮就行：
+          「覆盖」= 换成新的，「添加」= 保留旧的再加。
           <button
             type="button"
             className={styles.moreLink}
             onClick={() => setShowReplaceNote((v) => !v)}
           >
-            {showReplaceNote ? "收起" : "想保留多份记录？"}
+            {showReplaceNote ? "收起" : "多个聊天记录怎么一次全导入？"}
           </button>
         </p>
         {showReplaceNote ? (
           <p className={styles.replaceMore}>
             把要保留的聊天记录<b>一次全选进来</b>（按住 Ctrl / Shift 多选，或分几次
-            「继续添加文件」），它们会合并成这个源的完整数据。
+            「继续添加文件」），它们会合并成这个源的数据。
             <br />
-            如果只想补一份新的、又不确定会不会覆盖掉旧的：先把现在这份和新的<b>一起选中</b>
-            再导入，就万无一失了。
+            已经导入过的记录想继续保留：用<b>「添加」</b>按钮；想整体换成新的一批：
+            用<b>「覆盖」</b>按钮。
           </p>
         ) : null}
 

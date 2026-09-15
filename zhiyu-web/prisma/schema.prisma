@@ -52,6 +52,7 @@ model User {
   llmConfigs         LlmProviderConfig[]
   notifications      Notification[]
   sessions           AuthSession[]
+  linkedAccounts     LinkedAccount[]
 }
 
 /// 应用自己的登录会话。
@@ -155,6 +156,34 @@ model Persona {
 
   @@index([province])
   @@index([city])
+}
+
+/// 已授权的第三方账号（飞书 / 钉钉）。
+///
+/// 为什么要单独一张表而不是复用 AuthSession.zhihuTokenEnc：
+///   · 知乎的 token 与**登录**绑定（登录态即授权态），换个浏览器就要重登；
+///     而飞书/钉钉是"往已登录账号上挂一个数据源"，不该影响登录态。
+///   · 同一用户可能同时授权多个平台，且各自的 refresh_token / 过期时间不同。
+/// token 一律 AES-256-GCM 加密后落库（见 lib/crypto.ts），**绝不进 Cookie 或日志**。
+model LinkedAccount {
+  id             String   @id @default(cuid())
+  userId         String
+  /// provider：feishu | dingtalk
+  provider       String
+  /// 平台侧的用户标识（open_id / unionId 等），仅用于展示与排查
+  externalId     String?
+  displayName    String?
+  accessTokenEnc String
+  refreshTokenEnc String?
+  /// access_token 失效时间；到点后停止调用，不静默降级
+  expiresAt      DateTime?
+  /// 平台侧的额外信息（scope、tenant 等），仅存非敏感内容
+  meta           Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
 }
 
 // 数据源注入状态（微信 / QQ / 飞书 / 钉钉 / 知乎 / SBTI）

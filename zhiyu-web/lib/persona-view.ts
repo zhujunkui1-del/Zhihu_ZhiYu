@@ -47,6 +47,8 @@ export interface SourceChip {
   /** 是否已注入（chip 上点亮圆点） */
   injected: boolean;
   importedAt: Date | null;
+  /** 该源当前的证据条数（「覆盖」按钮用它告诉用户会删掉多少） */
+  evidenceCount: number;
 }
 
 export interface PersonaBoard {
@@ -178,6 +180,22 @@ export async function buildPersonaBoard(
   }
 
   const byType = new Map(persona.sources.map((s) => [s.type as PersonaSourceType, s]));
+
+  /**
+   * 每个源当前有多少条证据。
+   *
+   * 为什么要：导入弹窗在「覆盖」模式下要如实告诉用户"会删掉上次的 N 条"，
+   * 而不是笼统说"会删掉上次的全部数据" —— 数字能让人立刻确认自己按对了按钮。
+   */
+  const evidenceCounts = await prisma.personaEvidence.groupBy({
+    by: ["source"],
+    where: { personaId: persona.id },
+    _count: { _all: true },
+  });
+  const evidenceBySource = new Map(
+    evidenceCounts.map((r) => [r.source, r._count._all] as const),
+  );
+
   const sourceChips: SourceChip[] = SOURCE_TYPES.map((type) => {
     const row = byType.get(type);
     return {
@@ -186,6 +204,7 @@ export async function buildPersonaBoard(
       status: row?.status ?? "not_injected",
       injected: row?.status === "injected",
       importedAt: row?.importedAt ?? null,
+      evidenceCount: evidenceBySource.get(type) ?? 0,
     };
   });
 

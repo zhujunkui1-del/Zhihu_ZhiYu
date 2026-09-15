@@ -13,10 +13,20 @@ import SbtiResultModal, { type SbtiResultData } from "@/components/SbtiResultMod
 import SourceFacets from "@/components/SourceFacets";
 import ImportDataDialog, {
   type ImportFileResult,
+  type ImportMode,
 } from "@/components/ImportDataDialog";
+import ProviderLink from "@/components/ProviderLink";
 import { IMPORT_SOURCE_LABEL, isImportSource, type ImportSource } from "@/lib/import/parse";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
 import styles from "./persona.module.css";
+
+/** 三态按钮的文案：未注入一个、已注入两个（覆盖 / 添加） */
+const IMPORT_LABEL: Record<string, { first: string; replace: string; append: string }> = {
+  wechat: { first: "导入聊天记录", replace: "覆盖聊天记录", append: "添加聊天记录" },
+  qq: { first: "导入聊天记录", replace: "覆盖聊天记录", append: "添加聊天记录" },
+  feishu: { first: "导入飞书数据", replace: "覆盖飞书数据", append: "添加飞书数据" },
+  dingtalk: { first: "导入钉钉数据", replace: "覆盖钉钉数据", append: "添加钉钉数据" },
+};
 
 type Tab = "card" | "sources" | "distill";
 
@@ -55,7 +65,7 @@ const SOURCE_META: Record<
   wechat: {
     title: "微信聊天记录",
     dim: "私域人格 · 本地文件导入",
-    action: "导入聊天文件",
+    action: "导入聊天记录",
     note: "上传导出的聊天 JSON / TXT / CSV，可一次选多份（会合并）。重新导入会替换这个源上一次的数据，其它源不受影响。",
   },
   qq: {
@@ -277,17 +287,25 @@ export default function PersonaClient({
    * 所以这里只负责"哪个源、开弹窗、导入完刷新服务端数据"，
    * 解析与落库都在 /api/import（见 lib/import/parse.ts）。
    */
-  const [importSource, setImportSource] = useState<ImportSource | null>(null);
+  const [importState, setImportState] = useState<{
+    source: ImportSource;
+    mode: ImportMode;
+  } | null>(null);
   const [importMsg, setImportMsg] = useState("");
   const [importDetail, setImportDetail] = useState<ImportFileResult | null>(null);
 
   const onImported = useCallback(
     (r: ImportFileResult) => {
       setImportDetail(r);
+      const verb = r.mode === "append" ? "已添加" : "已覆盖";
       setImportMsg(
-        `导入完成：${r.counts?.items ?? 0} 条内容已写入「${
+        `${verb}：${r.counts?.items ?? 0} 条内容写入「${
           IMPORT_SOURCE_LABEL[r.source as ImportSource] ?? r.source
-        }」，分源解析已刷新。`,
+        }」${
+          r.mode === "replace" && r.replacedCount
+            ? `（删除了上次的 ${r.replacedCount} 条）`
+            : ""
+        }，分源解析已刷新。`,
       );
       /* 刷新服务端数据：六源状态、完整度、分源解析、综合画像都会跟着更新 */
       router.refresh();
@@ -621,6 +639,15 @@ export default function PersonaClient({
 
                   <p className={styles.srcNote}>{meta.note}</p>
 
+                  {/* 飞书 / 钉钉：**授权自动同步**（用户要求"引导用户授权网站使用他们的账号数据"）。
+                      能授权就真授权；平台拉不到的部分（如钉钉的消息）如实写在区块里。 */}
+                  {isSelf && (c.type === "feishu" || c.type === "dingtalk") ? (
+                    <ProviderLink
+                      provider={c.type}
+                      onSynced={() => router.refresh()}
+                    />
+                  ) : null}
+
                   {c.injected && c.importedAt ? (
                     <ul className={styles.srcStats}>
                       <li>
@@ -652,19 +679,57 @@ export default function PersonaClient({
                         {c.injected ? "重新测试" : "去完成 SBTI"}
                       </button>
                     ) : isImportSource(c.type) ? (
-                      /* 微信 / QQ / 飞书 / 钉钉：**手动导入本地文件**。
-                         没有其它平台的网页授权可走（原因见 api/import/route.ts），
-                         所以这里的按钮必须真的能打开系统文件窗口。 */
-                      <button
-                        type="button"
-                        className="btn btnPrimary"
-                        data-open-import={c.type}
-                        onClick={() => setImportSource(c.type as ImportSource)}
-                        disabled={!isSelf}
-                        title={isSelf ? undefined : "只能导入自己的人格数据"}
-                      >
-                        {c.injected ? `重新${meta.action}` : meta.action}
-                      </button>
+                      /* 微信 / QQ / 飞书 / 钉钉：手动导入本地文件（或授权平台自动同步）。
+                         按钮分三态（用户明确要求）：
+                           未注入 → 一个「导入X」
+                           已注入 → 「覆盖X」（删掉上次的）+ 「添加X」（保留上次的） */
+                      !isSelf ? (
+                        <button
+                          type="button"
+                          className="btn btnSecondary"
+                          disabled
+                          title="只能导入自己的人格数据"
+                        >
+                          {meta.action}
+                        </button>
+                      ) : !c.injected ? (
+                        <button
+                          type="button"
+                          className="btn btnPrimary"
+                          data-open-import={c.type}
+                          data-import-mode="replace"
+                          onClick={() =>
+                            setImportState({ source: c.type as ImportSource, mode: "replace" })
+                          }
+                        >
+                          {IMPORT_LABEL[c.type as ImportSource]?.first ?? meta.action}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btnPrimary"
+                            data-open-import={c.type}
+                            data-import-mode="replace"
+                            onClick={() =>
+                              setImportState({ source: c.type as ImportSource, mode: "replace" })
+                            }
+                          >
+                            {IMPORT_LABEL[c.type as ImportSource]?.replace ?? "覆盖数据"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btnSecondary"
+                            data-open-import={c.type}
+                            data-import-mode="append"
+                            onClick={() =>
+                              setImportState({ source: c.type as ImportSource, mode: "append" })
+                            }
+                          >
+                            {IMPORT_LABEL[c.type as ImportSource]?.append ?? "添加数据"}
+                          </button>
+                        </>
+                      )
                     ) : (
                       <button
                         type="button"
@@ -1121,11 +1186,15 @@ export default function PersonaClient({
       />
 
       {/* 手动导入弹窗：打开即弹出系统文件选择窗口（微信 / QQ / 飞书 / 钉钉） */}
-      {importSource ? (
+      {importState ? (
         <ImportDataDialog
-          source={importSource}
+          source={importState.source}
           personaId={board.id}
-          onClose={() => setImportSource(null)}
+          mode={importState.mode}
+          existingEvidence={
+            board.sourceChips.find((c) => c.type === importState.source)?.evidenceCount ?? 0
+          }
+          onClose={() => setImportState(null)}
           onImported={onImported}
         />
       ) : null}

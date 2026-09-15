@@ -191,20 +191,48 @@
   color: var(--accent-deep);
 }
 
-/* 「这批文件会整体替换」的说明 —— 用户实际问过"是覆盖还是追加"，
-   所以这句话必须常显，不能只在帮助里写 */
-.replaceNote {
+/* 写入方式横幅：覆盖=带警告色的删除提示；添加=温和的追加提示。
+   两者必须一眼能分辨 —— 用户问过"到底是覆盖还是添加"。 */
+.modeReplace,
+.modeAppend {
   margin: 12px 0 0;
-  padding: 9px 12px;
-  border-left: 3px solid var(--accent);
+  padding: 10px 12px;
   border-radius: 5px;
-  background: rgba(226, 102, 79, 0.07);
-  color: var(--fg);
   font-size: 12.5px;
   line-height: 1.8;
 }
-.replaceNote b {
-  color: var(--accent-deep);
+.modeReplace {
+  border-left: 3px solid #c9503a;
+  background: rgba(201, 80, 58, 0.09);
+  color: var(--fg);
+}
+.modeReplace b {
+  color: #a8371f;
+}
+.modeReplace u {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+.modeAppend {
+  border-left: 3px solid #5a8c50;
+  background: rgba(90, 140, 80, 0.1);
+  color: var(--fg);
+}
+.modeAppend b {
+  color: #3f6b37;
+}
+
+/* 「这批文件会整体替换」的说明 —— 用户实际问过"是覆盖还是追加"，
+   所以这句话必须常显，不能只在帮助里写 */
+.replaceNote {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--line-soft);
+  border-radius: 5px;
+  background: rgba(255, 253, 246, 0.8);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
 }
 .moreLink {
   margin-left: 6px;
