@@ -19,6 +19,7 @@ import ProviderLink from "@/components/ProviderLink";
 import SyncSetup from "@/components/SyncSetup";
 import { IMPORT_SOURCE_LABEL, isImportSource, type ImportSource } from "@/lib/import/parse";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
+import { personaTypeSourceNote } from "@/lib/persona/type-source";
 import styles from "./persona.module.css";
 
 /** 三态按钮的文案：未注入一个、已注入两个（覆盖 / 添加） */
@@ -553,26 +554,21 @@ export default function PersonaClient({
               <div className={styles.prCol}>
                 {/* ① 综合画像判定的**人格倾向**（六型之一）——
                     不是 SBTI 的沙雕人格，两者含义不同。 */}
-                {/* ① 主结论：**蒸馏时由 Agent 读懂证据后判定的**倾向 + 原话依据。
-                    没有依据就不显示型名 —— 一个没有理由的型名和编一个没区别。 */}
-                {board.judgedType?.evidence ? (
-                  <div data-judged-type="1">
+                {/* ① 主结论：**与首页同一个字段**（board.resolvedType）——
+                    判型优先、六维兜底、SBTI 最后。这里不再自己排优先级。 */}
+                {board.resolvedType.type ? (
+                  <div data-judged-type={board.resolvedType.source === "judged" ? "1" : undefined}>
                     <div className={styles.typeBadge}>
-                      <span className={styles.typeName}>{board.judgedType.type}</span>
-                      <span className="meta">Agent 读完你的数据后判定</span>
+                      <span className={styles.typeName}>{board.resolvedType.type}</span>
+                      <span className="meta">{personaTypeSourceNote(board.resolvedType)}</span>
                     </div>
-                    <p className={styles.hint} style={{ marginTop: 8 }}>
-                      判定依据：{board.judgedType.evidence}
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* ② 旧口径（六维相似度）降级为参考：不再当作"你的人格倾向"。
-                    原因：实测它的第一名与第二名只差 0.016 个百分点，
-                    把 career 从 0.5 挪到 0.6 就换型 —— 那不是判定。 */}
-                {board.fused ? (
-                  <>
-                    {board.judgedType?.evidence ? (
+                    {board.resolvedType.evidence ? (
+                      <p className={styles.hint} style={{ marginTop: 8 }}>
+                        判定依据：{board.resolvedType.evidence}
+                      </p>
+                    ) : null}
+                    {/* 六维相似度只在"判定来自六维"或"另有参考价值"时补一行 */}
+                    {board.resolvedType.source === "judged" && board.fused ? (
                       <p className="meta" style={{ marginTop: 10 }} data-fused-legacy="1">
                         六维相似度（旧口径，仅供参考）：{board.fused.type}{" "}
                         {toDisplayPercentText(board.fused.similarity / 100)}
@@ -582,22 +578,18 @@ export default function PersonaClient({
                               .join("、")}`
                           : ""}
                       </p>
-                    ) : (
-                      <>
-                        <div className={styles.typeBadge}>
-                          <span className={styles.typeName} data-fused-type="1">
-                            {board.fused.type}
-                          </span>
-                          <span className="meta">
-                            匹配度 {toDisplayPercentText(board.fused.similarity / 100)}
-                          </span>
-                        </div>
-                        <p className={styles.hint} style={{ marginTop: 8 }}>
-                          {board.fused.blurb}
-                        </p>
-                      </>
-                    )}
-                    {/* 只有自评时，必须说清这份"综合画像"目前等于把自评折算了一遍 */}
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/* 六维兜底时补上它的一句话特征与次接近（判型时上面已经写清楚了） */}
+                {board.resolvedType.source !== "judged" && board.fused ? (
+                  <>
+                    {board.fused.blurb ? (
+                      <p className={styles.hint} style={{ marginTop: 8 }}>
+                        {board.fused.blurb}
+                      </p>
+                    ) : null}
                     {board.fused.selfReportOnly ? (
                       <p className={styles.selfOnlyNote} data-fused-self-only="1">
                         目前只有 <b>SBTI 自评</b>这一份人格数据，因此这个倾向是
@@ -609,44 +601,32 @@ export default function PersonaClient({
                         这份结论含 <b>SBTI 自评</b>成分，其余来自观察到的数据。
                       </p>
                     ) : null}
-                    {!board.judgedType?.evidence && board.fused.runnerUp.length ? (
-                      <p className="meta" style={{ marginTop: 6 }}>
-                        次接近：
-                        {board.fused.runnerUp
-                          .map((r) => `${r.type} ${toDisplayPercentText(r.similarity / 100)}`)
-                          .join("、")}
-                      </p>
-                    ) : null}
-
-                    {/* 数据体检结论：为什么某一维没有、为什么某个源没算进来。
-                        宁可说"这个信号没量到"，也不要编一个数糊上去。 */}
-                    {board.facetWarnings?.length ? (
-                      <div data-facet-warnings="1" style={{ marginTop: 10 }}>
-                        {board.facetWarnings.map((w, i) => (
-                          <p key={`${w.code}-${i}`} className={styles.hint} style={{ marginTop: 4 }}>
-                            {w.text}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
                   </>
-                ) : !board.judgedType?.evidence ? (
-                  /* 既没有六维结论、也没有带依据的判型 → 如实说还没有，并告诉用户怎么办 */
+                ) : null}
+
+                {!board.resolvedType.type ? (
+                  /* 既没有判型也没有六维结论 → 如实说还没有，并告诉用户怎么办 */
                   <p className={styles.hint}>
-                    {board.behavior?.radarIsBehavior ? (
-                      <>
-                        还没有判定人格倾向（价值观维度在观察数据上量不出来）。
-                        点一次「重新蒸馏」，Agent 会读完你的数据给出结论与依据；
-                        下面这张图是**数出来的行为特征** —— 谁先开口、多久回、
-                        什么时候聊、聊得散不散，每一项都能指着原始数据说清。
-                      </>
-                    ) : (
-                      <>
-                        还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
-                        或完成一次 SBTI 自评，这里会给出融合判定的人格倾向。
-                      </>
-                    )}
+                    还没有判定人格倾向。点一次「重新蒸馏」，Agent 会读完你的数据给出结论与依据；
+                    下面那张图是**五个可比的维度**（思考深度 / 表达力 / 共情力 / 执行力 / 主动性），
+                    每个数据源都能喂它，喂不出来的维度如实留空。
                   </p>
+                ) : null}
+
+                {/* ② 旧口径（六维相似度）降级为参考：不再当作"你的人格倾向"。
+                    原因：实测它的第一名与第二名只差 0.016 个百分点，
+                    把 career 从 0.5 挪到 0.6 就换型 —— 那不是判定。 */}
+                {/* 数据体检结论：为什么某一维没有、为什么某个源没算进来。
+                    宁可说"这个信号没量到"，也不要编一个数糊上去。
+                    这一块与"型从哪来"无关，所以放在外面常显。 */}
+                {board.facetWarnings?.length ? (
+                  <div data-facet-warnings="1" style={{ marginTop: 10 }}>
+                    {board.facetWarnings.map((w, i) => (
+                      <p key={`${w.code}-${i}`} className={styles.hint} style={{ marginTop: 4 }}>
+                        {w.text}
+                      </p>
+                    ))}
+                  </div>
                 ) : null}
 
                 {/* ② SBTI 自评单独一行 —— 与上面的综合画像并列，不混为一谈 */}

@@ -10,7 +10,8 @@ import { prisma } from "@/lib/db";
 import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
 import { PROVINCES } from "@/lib/regions";
-import { matchPersonaType, PERSONA_TYPES } from "@/lib/persona/fusion";
+import { matchPersonaType } from "@/lib/persona/fusion";
+import { resolvePersonaType } from "@/lib/persona/type-source";
 import { clampPercent } from "@/lib/score";
 
 /** 发现页需要展示的候选视图 */
@@ -81,21 +82,15 @@ function stringArray(v: unknown): string[] {
  *   ③ 最后才退回 SBTI 自评的类型名。
  */
 function personaType(values: unknown, personality: unknown): string | null {
-  const p = (personality ?? {}) as Record<string, unknown>;
-  const sbti = p.sbti as { type?: string; typeTitle?: string } | undefined;
-
-  /* ① LLM 判定（或演示数据预置）的倾向型 */
-  const preset = typeof p.type === "string" ? p.type.trim() : "";
-  if (preset && (PERSONA_TYPES as string[]).includes(preset)) return preset;
-
-  /* ② 六维兜底（历史数据） */
+  /* ⭐ 与首页/人格页**同一个函数**：判型 → 六维兜底 → SBTI → 无。
+     这里不再自己排优先级（见 lib/persona/type-source.ts 的事故说明）。 */
   const fusedMatch = matchPersonaType(
     values && typeof values === "object" ? (values as Record<string, unknown>) : null,
   );
-  if (fusedMatch) return fusedMatch.type;
-
-  /* ③ SBTI 自评的类型名 */
-  return sbti?.typeTitle ?? sbti?.type ?? null;
+  return resolvePersonaType({
+    personality,
+    fused: fusedMatch ? { type: fusedMatch.type, similarity: fusedMatch.similarity } : null,
+  }).type;
 }
 
 /**

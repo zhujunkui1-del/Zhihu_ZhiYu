@@ -7,6 +7,7 @@ import Avatar from "@/components/radar/Avatar";
 import BoardRadar from "@/components/BoardRadar";
 import PersonaCardModal from "@/components/PersonaCardModal";
 import { locText } from "@/lib/regions";
+import { personaTypeSourceNote } from "@/lib/persona/type-source";
 import { formatDate } from "@/lib/datetime";
 import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import type { HomeData } from "@/lib/home";
@@ -90,14 +91,17 @@ export default function HomeClient({
   const hasData = board.injectedCount > 0;
 
   /**
-   * 首页标题用**综合画像**（多源融合判定的六型倾向），与「我的人格」页一致。
+   * 首页标题用**综合画像**，与「我的人格」页**取同一个字段**。
    *
-   * ⚠️ 这里曾经直接显示 `sbti.typeTitle` —— 那是 SBTI **自评**的结果，
-   * 不是综合画像。首页与人格页因此显示两套不同的"人格倾向"（实测被投诉）。
-   * 综合画像不可用时才退回"数据已就位/先接来源"的引导语。
+   * ⚠️ 两次事故都出在这里，所以第三次改成结构性的：
+   *   ① 最早直接显示 `sbti.typeTitle` —— 那是自评，不是综合画像；
+   *   ② 上一轮改成显示 `fused.type`（六维相似度），而人格页已经改成
+   *      LLM 判型优先 → 首页说"务实执行型"、人格页说"深度思考型"（被投诉）。
+   * 现在两处都读 `board.resolvedType`（唯一口径，见 lib/persona/type-source.ts），
+   * 首页**不再自己决定优先级**。
    */
-  const personaTitle = board.fused
-    ? `你的人格倾向是「${board.fused.type}」。`
+  const personaTitle = board.resolvedType.type
+    ? `你的人格倾向是「${board.resolvedType.type}」。`
     : hasData
       ? "数据已就位，等待一次蒸馏。"
       : "还没有人格数据，先接入一个来源。";
@@ -160,15 +164,31 @@ export default function HomeClient({
                 </p>
               </div>
 
-              {/* 综合画像：与人格页同一套判定（六型倾向 + 匹配度） */}
-              {board.fused ? (
+              {/* 综合画像：**与人格页同一个字段**（board.resolvedType），
+                  不再自己决定"优先读判型还是读六维"。 */}
+              {board.resolvedType.type ? (
                 <p className="meta" style={{ marginTop: 14 }} data-home-fused="1">
-                  综合画像：<b>{board.fused.type}</b>（匹配度{" "}
-                  {toDisplayPercentText(board.fused.similarity / 100)}）
-                  <br />
-                  {board.fused.blurb}
+                  综合画像：<b>{board.resolvedType.type}</b>
+                  {board.resolvedType.source === "judged" ? (
+                    <span>（{personaTypeSourceNote(board.resolvedType)}）</span>
+                  ) : board.resolvedType.similarity != null ? (
+                    <span>（六维相似度 {toDisplayPercentText(board.resolvedType.similarity / 100)}）</span>
+                  ) : board.resolvedType.source === "sbti" ? (
+                    <span>（来自 SBTI 自评，还不是综合画像）</span>
+                  ) : null}
+                  {board.resolvedType.evidence ? (
+                    <>
+                      <br />
+                      判定依据：{board.resolvedType.evidence}
+                    </>
+                  ) : board.fused?.blurb ? (
+                    <>
+                      <br />
+                      {board.fused.blurb}
+                    </>
+                  ) : null}
                   {/* 只有自评时要说清楚 —— 否则等于把 SBTI 当成观察结论（曾经就是这么错的） */}
-                  {board.fused.selfReportOnly ? (
+                  {board.fused?.selfReportOnly ? (
                     <span data-home-fused-self-only="1">
                       <br />
                       目前只有 SBTI 自评这一份人格数据，这个倾向是自评折算的结果；

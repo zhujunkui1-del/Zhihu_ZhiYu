@@ -112,12 +112,21 @@ await page.goto(`${BASE}/persona`, { waitUntil: "load", timeout: 60000 });
 await page.waitForTimeout(2800);
 const personaType = await page.evaluate(() => {
   /* ④c 之后人格页的主结论是「带依据的 LLM 判型」（[data-judged-type]）。
-     判型没出来时才退回旧的六维徽章 —— 两边取到的都应是同一个型名。 */
+     取**主型名**，不能用「六型数组里第一个出现在文本里的」那种写法 ——
+     同一个框里还有一行"六维相似度…次接近 深度思考型"，那样会取到次接近的型
+     （实测踩过：明明是理性辩手型却比出深度思考型）。 */
   const judged = document.querySelector("[data-judged-type]");
   if (judged) {
+    const badge = judged.querySelector('[class*="typeName"]');
+    const t = (badge?.textContent ?? judged.textContent ?? "").trim();
     const six = ["深度思考型", "好奇探索型", "温和共情型", "理性辩手型", "体验派", "务实执行型"];
-    const t = judged.textContent ?? "";
-    return six.find((x) => t.includes(x)) ?? "";
+    /* 先看徽章里的；徽章取不到时，取**文本中最先出现**的那个 */
+    if (badge) return six.find((x) => t.includes(x)) ?? "";
+    const hits = six
+      .map((x) => ({ x, i: t.indexOf(x) }))
+      .filter((h) => h.i >= 0)
+      .sort((a, b) => a.i - b.i);
+    return hits[0]?.x ?? "";
   }
   return document.querySelector("[data-fused-type]")?.textContent?.trim() ?? "";
 });

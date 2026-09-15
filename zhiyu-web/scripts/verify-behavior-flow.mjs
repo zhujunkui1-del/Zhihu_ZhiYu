@@ -166,7 +166,16 @@ try {
     ui.rows.find((r) => r.label === "主动发起率")?.pct ?? "",
   );
   rec("事实行（互动平衡/单段消息数/最长连续交流）也画出来了", ui.hasFactText);
-  rec("雷达轴标签是行为变量", ui.axisLabels.includes("主动发起率") && ui.axisLabels.includes("回应速度"), ui.axisLabels.join("/"));
+  /* ⚠️ 断言已按新政策更新：雷达**不再**画七个行为变量。
+     那七个只适用于"有对话、有时间戳"的源（知乎/SBTI 喂不动），
+     拿它当综合画像等于让微信一个源代表整个人。现在画写死的五维：
+     思考深度 / 表达力 / 共情力 / 执行力 / 主动性 —— 每个源都喂得动，
+     而且自己的人格页、首页、别人的卡画的是同一组。 */
+  rec(
+    "雷达轴标签是写死的五维",
+    ["思考深度", "表达力", "共情力", "执行力", "主动性"].every((x) => ui.axisLabels.includes(x)),
+    ui.axisLabels.join("/"),
+  );
   rec(
     "雷达轴上的值也都不是 0% / 100%",
     ui.axisVals.filter((v) => v && v !== "—").every((v) => !/^(0|100)%$/.test(v)),

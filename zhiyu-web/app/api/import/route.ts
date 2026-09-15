@@ -17,8 +17,9 @@ import {
 } from "@/lib/import/parse";
 import { facetFromContents, interestCountsFromTexts, interestsFromTexts } from "@/lib/persona/fusion";
 import { facetOptionsFor } from "@/lib/persona/facet-opts";
-import { persistBehaviorFacet, persistSourceFacet } from "@/lib/persona/source-facets";
+import { persistBehaviorFacet, persistDimsFacet, persistSourceFacet } from "@/lib/persona/source-facets";
 import { behaviorFromItems } from "@/lib/persona/behavior";
+import { dimsFromItems } from "@/lib/persona/five-dims";
 
 export const dynamic = "force-dynamic";
 /** 解析大文件可能超过默认 10s（Vercel Hobby 上限 60s） */
@@ -449,6 +450,19 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   } catch (e) {
     warnings.push(`行为变量计算失败（数据已保存）：${(e as Error).message}`);
     console.error("[import] persistBehaviorFacet 失败", e);
+  }
+
+  /* ── 刷新**五维画像**（dims:<source>）──
+     全站雷达用的就是这五个词（思考深度/表达力/共情力/执行力/主动性）。
+     必须在这里算：执行力（活跃天数）与主动性（谁先开口）依赖**时间与方向**，
+     而这两样在库里只剩"我发的那些 note"（方向根本没存），事后算不回来。 */
+  try {
+    const entryList = behaviorEntries.filter((e) => e.text.trim().length > 0);
+    const dims = dimsFromItems(source, entryList);
+    if (dims) await persistDimsFacet(personaId, dims);
+  } catch (e) {
+    warnings.push(`五维画像计算失败（数据已保存）：${(e as Error).message}`);
+    console.error("[import] persistDimsFacet 失败", e);
   }
 
   if (mode === "append" && skippedDuplicates > 0) {

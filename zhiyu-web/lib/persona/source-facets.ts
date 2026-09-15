@@ -26,6 +26,7 @@
 import { prisma } from "@/lib/db";
 import { personalities } from "@/lib/sbti/scoring";
 import { mergeBehavior, type BehaviorFacet, type MergedBehavior } from "./behavior";
+import { dimsFromItems, dimsFromSbti, mergeDims, type DimSet } from "./five-dims";
 import {
   facetFromContents,
   facetFromSbti,
@@ -153,6 +154,16 @@ export interface PersonaFacets {
     bySource: BehaviorFacet[];
     merged: MergedBehavior | null;
   };
+  /**
+   * **五维画像**（写死的五个词：思考深度/表达力/共情力/执行力/主动性）。
+   *
+   * 这是全站**唯一的雷达坐标系** —— 自己的人格页、首页模块、别人的人格卡
+   * 全部画这一组，标签与口径都一样。某个源喂不出某一维就留空（不给 0/0.5）。
+   */
+  dims: {
+    bySource: DimSet[];
+    merged: ReturnType<typeof mergeDims>;
+  };
 }
 
 /** PersonaFeature 里存"分源解析结果"用的 key 前缀 */
@@ -230,6 +241,38 @@ export async function loadBehaviorFacets(personaId: string): Promise<BehaviorFac
   return out.sort((a, b) => a.source.localeCompare(b.source));
 }
 
+/* ── 五维画像（dims:<source>） ───────────────────────────────────────────── */
+
+const DIMS_KEY_PREFIX = "dims:";
+
+/**
+ * 持久化某个源的五维。
+ *
+ * 为什么要在导入时存：执行力（活跃天数）与主动性（谁先开口）依赖**时间与方向**，
+ * 而这两样在库里只剩"我发的那些 note"，方向根本没存 —— 事后算不回来。
+ */
+export async function persistDimsFacet(personaId: string, set: DimSet): Promise<void> {
+  const key = `${DIMS_KEY_PREFIX}${set.source}`;
+  await prisma.personaFeature.upsert({
+    where: { personaId_key: { personaId, key } },
+    update: { value: set as never },
+    create: { personaId, key, value: set as never },
+  });
+}
+
+/** 读回已持久化的五维 */
+export async function loadDimsFacets(personaId: string): Promise<DimSet[]> {
+  const rows = await prisma.personaFeature.findMany({
+    where: { personaId, key: { startsWith: DIMS_KEY_PREFIX } },
+  });
+  const out: DimSet[] = [];
+  for (const r of rows) {
+    const v = r.value as unknown as DimSet | null;
+    if (v && typeof v === "object" && typeof v.source === "string" && v.values) out.push(v);
+  }
+  return out.sort((a, b) => a.source.localeCompare(b.source));
+}
+
 /**
  * 读取一个人格的分源解析 + 综合画像。
  *
@@ -296,6 +339,46 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
     : null;
 
   /**
+   * ⭐ **五维画像**：全站唯一的雷达坐标系（写死的五个词）。
+   *
+   * 数据来源与顺序：
+   *   ① 各行为源**已存好的 `dims:<source>`**（导入时算的，那时手上有时间与方向）
+   *   ② 没有存过的源（老数据、回填进来的创作者）→ **从库里已有证据现算**：
+   *      只有文本，所以能算思考深度/表达力/共情力，执行力与主动性如实留空
+   *   ③ SBTI → 由 15 维折算（问卷天然能喂满五维）
+   *
+   * 这样**别人的人格卡也有五维**，不会像上一版那样"没导过文件就退回旧坐标系"。
+   */
+  const storedDims = await loadDimsFacets(personaId);
+  const dimSets: DimSet[] = [...storedDims];
+  const storedSources = new Set(storedDims.map((d) => d.source));
+
+  const evidenceBySource = new Map<string, { text: string; at?: number }[]>();
+  {
+    const rows = await prisma.personaEvidence.findMany({
+      where: { personaId, source: { notIn: ["sbti", "distill", "privacy"] } },
+      select: { source: true, note: true, occurredAt: true },
+    });
+    for (const r of rows) {
+      if (storedSources.has(r.source)) continue; // 有存好的就用存好的（更准）
+      const text = (r.note ?? "").trim();
+      if (!text) continue;
+      const list = evidenceBySource.get(r.source) ?? [];
+      list.push({ text, at: r.occurredAt ? Math.floor(r.occurredAt.getTime() / 1000) : undefined });
+      evidenceBySource.set(r.source, list);
+    }
+  }
+  for (const [source, items] of evidenceBySource) {
+    const set = dimsFromItems(source, items);
+    if (set) dimSets.push(set);
+  }
+
+  const sbtiDims = dimsFromSbti(
+    sbti?.dimensions as Record<string, { score?: number } | number> | undefined,
+  );
+  if (sbtiDims) dimSets.push(sbtiDims);
+
+  /**
    * ⭐ 产品要求：**SBTI 的结果也是人格数据，也要参与蒸馏。**
    *
    * 所以这里把 15 维折算成六维，作为一个和其它源同构的 facet 放进列表，
@@ -348,6 +431,11 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
     behavior: {
       bySource: behaviorFacets,
       merged: behaviorFacets.length ? mergeBehavior(behaviorFacets) : null,
+    },
+    /* ⭐ 五维画像：全站唯一的雷达坐标系 */
+    dims: {
+      bySource: dimSets,
+      merged: mergeDims(dimSets),
     },
   };
 }

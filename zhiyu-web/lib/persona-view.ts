@@ -15,6 +15,8 @@ import {
   type BehaviorKey,
   type MergedBehavior,
 } from "@/lib/persona/behavior";
+import { resolvePersonaType, type ResolvedPersonaType } from "@/lib/persona/type-source";
+import { DIM_KEYS, DIM_LABEL, DIM_HOWTO, type DimSet } from "@/lib/persona/five-dims";
 
 /** 雷达轴的固定顺序（七条，都由行为变量直接数出来） */
 const RADAR_ORDER: BehaviorKey[] = [
@@ -138,6 +140,14 @@ export interface PersonaBoard {
    */
   judgedType: { type: string; evidence: string; judgedAt: string | null } | null;
   /**
+   * ⭐ **倾向型的唯一取值口径**（判型 → 六维兜底 → SBTI → 无）。
+   *
+   * 首页 / 人格页 / 发现页 / 人格卡**必须**都读这个字段，不许各自决定优先级 ——
+   * 实测事故：首页取 `fused`（务实执行型 60%）、人格页取 `judged`（深度思考型），
+   * 同一个人在两处显示成两个型。见 lib/persona/type-source.ts。
+   */
+  resolvedType: ResolvedPersonaType;
+  /**
    * **分源解析**：每个数据源各自解析出的特征与结论。**含 SBTI**。
    *
    * 产品要求："拿到某个源的数据后就该能解析出这个源里的人是什么样的"，
@@ -174,8 +184,21 @@ export interface PersonaBoard {
   behavior: {
     bySource: BehaviorFacet[];
     merged: MergedBehavior | null;
-    /** 雷达画的是不是行为变量（false = 退回旧的价值观口径） */
+    /** @deprecated 雷达已改用五维；恒为 false，仅为兼容旧调用方 */
     radarIsBehavior: boolean;
+  };
+  /**
+   * ⭐ **五维画像**（思考深度/表达力/共情力/执行力/主动性）——
+   * 全站唯一的雷达坐标系：自己的人格页、首页模块、别人的人格卡都是这一组。
+   * 某一维所有源都喂不出时 `values[key]` 不存在（界面显示 `—`）。
+   */
+  dims: {
+    bySource: DimSet[];
+    values: Partial<Record<string, number>>;
+    evidence: Partial<Record<string, string>>;
+    contributors: Partial<Record<string, string[]>>;
+    /** 每一维"在问什么"，界面上要能一句话说清 */
+    howto: Record<string, string>;
   };
   /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
   selfReport: {
@@ -277,7 +300,6 @@ export async function buildPersonaBoard(
     if (!t) return null;
     return { type: t, evidence, judgedAt: (p.typeJudgedAt as string) ?? null };
   })();
-
   const fused = facets?.type
     ? {
         type: facets.type.type,
@@ -290,6 +312,14 @@ export async function buildPersonaBoard(
         selfReportOnly: facets.selfReportOnly,
       }
     : null;
+
+  /**
+   * ⭐ **倾向型的唯一口径**：判型 → 六维兜底 → SBTI → 无。
+   *
+   * 首页 / 人格页 / 发现页 / 人格卡全部读它。之前首页自己取 `fused`、
+   * 人格页取 `judged`，同一个人在两处显示成两个型（实测被投诉）。
+   */
+  const resolvedType = resolvePersonaType({ personality, fused });
 
   /**
    * 雷达取值的优先级（逐维）：
@@ -337,50 +367,55 @@ export async function buildPersonaBoard(
   const mergedAxes = axesFromObservedValues(mergedValues);
 
   /**
-   * 雷达改画**可数行为变量**。
+   * ⭐ 雷达画什么：**写死的五维**（思考深度/表达力/共情力/执行力/主动性）。
    *
-   * 原来画的是"价值观五轴"，那五轴由文本形态（平均字数/长文比例/点赞数/
-   * 篇幅波动/领域数）折算而来，实测在真实数据上量不出东西（③ 之后 fused 为空）。
-   * 行为变量是直接数出来的：谁先开口、多久回、什么时候聊、用词单调不单调 ——
-   * 每一个都能指着原始数据说清怎么来的，也天然落在中间区间（实测 9%~66%）。
+   * 三次改动的终点：
+   *   ① 最早画"价值观五轴"（自我/情感/观念/行动/社交）—— 由文本形态反推，
+   *      实测在真实数据上量不出东西（③ 之后融合值为空）；
+   *   ② 改成七个"行为变量"—— 只适用于有对话、有时间戳的数据，
+   *      于是那张"综合画像"雷达实际上只由微信/QQ 一个源支撑，
+   *      又犯了"把单一数据源当综合画像"的错；
+   *   ③ 现在这五个词每个源都喂得动（知乎按标题、SBTI 按 15 维、聊天按对话），
+   *      而且**自己的人格页 / 首页 / 别人的人格卡画的是同一组**。
    *
-   * 两条"关系属性"（主动发起率/回应速度）取**内容量最大的那个源**：
-   * 它们描述的是一段关系，不能跨源平均（见 behavior.ts 的说明）。
+   * 某个源喂不出某一维就留空（`value = null`，界面 `—`），不给 0、不给 0.5。
    */
-  const RELATIONAL_AXES = new Set(["initiative", "replySpeed"]);
-  const primaryRelational = facets?.behavior?.merged?.primaryRelational ?? null;
-  const behaviorAxes: Axis[] = RADAR_ORDER.map((k) => {
-    const fromRelational = RELATIONAL_AXES.has(k)
-      ? facets?.behavior?.bySource.find((f) => f.source === primaryRelational)?.variables[k]
-      : undefined;
-    const v =
-      typeof fromRelational === "number"
-        ? fromRelational
-        : facets?.behavior?.merged?.personal[k as keyof typeof facets.behavior.merged.personal];
+  const dimsMerged = facets?.dims?.merged;
+  const fiveAxes: Axis[] = DIM_KEYS.map((k) => {
+    const v = dimsMerged?.values?.[k];
     return {
       key: k,
-      label: BEHAVIOR_LABEL[k],
+      label: DIM_LABEL[k],
       value: typeof v === "number" ? v : null,
       parts: typeof v === "number" ? [{ key: k, normalized: v }] : [],
     };
   });
-  /* 少于 3 个点连不成面（雷达组件的判据），那就退回旧口径，别给一张空图 */
-  const behaviorReady = behaviorAxes.filter((a) => a.value != null).length >= 3;
-
-  const axes = behaviorReady
-    ? behaviorAxes
+  /** 有几维有值（雷达组件少于 3 个点连不成面） */
+  const dimsReady = fiveAxes.filter((a) => a.value != null).length >= 3;
+  /**
+   * 雷达用**五维**（上面已算好 `fiveAxes`）。
+   *
+   * 七个行为变量不再当雷达：它们只适用于"有对话、有时间戳"的源，
+   * 拿它当综合画像等于让微信一个源代表整个人（而且别人的卡没有这些数据，
+   * 于是又退回旧坐标系 —— 实测被投诉"只改了我自己，别人的没改"）。
+   * 五个点凑不齐（<3 维有值）时才退回旧口径，别给一张空图。
+   */
+  const axes = dimsReady
+    ? fiveAxes
     : axesHaveValue(mergedAxes)
       ? mergedAxes
       : axesFromSbti;
   /**
    * 五轴的来源必须如实标注。
-   * 现在 SBTI 也进融合了，所以"有值"不再等于"来自观察"——
-   * 若融合里只有自评（`selfReportOnly`），画出来的图就得标成自评，
-   * 否则用户会以为我们观察到了什么。
+   * SBTI 也进融合，所以"有值"不等于"来自观察" ——
+   * 若五个词全部只由自评喂出来（没有任何行为源），要标成自评。
    */
+  const observedDims = (facets?.dims?.bySource ?? []).filter((d) => d.source !== "sbti");
   const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
-    ? behaviorReady
-      ? "observed"
+    ? dimsReady
+      ? observedDims.length > 0
+        ? "observed"
+        : "self-report"
       : axesHaveValue(mergedAxes)
         ? facets?.selfReportOnly
           ? "self-report"
@@ -414,6 +449,8 @@ export async function buildPersonaBoard(
      * 并**必须**把 `evidence` 一起显示出来（没有依据的型名等于编）。
      */
     judgedType,
+    /* ⭐ 唯一口径：四处都读它（见上方字段说明） */
+    resolvedType,
     /**
      * 数据体检结论（零区分度自评 / 跨源同值）。
      * 界面要如实说出来 —— "为什么这一维没有"比"编一个数"重要。
@@ -424,7 +461,19 @@ export async function buildPersonaBoard(
     behavior: {
       bySource: facets?.behavior?.bySource ?? [],
       merged: facets?.behavior?.merged ?? null,
-      radarIsBehavior: behaviorReady,
+      /** @deprecated 雷达已改用五维；保留字段只为兼容旧调用方 */
+      radarIsBehavior: false,
+    },
+    /**
+     * ⭐ **五维画像**（写死的五个词）—— 全站唯一的雷达坐标系。
+     * 自己的人格页 / 首页模块 / 别人的人格卡画的都是这一组。
+     */
+    dims: {
+      bySource: facets?.dims?.bySource ?? [],
+      values: facets?.dims?.merged?.values ?? {},
+      evidence: facets?.dims?.merged?.evidence ?? {},
+      contributors: facets?.dims?.merged?.contributors ?? {},
+      howto: DIM_HOWTO,
     },
     sourceFacets: (facets?.sources ?? []).map((f) => ({
       source: f.source,
