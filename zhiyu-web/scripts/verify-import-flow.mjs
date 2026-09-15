@@ -452,8 +452,63 @@ rec("QQ TXT 导入成功", await waitFor(() => Boolean(document.querySelector('[
 const qqRows = await evidenceCount("qq");
 rec("QQ 只留下我发的 2 条（跳过对方那条）", qqRows === 2, `${qqRows} 条`);
 
-/* ───────── ⑦ 越权与错误路径 ───────── */
-console.log("\n== ⑦ 别人的卡片上不能导入（越权保护）==");
+/* ───────── ⑦ 大文件：真实体量（我们踩过的超时坑）───────── */
+console.log("\n== ⑦ 大文件导入（几百条消息 / 200 条证据）==");
+/* 这一节是为一个**实际发生过的故障**立的回归：
+   逐条 create 200 条证据 = 200 次往返，Neon 在新加坡，累计 30 秒，
+   而 Prisma 交互式事务默认 5 秒超时 → 500 且**响应体为空**，
+   用户看到的是 "Unexpected end of JSON input"。
+   小文件（3 条）永远测不出来，所以这里造一份 400 条消息的文件。 */
+const bigMessages = Array.from({ length: 400 }, (_, i) => ({
+  localId: i + 1,
+  type: "文本消息",
+  /* 交替长短，保证既有长消息也有短消息 */
+  content:
+    i % 3 === 0
+      ? `第 ${i} 条：这个方案我建议先把风险列出来再决定要不要推进，一是合规边界，二是排期挤压，三是回滚方案。`
+      : `第 ${i} 条：好`,
+  isSend: i % 2 === 0 ? 1 : 0,
+  senderDisplayName: i % 2 === 0 ? "演示用户" : "对方",
+}));
+const bigFile = JSON.stringify({
+  weflow: { version: "1.0.3", generator: "WeFlow" },
+  session: { displayName: "对方", type: "私聊" },
+  messages: bigMessages,
+});
+
+await page.evaluate(() => {
+  document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
+});
+await page.waitForTimeout(400);
+await gotoSources();
+await clickSel('[data-open-import="qq"]');
+await page.waitForTimeout(500);
+const bigAttach = await attachFile('[data-import-input="1"]', "big.json", bigFile);
+rec("塞入 400 条消息的文件", bigAttach.ok, `${(bigAttach.size / 1024).toFixed(0)} KB`);
+
+const t0 = Date.now();
+await clickSel('[data-import-submit="1"]');
+const bigOk = await waitFor(() => Boolean(document.querySelector('[data-import-result="ok"]')), 90000);
+const secs = ((Date.now() - t0) / 1000).toFixed(1);
+rec(`大文件导入成功（用时 ${secs}s，没有事务超时）`, bigOk);
+
+const bigResult = await page.evaluate(
+  () => document.querySelector('[data-import-result="ok"]')?.textContent ?? "",
+);
+rec(
+  "没有出现空响应 / JSON 解析错误",
+  !bigResult.includes("空响应") && !bigResult.includes("Unexpected end"),
+  bigResult.slice(0, 120),
+);
+const bigRows = await evidenceCount("qq");
+rec("200 条证据一次写入（createMany）", bigRows === 200, `${bigRows} 条`);
+const bigMine = await page.evaluate(
+  () => document.querySelector("[data-import-mine-by]")?.getAttribute("data-import-mine-by"),
+);
+rec("大文件也按文件自带的 isSend 判断", bigMine === "flag", `${bigMine}`);
+
+/* ───────── ⑧ 越权与错误路径 ───────── */
+console.log("\n== ⑧ 别人的卡片上不能导入（越权保护）==");
 await page.evaluate(() => {
   document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
 });

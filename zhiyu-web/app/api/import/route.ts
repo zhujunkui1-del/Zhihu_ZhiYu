@@ -51,6 +51,34 @@ function bad(error: string, extra: Record<string, unknown> = {}, status = 400) {
  *   · 重新导入会**替换**该源的旧证据，不累加 —— 文件才是该源的事实来源
  */
 export async function POST(req: NextRequest) {
+  /**
+   * 整个流程包一层。
+   *
+   * 为什么必须包：Next 在 route handler 抛未捕获异常时会回一个
+   * **空响应体**的 500，前端 `res.json()` 只能报
+   * "Unexpected end of JSON input" —— 用户完全不知道发生了什么
+   * （真实案例：事务超时那次，页面上就只有这行英文）。
+   * 只要还活着，就一定要回一个带人话原因的 JSON。
+   */
+  try {
+    return await handleImport(req);
+  } catch (e) {
+    const err = e as Error;
+    console.error("[import] 未捕获异常", err);
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "INTERNAL",
+        error:
+          `服务器处理这个文件时出错了：${err.message}。` +
+          `数据**没有**写入或者已完整回滚，可以重试；若反复失败请把这个文件的情况反馈给我们。`,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleImport(req: NextRequest): Promise<NextResponse> {
   const blocked = denyIfCrossSite(req);
   if (blocked) return blocked;
 
@@ -152,41 +180,57 @@ export async function POST(req: NextRequest) {
     selfName,
   };
 
-  await prisma.$transaction(async (tx) => {
-    /* 重新导入 = 替换。累加会让"条数/平均字数"这类统计无限膨胀，
-       而文件本身就是这个源的事实来源。 */
-    await tx.personaEvidence.deleteMany({ where: { personaId, source } });
+  await prisma.$transaction(
+    async (tx) => {
+      /* 重新导入 = 替换。累加会让"条数/平均字数"这类统计无限膨胀，
+         而文件本身就是这个源的事实来源。 */
+      await tx.personaEvidence.deleteMany({ where: { personaId, source } });
 
-    for (const it of evidenceRows) {
-      await tx.personaEvidence.create({
-        data: {
+      /**
+       * ⚠️ 用 `createMany`（一条 SQL），**不要** for 循环逐条 create。
+       *
+       * 真实文件实测炸过：608 条消息的文件会挑出 200 条证据，
+       * 逐条 create 就是 200 次往返 —— Neon 在 ap-southeast-1，
+       * 每次约 150ms，累计 30 秒，而 Prisma 交互式事务**默认 5 秒超时**，
+       * 于是抛 `A query cannot be executed on an expired transaction`，
+       * 接口 500 且**响应体为空**，前端只看到
+       * "Unexpected end of JSON input"（用户报的就是这个）。
+       * 小文件（3 条）测不出来，必须有大数据量的用例才暴露。
+       */
+      if (evidenceRows.length) {
+        await tx.personaEvidence.createMany({
+          data: evidenceRows.map((it) => ({
+            personaId,
+            source,
+            trait: it.trait,
+            value: it.heat ?? null,
+            note: it.text.slice(0, 2000),
+            url: it.url ?? null,
+          })),
+        });
+      }
+
+      await tx.personaSource.upsert({
+        where: { personaId_type: { personaId, type: source } },
+        update: { status: "injected", importedAt: new Date(), meta: meta as never },
+        create: {
           personaId,
-          source,
-          trait: it.trait,
-          value: it.heat ?? null,
-          note: it.text.slice(0, 2000),
-          url: it.url ?? null,
+          type: source,
+          status: "injected",
+          importedAt: new Date(),
+          meta: meta as never,
         },
       });
-    }
 
-    await tx.personaSource.upsert({
-      where: { personaId_type: { personaId, type: source } },
-      update: { status: "injected", importedAt: new Date(), meta: meta as never },
-      create: {
-        personaId,
-        type: source,
-        status: "injected",
-        importedAt: new Date(),
-        meta: meta as never,
-      },
-    });
-
-    await tx.persona.update({
-      where: { id: personaId },
-      data: { interests: mergedInterests as never },
-    });
-  });
+      await tx.persona.update({
+        where: { id: personaId },
+        data: { interests: mergedInterests as never },
+      });
+    },
+    /* 事务超时同样要显式给足：默认 5 秒对"删旧证据 + 写新证据"这种
+       多语句事务太紧（Neon 单趟往返就有 100~200ms）。 */
+    { maxWait: 20000, timeout: 60000 },
+  );
 
   /* ── 刷新分源解析 ──
      产品要求："拿到某个源的数据后第一时间就该能解析出这个源里的人格特征"。
@@ -223,6 +267,9 @@ export async function POST(req: NextRequest) {
     format: parsed.format,
     encoding: decoded.encoding,
     speakers: parsed.speakers,
+    /* 会话信息 + "我发的"是怎么判定的：用户据此判断结果可不可信 */
+    session: parsed.session,
+    mineDetectedBy: parsed.mineDetectedBy,
     addedInterests,
     warnings,
     facet: facet

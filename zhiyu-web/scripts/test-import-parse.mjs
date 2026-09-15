@@ -172,6 +172,94 @@ rec(
   parseCsv('a,"他说""你好""",c')[0][1],
 );
 
+/* ── ④b 真实微信导出工具 WeFlow 的格式（用户的实际文件）────────────── */
+console.log("\n== 微信 WeFlow 导出（真实文件格式：senderDisplayName + isSend + session）==");
+const weflow = JSON.stringify({
+  weflow: { version: "1.0.3", exportedAt: 1788287742, generator: "WeFlow" },
+  session: {
+    wxid: "wxid_el53la4o0sc522",
+    nickname: "Evol",
+    remark: "陈思婕",
+    displayName: "陈思婕",
+    type: "私聊",
+    messageCount: 608,
+  },
+  messages: [
+    {
+      localId: 1,
+      createTime: 1729904359,
+      formattedTime: "2024-10-26 08:59:19",
+      type: "文本消息",
+      content: "我通过了你的朋友验证请求，现在我们可以开始聊天了",
+      isSend: 0,
+      senderUsername: "wxid_el53la4o0sc522",
+      senderDisplayName: "陈思婕",
+    },
+    {
+      localId: 2,
+      type: "动画表情",
+      content: "[表情包]",
+      isSend: 1,
+      senderDisplayName: "S·P·W",
+    },
+    {
+      localId: 3,
+      type: "文本消息",
+      content: "我下周一到长沙，大概待三天，想把上次说的那个方案再对一遍细节",
+      isSend: 1,
+      senderDisplayName: "S·P·W",
+    },
+    {
+      localId: 4,
+      type: "引用消息",
+      content: "可以([引用 S·P·W：我下周一到长沙])",
+      isSend: 0,
+      senderDisplayName: "陈思婕",
+      replyToMessageId: 3,
+      quotedSender: "S·P·W",
+    },
+    { localId: 5, type: "系统消息", content: "对方撤回了一条消息", isSend: 0, senderDisplayName: "" },
+  ],
+});
+const wf = parseImportFile("wechat", "私聊_陈思婕.json", weflow, { selfName: "S·W" });
+rec(
+  "认出发言人（senderDisplayName）",
+  wf.speakers.some((s) => s.includes("S·P·W")) && wf.speakers.some((s) => s.includes("陈思婕")),
+  wf.speakers.join("、"),
+);
+rec(
+  "⚠️ 用文件自带的 isSend 判断方向（不再依赖昵称，昵称填错也不影响）",
+  wf.mineDetectedBy === "flag",
+  `mineDetectedBy=${wf.mineDetectedBy}`,
+);
+rec(
+  "只留我发的 1 条（对方 2 条被跳过；表情包与系统消息被丢）",
+  wf.items.length === 1 && wf.items[0].text.includes("长沙"),
+  wf.items.map((i) => i.text.slice(0, 24)).join(" ⏐ "),
+);
+rec(
+  "认出会话对象（与「陈思婕」的私聊）",
+  wf.session?.partnerName === "陈思婕" && wf.session?.type === "私聊",
+  JSON.stringify(wf.session),
+);
+rec(
+  "昵称填错时**如实告知**，而不是静默按错的过滤",
+  wf.warnings.some((w) => w.includes("S·W") && w.includes("没有出现")),
+  wf.warnings.find((w) => w.includes("没有出现")) ?? "(无)",
+);
+rec("系统消息整条丢弃", !wf.items.some((i) => i.text.includes("撤回")));
+
+/* 没有 isSend、也没有昵称时，必须警告"会混入对方的特征" */
+const noFlag = JSON.parse(weflow);
+delete noFlag.session;
+for (const m of noFlag.messages) delete m.isSend;
+const nf = parseImportFile("wechat", "x.json", JSON.stringify(noFlag));
+rec(
+  "没有方向标记又没填昵称 → 明确警告会混入对方特征",
+  nf.mineDetectedBy === "none" && nf.warnings.some((w) => w.includes("没有填昵称")),
+  nf.warnings.join(" ⏐ ").slice(0, 110),
+);
+
 /* ── ⑤ 飞书：distilly feishu_parser.py 认的 JSON ─────────────────────── */
 console.log("\n== 飞书 JSON（distilly 口径：data.messages + sender_name/content.text）==");
 const feishuJson = JSON.stringify({

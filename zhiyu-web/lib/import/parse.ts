@@ -74,6 +74,10 @@ export interface ParseResult {
   warnings: string[];
   /** 本次解析使用的昵称过滤条件 */
   selfName: string | null;
+  /** 会话元信息（对方名字 / 私聊还是群聊）；认不出为 null */
+  session: SessionInfo | null;
+  /** "哪些是我发的"是靠什么判定的 —— 如实告诉用户，便于判断结果可不可信 */
+  mineDetectedBy: "flag" | "nickname" | "none";
 }
 
 const NOISE = new Set([
@@ -176,6 +180,10 @@ export function decodeBytes(buf: ArrayBuffer | Uint8Array): {
 
 const SENDER_KEYS = [
   "sender_name", "senderName", "sender", "from", "fromName", "user_name", "userName",
+  /* WeFlow（微信导出工具）用 senderDisplayName / senderUsername，
+     实测真实文件里只有这两个字段带发言人 —— 少了它们会把 560 条消息
+     全当成"没有发言人"，于是对方的 227 条也被算进我的人格。 */
+  "senderDisplayName", "senderNickname", "senderUsername",
   "talker", "nickName", "nickname", "displayName", "name", "accountName", "wxid", "uin",
 ];
 const CONTENT_KEYS = [
@@ -187,6 +195,11 @@ const TIME_KEYS = [
   "sendTime", "createdAt",
 ];
 const HEAT_KEYS = ["likeCount", "likes", "heat", "score"];
+
+/** 消息类型字段：值为「系统消息」「转账消息」这类时整条丢弃 */
+const TYPE_KEYS = ["type", "msgType", "messageType", "localType", "subType"];
+/** 这些类型不携带人格信息（系统提示、转账、通话、撤回…） */
+const DROP_TYPE = /系统|撤回|转账|红包|通话|拍一拍|群公告|接龙|位置|名片|卡券|小程序|视频号|直播|礼物|裂开|GIF|语音|图片|视频|文件|表情|动画|链接|分享|收藏|音乐|合并转发/;
 
 function pick(obj: Record<string, unknown>, keys: string[]): unknown {
   for (const k of keys) {
@@ -271,6 +284,68 @@ interface RawMsg {
   content: string;
   time: string;
   heat?: number;
+  /**
+   * 文件**自带**的"这条是我发的"标记（`isSend: 1` / `isSelf: true` / `direction: "out"`）。
+   *
+   * 为什么它比昵称匹配可靠得多：实测的真实微信导出（WeFlow 1.0.3）长这样
+   *   { content, isSend: 1, senderDisplayName: "S·P·W", type: "文本消息" }
+   * `isSend` 直接说明方向，而昵称是用户手输的 —— 实测用户填「S·W」、
+   * 文件里其实叫「S·P·W」，按昵称过滤会**一条都留不下**（或者更糟：
+   * 匹配不上就把对方的话也算成自己的）。有标记就用标记。
+   */
+  mine?: boolean;
+}
+
+/**
+ * 从消息对象里读"这条是不是我发的"。
+ *
+ * 认得出三种常见写法：
+ *   · `isSend: 1 / 0`（WeFlow、部分 QQ 导出）
+ *   · `isSelf / self / fromMe / isMine: true / false`
+ *   · `direction / msgDirection: "out" / "send" / "发送"`（发） vs "in" / "recv"（收）
+ *
+ * @returns 读得出就是 true/false；读不出返回 undefined（**不猜**）
+ */
+function readMine(o: Record<string, unknown>): boolean | undefined {
+  const boolKeys = ["isSend", "isSelf", "self", "fromMe", "isMine", "send"];
+  for (const k of boolKeys) {
+    const v = o[k];
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number" && (v === 0 || v === 1)) return v === 1;
+    if (v === "1" || v === "true") return true;
+    if (v === "0" || v === "false") return false;
+  }
+  const dirKeys = ["direction", "msgDirection", "flow", "sendOrRecv"];
+  for (const k of dirKeys) {
+    const v = o[k];
+    if (typeof v !== "string") continue;
+    const s = v.trim().toLowerCase();
+    if (["out", "outgoing", "send", "sent", "sendout", "发送", "发出"].includes(s)) return true;
+    if (["in", "incoming", "recv", "receive", "received", "接收", "收到"].includes(s)) return false;
+  }
+  return undefined;
+}
+
+/** 会话信息（私聊/群聊导出里通常带一段 session 元信息） */
+export interface SessionInfo {
+  /** 对方名字（私聊时是对方；群聊时是群名） */
+  partnerName: string | null;
+  /** 会话类型原文，如「私聊」「群聊」 */
+  type: string | null;
+}
+
+function findSessionInfo(root: unknown): SessionInfo | null {
+  if (!root || typeof root !== "object" || Array.isArray(root)) return null;
+  const s = (root as Record<string, unknown>).session;
+  if (!s || typeof s !== "object" || Array.isArray(s)) return null;
+  const o = s as Record<string, unknown>;
+  const name = [o.displayName, o.remark, o.remarkName, o.nickname, o.name, o.title].find(
+    (x): x is string => typeof x === "string" && x.trim() !== "",
+  );
+  const type = [o.type, o.chatType, o.kind].find(
+    (x): x is string => typeof x === "string" && x.trim() !== "",
+  );
+  return { partnerName: name?.trim() ?? null, type: type?.trim() ?? null };
 }
 
 function messagesFromArray(arr: unknown[]): RawMsg[] {
@@ -299,7 +374,18 @@ function messagesFromArray(arr: unknown[]): RawMsg[] {
     const heat = typeof heatRaw === "number" && Number.isFinite(heatRaw) ? heatRaw : undefined;
 
     if (!content.trim()) continue;
-    out.push({ sender: sender.trim(), content: content.trim(), time: time.trim(), heat });
+
+    /* 系统提示 / 转账 / 通话记录这类整条丢掉（不是"他说了什么"） */
+    const typeRaw = pick(inner, TYPE_KEYS) ?? pick(o, TYPE_KEYS);
+    if (typeof typeRaw === "string" && DROP_TYPE.test(typeRaw)) continue;
+
+    out.push({
+      sender: sender.trim(),
+      content: content.trim(),
+      time: time.trim(),
+      heat,
+      mine: readMine(inner) ?? readMine(o),
+    });
   }
   return out;
 }
@@ -674,11 +760,15 @@ export function parseImportFile(
       format: "空文件",
       warnings: ["文件是空的（或者解码后没有任何字符）。"],
       selfName,
+      session: null,
+      mineDetectedBy: "none",
     };
   }
 
   let msgs: RawMsg[] = [];
   let format = "";
+  /** 会话元信息（对方是谁、私聊还是群聊）—— 用来告诉用户"我们看懂了这是什么" */
+  let session: SessionInfo | null = null;
 
   if (ext === ".json") {
     let data: unknown;
@@ -695,8 +785,11 @@ export function parseImportFile(
             `如果文件其实是纯文本，请把后缀改成 .txt 再导入。`,
         ],
         selfName,
+        session: null,
+        mineDetectedBy: "none",
       };
     }
+    session = findSessionInfo(data);
     const found = findMessageArray(data);
     if (!found) {
       /* 只有一层对象、没有消息数组：若它本身像一条消息就当一条，否则如实报错 */
@@ -716,6 +809,8 @@ export function parseImportFile(
               "请确认导出的是聊天记录或文档导出文件。",
           ],
           selfName,
+          session,
+          mineDetectedBy: "none",
         };
       }
     } else {
@@ -729,6 +824,15 @@ export function parseImportFile(
     const parsed = messagesFromText(text);
     msgs = parsed.msgs;
     format = parsed.sections > 0 ? "文本 · 文档/消息分区" : "文本 · 逐行";
+  }
+
+  /* 会话信息能认出来就写进 warnings —— 用户据此一眼确认"文件读对了"。
+     实测：私聊导出里 session 有对方名字，而用户自己填的昵称可能对不上。 */
+  if (session && (session.partnerName || session.type)) {
+    const who = session.partnerName ? `「${session.partnerName}」` : "";
+    warnings.push(
+      `识别为${session.type ? `与 ${who} 的${session.type}` : `${who}的会话`}。`,
+    );
   }
 
   const rawCount = msgs.length;
@@ -752,7 +856,35 @@ export function parseImportFile(
   let noiseDropped = 0;
   let senderlessKept = 0;
 
-  if (selfName) {
+  /**
+   * 判定"哪些是我发的"，优先级从高到低：
+   *   ① 文件自带的方向标记（`isSend` 等）—— 最可靠，不依赖用户手输昵称
+   *   ② 用户填的昵称
+   *   ③ 都没有：全留，并明确警告会混入对方的话
+   */
+  const marked = msgs.filter((m) => m.mine !== undefined);
+  const hasMarkers = marked.length > 0 && marked.length >= msgs.length / 2;
+  const myCount = marked.filter((m) => m.mine === true).length;
+
+  if (hasMarkers) {
+    filtered = msgs.filter((m) => m.mine !== false);
+    const dropped = rawCount - filtered.length;
+    if (dropped > 0) {
+      warnings.push(
+        `文件自带发送方向标记（isSend 一类），据此只保留你发出的 ${myCount} 条、` +
+          `跳过 ${dropped} 条对方的消息 —— 不需要靠昵称猜。`,
+      );
+    }
+    /* 用户填了昵称、但文件里的昵称和他填的不一样：如实说一句，
+       免得他以后以为"填了没用"（实测用户填「S·W」，文件里是「S·P·W」）。 */
+    if (selfName && !msgs.some((m) => m.sender.includes(selfName))) {
+      warnings.push(
+        `你填的昵称「${selfName}」在文件里没有出现（文件里的发言者是：${
+          speakers.join("、") || "（无）"
+        }）；本次按文件自带的方向标记判断，结果不受影响。`,
+      );
+    }
+  } else if (selfName) {
     filtered = msgs.filter((m) => !m.sender || m.sender.includes(selfName));
     const dropped = rawCount - filtered.length;
     if (filtered.length === 0) {
@@ -767,6 +899,8 @@ export function parseImportFile(
           }。请核对昵称后重试；如果这是单人文档（没有发言人），把昵称留空即可。`,
         ],
         selfName,
+        session,
+        mineDetectedBy: "none",
       };
     }
     senderlessKept = filtered.filter((m) => !m.sender).length;
@@ -784,7 +918,7 @@ export function parseImportFile(
     }
   } else if (speakerCount.size > 1) {
     warnings.push(
-      `文件里有 ${speakerCount.size} 个发言者，而你**没有填昵称** —— ` +
+      `文件里有 ${speakerCount.size} 个发言者、也没有发送方向标记，而你**没有填昵称** —— ` +
         `本次把所有人的话都当成了你的（会混入对方的特征）。` +
         `建议重新导入并在「你在文件里的昵称」里填上你自己。`,
     );
@@ -813,7 +947,6 @@ export function parseImportFile(
       break;
     }
   }
-
   if (noiseDropped > 0) {
     warnings.push(`过滤掉 ${noiseDropped} 条噪声（图片/表情/撤回提示、过短消息）。`);
   }
@@ -837,7 +970,18 @@ export function parseImportFile(
     return b.text.length - a.text.length;
   });
 
-  return { items, rawCount, speakers, format, warnings, selfName };
+  return {
+    items,
+    rawCount,
+    speakers,
+    format,
+    warnings,
+    selfName,
+    session,
+    /* 如实回报"我发的"是靠什么判定的：flag=文件自带方向标记（最可靠）、
+       nickname=靠用户填的昵称、none=没判定（全留） */
+    mineDetectedBy: hasMarkers ? "flag" : selfName ? "nickname" : "none",
+  };
 }
 
 /**

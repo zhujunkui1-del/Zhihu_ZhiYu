@@ -37,6 +37,10 @@ export interface ImportFileResult {
   format?: string;
   encoding?: string;
   speakers?: string[];
+  /** 会话信息（对方名字 / 私聊还是群聊） */
+  session?: { partnerName: string | null; type: string | null } | null;
+  /** "我发的"是怎么判定的：flag=文件自带方向标记，nickname=靠昵称 */
+  mineDetectedBy?: "flag" | "nickname" | "none";
   addedInterests?: string[];
   warnings?: string[];
   facet?: {
@@ -209,11 +213,41 @@ export default function ImportDataDialog({
       fd.append("file", file);
       if (selfName.trim()) fd.append("selfName", selfName.trim());
 
-      const r = (await fetch("/api/import", {
+      const res = await fetch("/api/import", {
         method: "POST",
         headers: { "x-silent-error": "1" },
         body: fd,
-      }).then((x) => x.json())) as ImportFileResult;
+      });
+
+      /**
+       * ⚠️ 先取文本再解析，不能直接 `res.json()`。
+       *
+       * 实测：serverless/route handler 抛未捕获异常或请求被平台拦下时，
+       * 响应体**是空的**，`res.json()` 只会抛
+       * "Failed to execute 'json' on 'Response': Unexpected end of JSON input"
+       * —— 用户看到的就是这行英文，完全不知道发生了什么。
+       * 这里把状态码与响应片段如实带出来，至少能定位。
+       */
+      const raw = await res.text();
+      let r: ImportFileResult;
+      if (!raw) {
+        r = {
+          ok: false,
+          error:
+            `服务器返回了空响应（HTTP ${res.status}）—— ` +
+            `通常是文件太大、处理超时或服务端出错。数据未写入，可以重试；` +
+            `若文件很大，请先按月/按会话拆分再导入。`,
+        };
+      } else {
+        try {
+          r = JSON.parse(raw) as ImportFileResult;
+        } catch {
+          r = {
+            ok: false,
+            error: `服务器返回的不是 JSON（HTTP ${res.status}）：${raw.slice(0, 160)}`,
+          };
+        }
+      }
 
       setResult(r);
       if (r.ok) onImported(r);
@@ -371,6 +405,20 @@ export default function ImportDataDialog({
                 </p>
                 <p className={styles.resultMeta}>
                   按「{result.format}」解析 · 编码 {result.encoding}
+                  {result.session?.partnerName
+                    ? ` · 会话对象 ${result.session.partnerName}${
+                        result.session.type ? `（${result.session.type}）` : ""
+                      }`
+                    : ""}
+                </p>
+
+                {/* "我发的"是靠什么判定的 —— 直接决定这份数据可不可信，必须说 */}
+                <p className={styles.resultMeta} data-import-mine-by={result.mineDetectedBy}>
+                  {result.mineDetectedBy === "flag"
+                    ? "只提取了你自己发出的消息（依据文件里自带的发送方向标记）"
+                    : result.mineDetectedBy === "nickname"
+                      ? "只提取了你自己发出的消息（依据你填的昵称）"
+                      : "⚠️ 没能判断哪些是你发的，本次把文件里所有人的话都算进来了"}
                 </p>
 
                 {result.speakers?.length ? (
