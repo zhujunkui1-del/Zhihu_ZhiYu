@@ -278,7 +278,7 @@ node scripts/verify-live-deploy.mjs https://www.zhiyuapp.site                   
 
 ## 当前状态
 
-**已完成并上线**（https://www.zhiyuapp.site，自有域名 + Vercel 单体）：
+**已完成并上线**（https://www.zhiyuapp.site ，自有域名 + Vercel 单体）：
 
 - 7 个页面 · 30 个 API · 16 个数据模型
 - **六源接入**：知乎 OAuth 实网跑通；微信/QQ/飞书/钉钉文件导入；飞书/钉钉 OAuth 授权同步；SBTI 自评
