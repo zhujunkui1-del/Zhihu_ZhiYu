@@ -405,8 +405,16 @@ export async function buildPersonaBoard(
       label: f.label,
       summary: f.summary,
       itemCount: f.itemCount,
+      /**
+       * ⚠️ 被体检判定"跨源同值 / 零区分度"的维度**在卡片上也不显示**。
+       * 只把融合结果置空是不够的：用户看到的是卡片上那根 99% 的条，
+       * 而它恰恰是"所有源都给出同一个数"的那个假信号（实测微信/QQ 的
+       * 创造表达都是 0.99 —— 因为证据在导入时已去重，这个指标恒为 1）。
+       */
       values: Object.fromEntries(
-        Object.entries(f.values).filter(([, v]) => typeof v === "number") as [string, number][],
+        Object.entries(f.values).filter(
+          ([k, v]) => typeof v === "number" && !blanked.has(k) && !skipped.has(f.source),
+        ) as [string, number][],
       ),
       titleOnly: f.titleOnly === true,
       partialReason: f.partialReason ?? null,
