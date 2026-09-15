@@ -112,6 +112,12 @@ export default function SourceFacets({
                   {VALUE_KEYS.filter((k) => typeof f.values[k] !== "number")
                     .map((k) => VALUE_LABEL[k] ?? k)
                     .join("、")}
+                  {/* 说清"为什么给不出"。否则用户看到缺维会以为是 bug
+                      —— 实际是数据源本身只给标题（如知乎开放平台），
+                      依赖文本长度的维度无从计算。 */}
+                  {f.titleOnly
+                    ? "（该源只提供标题、没有正文，表达密度 / 长文比例 / 稳定输出需要正文才能算）"
+                    : ""}
                 </p>
               ) : null}
             </article>

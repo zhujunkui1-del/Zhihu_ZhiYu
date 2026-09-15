@@ -95,6 +95,35 @@ rec(
   `融合=${fusedInfo.fusedType}；SBTI 行里不含该词`,
 );
 
+/* ⚠️ 雷达必须**五条轴都有值**。
+   回归点：曾经把雷达改成"整体优先融合值"，而某个源只算出 2 维
+   （知乎只给标题 → 依赖文本长度的三维留空），结果 3 条轴变 `—`，
+   用户看到的是"雷达图被干没了"。分源缺维是常态，不能拖垮整张图。 */
+const axisInfo = await page.evaluate(() => {
+  const rows = [...document.querySelectorAll('[class*="axisRow"]')];
+  return {
+    count: rows.length,
+    labels: rows.map((r) => r.querySelector('[class*="axisLabel"]')?.textContent?.trim() ?? ""),
+    vals: rows.map((r) => r.querySelector('[class*="axisVal"]')?.textContent?.trim() ?? ""),
+    radarDots: document.querySelectorAll("circle[class*='prDot']").length,
+  };
+});
+rec(
+  "雷达五条轴齐全",
+  axisInfo.count === 5,
+  `${axisInfo.count} 条：${axisInfo.labels.join("/")}`,
+);
+rec(
+  "五条轴**全部有数值**（不因某个源缺维而变「—」）",
+  axisInfo.vals.length === 5 && axisInfo.vals.every((v) => v && v !== "—"),
+  axisInfo.vals.join(" "),
+);
+rec(
+  "雷达画出了数据面（不是空态）",
+  axisInfo.radarDots === 5,
+  `${axisInfo.radarDots} 个顶点`,
+);
+
 /* ───────── ③ 分源解析模块 ───────── */
 console.log("\n== ③ 每个数据源各自的解析 ==");
 const facetInfo = await page.evaluate(() => {

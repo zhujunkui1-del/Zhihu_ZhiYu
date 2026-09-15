@@ -107,6 +107,8 @@ export interface PersonaBoard {
     summary: string;
     itemCount: number;
     values: Record<string, number>;
+    /** 该源只有标题、没有正文（依赖文本长度的维度因此缺失） */
+    titleOnly: boolean;
   }[];
   /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
   selfReport: {
@@ -185,18 +187,35 @@ export async function buildPersonaBoard(
     : null;
 
   /**
-   * 雷达画的就是**这一份融合值**，与右边那行六维、与「综合画像」的判定
-   * 用的是同一组数字 —— 一张卡里三处显示必须同源，否则用户会看到
-   * "文字说 56%、图却画另一套"的矛盾。
+   * 雷达画什么：**逐维补全**，而不是整组二选一。
    *
-   * 注意不能退回用 `persona.values`：那是**蒸馏输出的六维**，
-   * 而蒸馏的证据包里包含了 SBTI 自评（见 lib/persona/distill.ts 的 collectEvidence），
-   * 也就是说它并非纯观察值。融合值里不含自评，才是这里要的。
+   * 每一维单独按优先级取值：
+   *   ① 多源融合值（纯观察数据，最可信）
+   *   ② 蒸馏产物 `Persona.values`（LLM 归纳，证据包里可能含自评）
+   *   ③ SBTI 自评的 15 维聚合（前两者都给不出时才用）
+   *
+   * ⚠️ 为什么必须逐维补：曾经写成"整体优先融合值"，于是某个源只算出 2 维
+   * （知乎只返回标题 → 依赖文本长度的三维如实留空）时，雷达就只剩 2 条轴、
+   * 另外 3 条变 `—`。用户重新蒸馏后看到的就是"雷达图被干没了"（实际被投诉）。
+   * 分源缺维是**正常情况**，不该拖垮整张图。
+   *
+   * 注意：「综合画像」的**倾向型判定**仍然只用 `facets.fused`（纯观察值）——
+   * 那是结论，含义不同，不能拿自评掺进去。逐维补全只用于画图与展示。
    */
-  const fusedAxes = facets?.fused ? axesFromObservedValues(facets.fused) : [];
-  const axes = axesHaveValue(fusedAxes) ? fusedAxes : axesFromSbti;
+  const mergedValues: Record<string, number> = {};
+  const personaValues = (persona.values ?? {}) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(personaValues)) {
+    if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
+  }
+  /* 融合值覆盖同名的蒸馏值（观察优先，逐维） */
+  for (const [k, v] of Object.entries(facets?.fused ?? {})) {
+    if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
+  }
+
+  const mergedAxes = axesFromObservedValues(mergedValues);
+  const axes = axesHaveValue(mergedAxes) ? mergedAxes : axesFromSbti;
   const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
-    ? axesHaveValue(fusedAxes)
+    ? axesHaveValue(mergedAxes)
       ? "observed"
       : "self-report"
     : "none";
@@ -225,6 +244,7 @@ export async function buildPersonaBoard(
       values: Object.fromEntries(
         Object.entries(f.values).filter(([, v]) => typeof v === "number") as [string, number][],
       ),
+      titleOnly: f.titleOnly === true,
     })),
     selfReport: facets?.selfReport ?? null,
   };
