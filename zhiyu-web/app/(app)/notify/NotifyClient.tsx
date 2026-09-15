@@ -42,6 +42,8 @@ export default function NotifyClient({
   const [busy, setBusy] = useState(false);
   /** 要就地打开哪一场匹配报告；null = 不显示弹窗 */
   const [reportMatchId, setReportMatchId] = useState<string | null>(null);
+  /** 打开的报告是不是**别人送来的**（决定弹窗里显不显示「给TA送去报告」） */
+  const [reportReceived, setReportReceived] = useState(false);
 
   const isRead = (id: string, read: boolean) => read || markedAll || readIds.has(id);
 
@@ -63,9 +65,11 @@ export default function NotifyClient({
    * 通知里只有 matchId，没有报告内容，所以交给 MatchReportModal 按 id 自己拉
    * （复用与 Agent 匹配页同一份报告装配逻辑，数字与理由不会两处不一致）。
    */
-  const open = async (id: string, matchId: string | null) => {
+  const open = async (id: string, matchId: string | null, category?: NotifyCategory) => {
     setReadIds((s) => new Set(s).add(id));
     if (!matchId) return;
+    /* 「发来的报告」这一类是别人送的 → 弹窗里不显示「给TA送去报告」 */
+    setReportReceived(category === "report");
     setReportMatchId(matchId);
   };
 
@@ -173,7 +177,7 @@ export default function NotifyClient({
                       <button
                         type="button"
                         className={`btn btnGhost ${styles.open}`}
-                        onClick={() => void open(it.id, it.matchId)}
+                        onClick={() => void open(it.id, it.matchId, it.category)}
                         disabled={!it.matchId}
                         title={it.matchId ? undefined : "这条通知没有可打开的匹配"}
                       >
@@ -228,10 +232,16 @@ export default function NotifyClient({
       </section>
 
       {/* 就地打开匹配报告（不跳「Agent 匹配」页）。
-          点「再看一次」时用 matchId 拉取，复用与那页同一份装配逻辑。 */}
+          点「再看一次」时用 matchId 拉取，复用与那页同一份装配逻辑。
+          `received`：从「发来的报告」点进来的，是**别人送给我的** ——
+          这种报告不再显示「给TA送去报告」按钮（服务端也会回报 sentToMe 兜底）。 */}
       <MatchReportModal
         matchId={reportMatchId}
-        onClose={() => setReportMatchId(null)}
+        received={reportReceived}
+        onClose={() => {
+          setReportMatchId(null);
+          setReportReceived(false);
+        }}
       />
     </>
   );

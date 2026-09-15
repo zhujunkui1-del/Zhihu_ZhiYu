@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PersonaRadar from "@/components/PersonaRadar";
 import Avatar from "@/components/radar/Avatar";
 import PersonaCardModal from "@/components/PersonaCardModal";
-import { reportError } from "@/lib/client/error-bus";
+import { reportError, reportSuccess, reportWarn } from "@/lib/client/error-bus";
 import type { ReportView } from "@/lib/agent-match";
 import styles from "./MatchReportModal.module.css";
 
@@ -29,14 +29,25 @@ export default function MatchReportModal({
   report: reportProp,
   matchId,
   onClose,
+  /** 已知这份报告是**别人送来**的（通知页从「发来的报告」打开时）→ 不显示送出按钮 */
+  received = false,
 }: {
   report?: ReportView | null;
   matchId?: string | null;
   onClose: () => void;
+  received?: boolean;
 }) {
   const [fetched, setFetched] = useState<ReportView | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  /** 送出状态：由接口如实回报（sentToMe 时压根不显示按钮） */
+  const [sendState, setSendState] = useState<{
+    sentToMe: boolean;
+    sentByMe: boolean;
+    sending: boolean;
+    /** 送出后对方未注册账号时服务端给的说明 */
+    notice: string;
+  }>({ sentToMe: received, sentByMe: false, sending: false, notice: "" });
 
   const open = Boolean(reportProp ?? matchId);
 
@@ -56,11 +67,18 @@ export default function MatchReportModal({
           cache: "no-store",
           headers: { "x-silent-error": "1" },
         }).then((x) => x.json())) as
-          | { ok: true; report: ReportView }
+          | { ok: true; report: ReportView; sentToMe?: boolean; sentByMe?: boolean }
           | { ok: false; error?: string };
         if (cancelled) return;
         if (!r.ok) throw new Error(r.error ?? "读取匹配报告失败");
         setFetched(r.report);
+        /* 服务端是权威：它说"这份是别人送来的"就听它的，
+           不管是哪个入口打开的（通知页 / 直接粘贴 matchId） */
+        setSendState((s) => ({
+          ...s,
+          sentToMe: received || r.sentToMe === true,
+          sentByMe: r.sentByMe === true,
+        }));
       } catch (e) {
         if (cancelled) return;
         setErr((e as Error).message);
@@ -72,7 +90,7 @@ export default function MatchReportModal({
     return () => {
       cancelled = true;
     };
-  }, [reportProp, matchId]);
+  }, [reportProp, matchId, received]);
 
   /* Esc 关闭 + 锁背景滚动 */
   useEffect(() => {
@@ -205,10 +223,80 @@ export default function MatchReportModal({
                 >
                   查看 TA 的人格卡
                 </button>
-                <button type="button" className="btn btnPrimary" onClick={onClose}>
+
+                {/**
+                 * 把这份报告送给对方。
+                 *
+                 * ⚠️ **别人送来的报告不显示这个按钮**（用户明确要求）：
+                 * 收到报告的人不该再把它打回去。判定以服务端为准
+                 * （`sentToMe`），本地只做已知情况下的提前隐藏。
+                 */}
+                {!sendState.sentToMe ? (
+                  <button
+                    type="button"
+                    className="btn btnPrimary"
+                    disabled={sendState.sending || sendState.sentByMe}
+                    data-send-report={report.matchId}
+                    onClick={() => {
+                      if (sendState.sending || sendState.sentByMe) return;
+                      setSendState((s) => ({ ...s, sending: true }));
+                      void (async () => {
+                        try {
+                          const r = (await fetch(
+                            `/api/matches/${encodeURIComponent(report.matchId)}/send-report`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ fromPersonaId: report.me.id }),
+                            },
+                          ).then((x) => x.json())) as
+                            | { ok: true; sent: boolean; alreadySent?: boolean; reason?: string; to?: string }
+                            | { ok: false; error?: string };
+                          if (!r.ok) throw new Error(r.error ?? "送出失败");
+                          if (r.sent) {
+                            setSendState((s) => ({ ...s, sending: false, sentByMe: true }));
+                            reportSuccess(
+                              r.alreadySent ? "报告之前已经送出过了" : "报告已送出",
+                              r.to ? `对方（${r.to}）可在「通知 → 发来的报告」里看到它` : undefined,
+                            );
+                          } else {
+                            /* 对方是 AI 演示人格 / 公开创作者：如实说明，不算成功 */
+                            setSendState((s) => ({
+                              ...s,
+                              sending: false,
+                              notice: r.reason ?? "对方还没有知遇账号，无法站内投递。",
+                            }));
+                            reportWarn("没送出去", r.reason ?? "对方还没有知遇账号。");
+                          }
+                        } catch (e) {
+                          setSendState((s) => ({ ...s, sending: false }));
+                          reportError(e, { title: "送出报告失败" });
+                        }
+                      })();
+                    }}
+                  >
+                    {sendState.sending
+                      ? "正在送出…"
+                      : sendState.sentByMe
+                        ? "已送去"
+                        : "给TA送去报告"}
+                  </button>
+                ) : (
+                  <span className="meta" data-report-received="1">
+                    这份报告是 TA 送给你的
+                  </span>
+                )}
+
+                <button type="button" className="btn btnSecondary" onClick={onClose}>
                   关闭
                 </button>
               </div>
+
+              {sendState.notice ? (
+                <p className="meta" style={{ marginTop: 8 }} data-send-notice="1">
+                  {sendState.notice}
+                </p>
+              ) : null}
             </>
           ) : null}
         </div>

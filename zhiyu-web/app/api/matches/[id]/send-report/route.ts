@@ -43,7 +43,33 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
   }
 
-  await prisma.notification.create({
+  /**
+   * 幂等：同一场匹配、同一个收件人只投一次。
+   *
+   * 为什么必须做：按钮可以连点，重复投递会让对方的「发来的报告」里
+   * 出现一串一模一样的条目。这里先查后写（同一用户同一 matchId 的
+   * `report_received` 已存在就跳过），并在响应里如实回报 `alreadySent`，
+   * 界面据此把按钮切成「已送去」。
+   */
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId: counterpart.userId,
+      type: "report_received",
+      payload: { path: ["matchId"], equals: match.id },
+    },
+    select: { id: true, createdAt: true },
+  });
+  if (existing) {
+    return NextResponse.json({
+      ok: true,
+      sent: true,
+      alreadySent: true,
+      sentAt: existing.createdAt,
+      to: counterpart.displayName,
+    });
+  }
+
+  const created = await prisma.notification.create({
     data: {
       userId: counterpart.userId,
       type: "report_received",
@@ -54,7 +80,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         counterpart: from.displayName,
       },
     },
+    select: { createdAt: true },
   });
 
-  return NextResponse.json({ ok: true, sent: true });
+  return NextResponse.json({
+    ok: true,
+    sent: true,
+    alreadySent: false,
+    sentAt: created.createdAt,
+    to: counterpart.displayName,
+  });
 }
