@@ -596,25 +596,7 @@ export default function ImportDataDialog({
                   </p>
                 ) : null}
 
-                {dims.length ? (
-                  <div className={styles.dims}>
-                    <p className={styles.dimsHead}>这个源解析出的特征</p>
-                    {dims.map(([k, v]) => (
-                      <div key={k} className={styles.dimRow}>
-                        <span className={styles.dimLabel}>{VALUE_LABEL[k] ?? k}</span>
-                        <span className="track">
-                          <i
-                            className="trackFill"
-                            style={{ width: `${toDisplayPercent(v) ?? 0}%` }}
-                          />
-                        </span>
-                        <span className={`num ${styles.dimVal}`}>
-                          {toDisplayPercentText(v)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                
 
                 {result.samples?.length ? (
                   <div className={styles.samples}>
