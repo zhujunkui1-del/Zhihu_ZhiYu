@@ -20,6 +20,7 @@ import SyncSetup from "@/components/SyncSetup";
 import { IMPORT_SOURCE_LABEL, isImportSource, type ImportSource } from "@/lib/import/parse";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
 import { personaTypeSourceNote } from "@/lib/persona/type-source";
+import { dimPercentText } from "@/lib/persona/five-dims";
 import styles from "./persona.module.css";
 
 /** 三态按钮的文案：未注入一个、已注入两个（覆盖 / 添加） */
@@ -659,7 +660,10 @@ export default function PersonaClient({
                         />
                       </span>
                       <span className={`num ${styles.axisVal}`}>
-                        {toDisplayPercentText(a.value)}
+                        {/* ⚠️ 用 dimPercentText 而不是全站的 toDisplayPercentText：
+                            后者会把真实的 0 收口成「1%」—— 那正是用户骂过的
+                            "你不让写 0/100 就整 99 和 1"。这里真实的 0 写「<1%」。 */}
+                        {dimPercentText(a.value ?? undefined)}
                       </span>
                     </div>
                   ))}
