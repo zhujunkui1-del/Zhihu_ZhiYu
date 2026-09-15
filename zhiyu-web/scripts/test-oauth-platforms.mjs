@@ -60,13 +60,24 @@ rec(
   PROVIDER_META.dingtalk.capability.cannotPull.map((c) => `${c.what}: ${c.why.slice(0, 40)}`).join(" | "),
 );
 rec(
-  "飞书声明能拉消息（这才是「自动调取飞书数据」的兑现）",
-  PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("消息")),
+  "飞书声明能拉群聊消息 + 云文档（这才是「自动调取飞书数据」的兑现）",
+  PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("消息")) &&
+    PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("文档")) &&
+    PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("多维表格")),
   PROVIDER_META.feishu.capability.canPull.join("；"),
 );
 rec(
-  "飞书声明了文档尚未接入（而不是假装能拉）",
-  PROVIDER_META.feishu.capability.cannotPull.some((c) => c.what.includes("文档")),
+  "⚠️ 飞书如实声明「私聊拉不到」并给出原因（不再写「含私聊」这种假话）",
+  PROVIDER_META.feishu.capability.cannotPull.some((c) => c.what.includes("私聊")) &&
+    !PROVIDER_META.feishu.capability.canPull.some((x) => x.includes("含私聊")),
+  PROVIDER_META.feishu.capability.cannotPull.map((c) => c.what).join("；"),
+);
+rec(
+  "飞书 scope 覆盖本轮新增的云文档能力",
+  ["docx:document", "wiki:wiki", "bitable:app"].every((s) =>
+    PROVIDER_META.feishu.scope.includes(s),
+  ),
+  PROVIDER_META.feishu.scope,
 );
 
 /* ── ② 授权 URL ───────────────────────────────────────────────────────── */
@@ -82,7 +93,16 @@ rec("飞书授权页域名正确", fu.host === "open.feishu.cn", fu.host);
 rec("飞书授权页路径正确", fu.pathname === "/open-apis/authen/v1/authorize", fu.pathname);
 rec("带上 app_id", fu.searchParams.get("app_id") === "cli_test_app");
 rec("带上 redirect_uri（与配置逐字一致）", fu.searchParams.get("redirect_uri") === feishuEnv.redirectUri);
-rec("带上 scope（im:message im:chat）", fu.searchParams.get("scope") === "im:message im:chat", fu.searchParams.get("scope"));
+rec(
+  "带上 scope（消息 + 云文档 + 多维表格）",
+  (() => {
+    const s = fu.searchParams.get("scope") ?? "";
+    return ["im:message", "im:chat", "docx:document", "wiki:wiki", "bitable:app"].every((x) =>
+      s.includes(x),
+    );
+  })(),
+  fu.searchParams.get("scope"),
+);
 rec("带上 state（防 CSRF）", fu.searchParams.get("state") === "STATE123");
 rec(
   "⚠️ URL 里**不能**出现 app_secret",

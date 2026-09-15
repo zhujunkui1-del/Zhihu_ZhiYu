@@ -808,9 +808,28 @@ await waitFor(
   15000,
 );
 
-/* 未配置凭证时点「同步数据」应弹出三步向导 */
+/* 未配置凭证时点「同步数据」应弹出三步向导。
+   ⚠️ 先等状态文字出来再点：状态还没拿到时按钮会走"交给服务端判断"的兜底
+   （跳一次 /api/oauth/… 再回来），那要多花一两秒，固定 sleep 会误判成"没弹出"。 */
+await waitFor(
+  () => {
+    const t = document.querySelector(
+      '[data-provider-link="feishu"] [data-provider-state-text]',
+    )?.textContent;
+    return Boolean(t) && !t.includes("检查中");
+  },
+  15000,
+);
 await clickSel('[data-provider-link="feishu"] [data-provider-sync]');
-await page.waitForTimeout(900);
+/* 用 waitFor 等，而不是固定 sleep —— 兜底路径会经历一次页面跳转 */
+const wizardAppeared = await waitFor(
+  () => Boolean(document.querySelector("[data-sync-setup]")),
+  20000,
+);
+rec("点「同步数据」弹出配置向导", wizardAppeared);
+await page.waitForTimeout(400);
+rec("点「同步数据」弹出配置向导", wizardAppeared);
+await page.waitForTimeout(400);
 const wizard = await page.evaluate(() => {
   const w = document.querySelector("[data-sync-setup]");
   if (!w) return null;
@@ -926,8 +945,19 @@ rec("凭证能保存（存本站，不用配环境变量）", saveRes.save?.ok =
 rec("保存后状态变为已配置", saveRes.configured === true, `appId=${saveRes.appId}`);
 rec("⚠️ 状态接口**不回传 secret**", saveRes.leak === false);
 
-/* 收尾：把这把自测凭证删掉，恢复"未配置"（否则线上会带着假凭证） */
+/**
+ * 收尾：删掉**自己刚写的那把**自测凭证。
+ *
+ * ⚠️ 只能删自己写的：`appId` 不以 `cli_selftest` 开头就说明那是**真凭证**
+ * （用户真的建了飞书/钉钉应用填进来的），绝不能删。
+ * 之前这里无条件清空，等于测试会顺手把用户的真实配置抹掉。
+ */
 const cleaned = await page.evaluate(async () => {
+  const before = await fetch("/api/oauth/status").then((x) => x.json());
+  const current = before.providers?.feishu?.appId ?? "";
+  if (!current.startsWith("cli_selftest")) {
+    return { ok: true, skipped: true, current };
+  }
   const r = await fetch("/api/oauth/app", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -352,12 +352,17 @@
   padding-top: 16px;
   display: flex;
   gap: 8px;
+  /* 允许换行：平台源的状态文字要独占一整行（见 ProviderLink.module.css 的说明） */
+  flex-wrap: wrap;
 }
 .srcFoot button {
+  order: 1;
   flex: 1;
   min-height: 42px;
   padding: 8px 12px;
   font-size: 13.5px;
+  /* 「手动导入数据」这种六个字的按钮在窄卡片里不许被拆成竖排单字 */
+  white-space: nowrap;
 }
 
 /* ── Agent 蒸馏 ─────────────────────────────────────────────────────────── */

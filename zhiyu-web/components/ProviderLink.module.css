@@ -1,14 +1,28 @@
 /* 「同步数据」按钮 + 一行状态。刻意保持极简：不放大段说明。 */
 
+/**
+ * ⚠️ 这里用 `display: contents`，让按钮与状态文字**成为源卡片底栏的直接 flex 项**。
+ *
+ * 之前是一个 `inline-flex` 的包裹层把按钮和状态文字捆在一起 ——
+ * 于是这一整块和旁边的「手动导入数据」抢宽度：状态文字长一点，
+ * 旁边那个按钮就被挤成一列竖排的"手/动/导/入/数/据"（用户截图实测）。
+ * 拆开之后按钮照常等分，状态文字靠 `flex-basis:100%` 独占一整行。
+ */
 .row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 8px 0 0;
+  display: contents;
 }
 .state {
+  /* 独占一行（配合底栏的 flex-wrap），排在按钮下面 */
+  flex: 1 0 100%;
+  order: 2;
+  margin-top: 6px;
   font-size: 11.5px;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
+  /* 错误信息可能较长：最多两行，超出省略，完整内容放 title */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }

@@ -115,14 +115,33 @@ export interface PulledItem {
   time?: string;
 }
 
-/** 从飞书消息体里取纯文本（正文是 JSON 字符串：{"text":"..."}） */
-function feishuMessageText(bodyContent: unknown): string {
-  if (typeof bodyContent !== "string") return "";
+/**
+ * 从飞书消息体里取纯文本。
+ *
+ * ⚠️ 踩过的坑（真 bug，不是理论风险）：飞书消息的形状是
+ * `{ msg_type, body: { content: '{"text":"..."}' } }` —— 正文是**嵌在 body.content
+ * 里的 JSON 字符串**。之前这里只接受字符串，调用处却传了 `m.body`（对象），
+ * 于是 `typeof !== "string"` 直接返回空串，**所有消息都被丢掉**。
+ * 表现是"同步成功但读到 0 条"，而我当时把它归因成了"应用缺 im:message 权限"
+ * —— 用户截图里那条错误其实是这个 bug 造成的。
+ * 所以这里两种形状都接受：body 对象、或已经是字符串的 content。
+ */
+function feishuMessageText(body: unknown): string {
+  let raw = "";
+  if (typeof body === "string") {
+    raw = body;
+  } else if (body && typeof body === "object") {
+    const o = body as Record<string, unknown>;
+    const c = o.content ?? o.text ?? o.msg;
+    raw = typeof c === "string" ? c : "";
+  }
+  if (!raw) return "";
+
   try {
-    const o = JSON.parse(bodyContent) as Record<string, unknown>;
+    const o = JSON.parse(raw) as Record<string, unknown>;
     const t = o.text;
     if (typeof t === "string") return t;
-    /* 富文本：{ title, content: [[{text}]] } */
+    /* 富文本 post：{ title, content: [[{text}]] } */
     if (Array.isArray(o.content)) {
       return (o.content as unknown[])
         .map((line) =>
@@ -134,23 +153,33 @@ function feishuMessageText(bodyContent: unknown): string {
     }
     return "";
   } catch {
-    return bodyContent;
+    /* content 不是 JSON（纯文本消息）→ 原样用 */
+    return raw;
   }
 }
 
 /**
- * 拉取飞书消息。
+ * 拉取飞书**群聊**消息。
  *
  * 只留**我自己发的**消息：`sender.sender_type === "user"` 且 `sender.id` 等于我的 open_id。
  * 群里别人的话不算我的人格（与手动导入只留自己发的内容同一口径）。
+ *
+ * ⚠️ 这里**只覆盖群聊**。`GET /im/v1/chats` 不返回私聊会话（飞书平台限制，
+ * distilly 的注释里也写着这一点），私聊需要"发消息换 chat_id"的打扰式做法，
+ * 本站不做 —— 见 lib/oauth/platforms.ts 的 cannotPull 说明。
+ *
+ * 分页按 distilly 的默认量级取（`--msg-limit 1000`）：之前只取
+ * 10 个会话 × 50 条，样本太小、人格画像会失真。
  */
 export async function feishuPullMessages(
   accessToken: string,
   myOpenId: string,
-  opts: { maxChats?: number; maxMessagesPerChat?: number } = {},
+  opts: { maxChats?: number; maxTotalMessages?: number } = {},
 ): Promise<{ items: PulledItem[]; chats: number; scanned: number }> {
-  const maxChats = opts.maxChats ?? 10;
-  const maxMessages = opts.maxMessagesPerChat ?? 50;
+  const maxChats = opts.maxChats ?? 20;
+  /* 总量上限，与 distilly 的 --msg-limit 1000 对齐 */
+  const maxTotal = opts.maxTotalMessages ?? 1000;
+  const PAGE = 50;
   const headers = { Authorization: `Bearer ${accessToken}` };
 
   const chatsRes = await fetch(`${FEISHU_BASE}/im/v1/chats?page_size=50`, { headers });
@@ -165,29 +194,213 @@ export async function feishuPullMessages(
     const chatId = pickStr(c, "chat_id");
     if (!chatId) continue;
     const name = pickStr(c, "name") || "会话";
-    const url = `${FEISHU_BASE}/im/v1/messages?container_id_type=chat&container_id=${encodeURIComponent(
-      chatId,
-    )}&page_size=${maxMessages}`;
-    const msgRes = await fetch(url, { headers });
-    const msgJson = await readJson(msgRes);
-    const list = ((msgJson.data ?? {}) as Record<string, unknown>).items;
-    if (!Array.isArray(list)) continue;
 
-    for (const m of list as Record<string, unknown>[]) {
-      scanned += 1;
-      const sender = (m.sender ?? {}) as Record<string, unknown>;
-      const senderId = pickStr(sender, "id");
-      const senderType = pickStr(sender, "sender_type");
-      if (senderType !== "user" || senderId !== myOpenId) continue;
-      const msgType = pickStr(m, "msg_type");
-      if (msgType && msgType !== "text" && msgType !== "post") continue;
-      const text = feishuMessageText((m.body ?? {}) as unknown).trim();
-      if (text.length < 2) continue;
-      items.push({ text, trait: `飞书 · ${name}`.slice(0, 40), url: null });
+    /* 逐页翻，直到取满本会话配额或没有下一页 */
+    let pageToken = "";
+    let got = 0;
+    while (scanned < maxTotal) {
+      const url =
+        `${FEISHU_BASE}/im/v1/messages?container_id_type=chat&container_id=${encodeURIComponent(chatId)}` +
+        `&page_size=${PAGE}${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ""}`;
+      const msgRes = await fetch(url, { headers });
+      const msgJson = await readJson(msgRes);
+      const data = (msgJson.data ?? {}) as Record<string, unknown>;
+      const list = data.items;
+      if (!Array.isArray(list) || list.length === 0) break;
+
+      for (const m of list as Record<string, unknown>[]) {
+        scanned += 1;
+        const sender = (m.sender ?? {}) as Record<string, unknown>;
+        const senderId = pickStr(sender, "id");
+        const senderType = pickStr(sender, "sender_type");
+        if (senderType !== "user" || senderId !== myOpenId) continue;
+        const msgType = pickStr(m, "msg_type");
+        if (msgType && msgType !== "text" && msgType !== "post") continue;
+        const text = feishuMessageText(m.body).trim();
+        if (text.length < 2) continue;
+        items.push({ text, trait: `飞书 · 群「${name}」`.slice(0, 40), url: null });
+        got += 1;
+      }
+
+      const hasMore = data.has_more === true;
+      pageToken = pickStr(data, "page_token");
+      if (!hasMore || !pageToken) break;
+      void got;
     }
   }
 
   return { items, chats: chats.length, scanned };
+}
+
+/* ── 飞书云文档（文档 / Wiki / 多维表格）────────────────────────────────
+   调用链与 distilly 的 `feishu_auto_collector.py` 一致：
+     ① `POST /search/v2/message`（search_type=docs, creator_ids=[我]）找到我创建的文档
+     ② 从返回的 url 里取出 token（`/(?:wiki|docx|docs|sheets|base)/<token>`）
+     ③ 按类型取正文：
+        · docx  → `GET /docx/v1/documents/{token}/raw_content`
+        · wiki  → `GET /wiki/v2/spaces/get_node?token=` → obj_token/obj_type → 回到 ③
+        · base  → `GET /bitable/v1/apps/{token}/tables` → 每张表 records
+   ──────────────────────────────────────────────────────────────────────── */
+
+const DOC_TOKEN_RE = /\/(?:wiki|docx|docs|sheets|base)\/([A-Za-z0-9]+)/;
+
+/**
+ * 把长文切成段落，每段一条证据（与手动导入 docs.txt 的口径一致）。
+ *
+ * ⚠️ 段落太短时**回落成整篇一条**：真实飞书文档里"每行一句话"很常见，
+ * 若每段都不够长就一段都不产出，这篇文档就等于白拉了 ——
+ * 但调用方已经把它算进"已拉取"，数字会骗人（e2e 实测暴露）。
+ */
+function splitParagraphs(text: string, trait: string, minLen = 10): PulledItem[] {
+  const label = trait.slice(0, 40);
+  const paras = text
+    .split(/\n{2,}|\r\n\r\n/)
+    .map((p) => p.replace(/[ \t]+/g, " ").trim())
+    .filter((p) => p.length >= minLen);
+
+  if (paras.length === 0) {
+    const whole = text.replace(/\s+/g, " ").trim();
+    return whole.length >= minLen
+      ? [{ text: whole.slice(0, 2000), trait: label, url: null }]
+      : [];
+  }
+  return paras.slice(0, 60).map((p) => ({ text: p.slice(0, 2000), trait: label, url: null }));
+}
+
+/** 拉一篇文档的正文（docx / wiki 递归） */
+async function feishuDocContent(
+  token: string,
+  type: string,
+  headers: Record<string, string>,
+  depth = 0,
+): Promise<string> {
+  if (depth > 2) return "";
+
+  if (type === "wiki") {
+    const r = await fetch(
+      `${FEISHU_BASE}/wiki/v2/spaces/get_node?token=${encodeURIComponent(token)}`,
+      { headers },
+    );
+    const j = await readJson(r);
+    const node = (((j.data ?? {}) as Record<string, unknown>).node ?? {}) as Record<string, unknown>;
+    const objToken = pickStr(node, "obj_token") || token;
+    const objType = pickStr(node, "obj_type") || "docx";
+    return feishuDocContent(objToken, objType, headers, depth + 1);
+  }
+
+  if (type === "doc" || type === "docx") {
+    const r = await fetch(`${FEISHU_BASE}/docx/v1/documents/${encodeURIComponent(token)}/raw_content`, {
+      headers,
+    });
+    const j = await readJson(r);
+    return pickStr((j.data ?? {}) as Record<string, unknown>, "content");
+  }
+
+  return "";
+}
+
+/** 拉一张多维表格的全部记录（拼成 Markdown 表） */
+async function feishuBitableText(
+  appToken: string,
+  headers: Record<string, string>,
+): Promise<string> {
+  const r = await fetch(`${FEISHU_BASE}/bitable/v1/apps/${encodeURIComponent(appToken)}/tables?page_size=100`, {
+    headers,
+  });
+  const j = await readJson(r);
+  const data = (j.data ?? {}) as Record<string, unknown>;
+  const tables = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
+
+  const out: string[] = [];
+  for (const t of tables.slice(0, 10)) {
+    const tableId = pickStr(t, "table_id");
+    if (!tableId) continue;
+    const name = pickStr(t, "name") || tableId;
+    const rr = await fetch(
+      `${FEISHU_BASE}/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records?page_size=200`,
+      { headers },
+    );
+    const rj = await readJson(rr);
+    const rd = (rj.data ?? {}) as Record<string, unknown>;
+    const records = Array.isArray(rd.items) ? (rd.items as Record<string, unknown>[]) : [];
+    for (const rec of records.slice(0, 200)) {
+      const fields = (rec.fields ?? {}) as Record<string, unknown>;
+      const line = Object.entries(fields)
+        .map(([k, v]) => `${k}：${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+        .join(" / ");
+      if (line.length < 10) continue;
+      out.push(`【${name}】${line}`);
+    }
+  }
+  return out.join("\n");
+}
+
+export async function feishuPullDocs(
+  accessToken: string,
+  myOpenId: string,
+  myName: string,
+  opts: { maxDocs?: number } = {},
+): Promise<{ items: PulledItem[]; docs: number; found: number }> {
+  const maxDocs = opts.maxDocs ?? 20;
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json; charset=utf-8",
+  };
+
+  /** 先按"创建人是我"搜；平台不支持该过滤时退回关键词搜索（distilly 的同款兜底） */
+  const search = async (body: Record<string, unknown>) => {
+    const r = await fetch(`${FEISHU_BASE}/search/v2/message`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    return readJson(r);
+  };
+
+  let j = await search({
+    query: myName || "",
+    search_type: "docs",
+    docs_options: { creator_ids: [myOpenId] },
+    page_size: maxDocs,
+  });
+  let raw = ((j.data ?? {}) as Record<string, unknown>).items;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    j = await search({ query: myName || "", search_type: "docs", page_size: maxDocs });
+    raw = ((j.data ?? {}) as Record<string, unknown>).items;
+  }
+  const list = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+
+  const items: PulledItem[] = [];
+  let docs = 0;
+
+  for (const it of list.slice(0, maxDocs)) {
+    const info = (it.docs_info ?? {}) as Record<string, unknown>;
+    const title = pickStr(info, "title") || "无标题";
+    const url = pickStr(info, "url");
+    const dtype = pickStr(info, "docs_type") || "docx";
+    const m = DOC_TOKEN_RE.exec(url);
+    if (!m) continue;
+    const token = m[1];
+
+    try {
+      let text = "";
+      if (dtype === "bitable" || dtype === "base") {
+        text = await feishuBitableText(token, headers);
+      } else {
+        text = await feishuDocContent(token, dtype, headers);
+      }
+      if (text.trim().length < 10) continue;
+      const chunks = splitParagraphs(text, `飞书 · 文档《${title}》`);
+      /* 只有真的产出证据才算"拉到" —— 否则计数会骗人 */
+      if (chunks.length === 0) continue;
+      docs += 1;
+      items.push(...chunks);
+    } catch {
+      /* 单篇拉不到不影响其它文档 */
+    }
+  }
+
+  return { items, docs, found: list.length };
 }
 
 /* ── 钉钉 ──────────────────────────────────────────────────────────────── */
@@ -223,8 +436,8 @@ export async function dingtalkExchangeCode(env: ProviderEnv, code: string): Prom
 /** 钉钉文档 / 多维表格拉取（**消息拉不到**，见 platforms.ts 的能力声明） */
 export async function dingtalkPullDocs(
   accessToken: string,
-  opts: { maxDocs?: number } = {},
-): Promise<{ items: PulledItem[]; workspaces: number; docs: number }> {
+  opts: { maxDocs?: number; keyword?: string } = {},
+): Promise<{ items: PulledItem[]; workspaces: number; docs: number; bitables: number }> {
   const maxDocs = opts.maxDocs ?? 20;
   const headers = { "x-acs-dingtalk-access-token": accessToken };
   const items: PulledItem[] = [];
@@ -259,16 +472,141 @@ export async function dingtalkPullDocs(
       const contentJson = await readJson(contentRes);
       const text = pickStr(contentJson, "content", "text", "markdown").trim();
       if (text.length < 10) continue;
-      docs += 1;
       /* 文档可能很长：切成段落，每段一条证据（与手动导入 docs.txt 的口径一致） */
-      for (const para of text.split(/\n{2,}/)) {
-        const t = para.replace(/\s+/g, " ").trim();
-        if (t.length < 10) continue;
-        items.push({ text: t.slice(0, 2000), trait: `钉钉 · ${name}`.slice(0, 40), url: null });
-      }
+      const chunks = splitParagraphs(text, `钉钉 · 文档《${name}》`);
+      if (chunks.length === 0) continue;
+      docs += 1;
+      items.push(...chunks);
     }
   }
-  return { items, workspaces: workspaces.length, docs };
+
+  /* ── 多维表格 ──
+     调用链与 distilly 的 `dingtalk_auto_collector.py` 一致：
+       `POST /v1.0/doc/search`（docTypes=["bitable"]）找表格
+       → `GET /v1.0/bitable/bases/{baseId}/sheets` 取工作表
+       → `…/sheets/{sheetId}/fields` 取字段名、`…/records` 取记录
+     （之前完全没做这一块，而 distilly 是把它当"职场人格"的主要素材之一。） */
+  const bitables: PulledItem[] = [];
+  let bitableCount = 0;
+  try {
+    const searchRes = await fetch(`${DINGTALK_BASE}/v1.0/doc/search`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keyword: opts.keyword ?? "",
+        size: 20,
+        offset: 0,
+        docTypes: ["bitable"],
+      }),
+    });
+    const searchJson = await readJson(searchRes);
+    const docList = searchJson.docList;
+    const found = Array.isArray(docList) ? (docList as Record<string, unknown>[]) : [];
+
+    for (const d of found.slice(0, 10)) {
+      const baseId = pickStr(d, "docId", "baseId", "dentries");
+      const title = pickStr(d, "name", "title") || "多维表格";
+      if (!baseId) continue;
+
+      const sheetsRes = await fetch(
+        `${DINGTALK_BASE}/v1.0/bitable/bases/${encodeURIComponent(baseId)}/sheets`,
+        { headers },
+      );
+      const sheetsJson = await readJson(sheetsRes);
+      const sheets = Array.isArray(sheetsJson.sheets)
+        ? (sheetsJson.sheets as Record<string, unknown>[])
+        : [];
+      if (!sheets.length) continue;
+      bitableCount += 1;
+
+      for (const sh of sheets.slice(0, 5)) {
+        const sheetId = pickStr(sh, "sheetId", "id");
+        const sheetName = pickStr(sh, "name") || sheetId;
+        if (!sheetId) continue;
+
+        const fieldsRes = await fetch(
+          `${DINGTALK_BASE}/v1.0/bitable/bases/${encodeURIComponent(baseId)}/sheets/${encodeURIComponent(
+            sheetId,
+          )}/fields?maxResults=100`,
+          { headers },
+        );
+        const fieldsJson = await readJson(fieldsRes);
+        const fields = (Array.isArray(fieldsJson.fields) ? fieldsJson.fields : [])
+          .map((f) => pickStr(f as Record<string, unknown>, "name"))
+          .filter(Boolean);
+
+        const recRes = await fetch(
+          `${DINGTALK_BASE}/v1.0/bitable/bases/${encodeURIComponent(baseId)}/sheets/${encodeURIComponent(
+            sheetId,
+          )}/records?maxResults=200`,
+          { headers },
+        );
+        const recJson = await readJson(recRes);
+        const records = Array.isArray(recJson.records)
+          ? (recJson.records as Record<string, unknown>[])
+          : [];
+
+        for (const rec of records.slice(0, 200)) {
+          const f = (rec.fields ?? {}) as Record<string, unknown>;
+          const keys = fields.length ? fields : Object.keys(f);
+          const line = keys
+            .map((k) => {
+              const v = f[k];
+              if (v == null) return "";
+              return `${k}：${typeof v === "object" ? JSON.stringify(v) : String(v)}`;
+            })
+            .filter(Boolean)
+            .join(" / ");
+          if (line.length < 10) continue;
+          bitables.push({
+            text: `【${title} · ${sheetName}】${line}`.slice(0, 2000),
+            trait: `钉钉 · 多维表格《${title}》`.slice(0, 40),
+            url: null,
+          });
+        }
+      }
+    }
+  } catch {
+    /* 多维表格失败不影响文档（权限可能只开了一部分） */
+  }
+
+  return {
+    items: [...items, ...bitables],
+    workspaces: workspaces.length,
+    docs,
+    bitables: bitableCount,
+  };
+}
+
+/* ── 用户信息（open_id / 昵称）────────────────────────────────────────
+   ⚠️ 为什么必须有这一步：拉消息时要靠 `open_id` 判断"哪条是我发的"
+   （`sender.id === myOpenId`）。而 `/authen/v1/oidc/access_token` 的返回里
+   **没有 open_id**，只有一个 access_token —— 少了这一步，`myOpenId` 是空串，
+   过滤条件恒不成立，**所有消息都会被丢掉**（实测：授权成功但读到 0 条）。
+   ──────────────────────────────────────────────────────────────────── */
+
+export async function feishuFetchUserInfo(
+  accessToken: string,
+): Promise<{ openId: string | null; name: string | null }> {
+  const r = await fetch(`${FEISHU_BASE}/authen/v1/user_info`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const j = await readJson(r);
+  const d = (j.data ?? {}) as Record<string, unknown>;
+  return { openId: pickStr(d, "open_id") || null, name: pickStr(d, "name") || null };
+}
+
+export async function dingtalkFetchUserInfo(
+  accessToken: string,
+): Promise<{ openId: string | null; name: string | null }> {
+  const r = await fetch(`${DINGTALK_BASE}/v1.0/contact/users/me`, {
+    headers: { "x-acs-dingtalk-access-token": accessToken },
+  });
+  const j = await readJson(r);
+  return {
+    openId: pickStr(j, "unionId", "openId") || null,
+    name: pickStr(j, "nick", "name") || null,
+  };
 }
 
 /** 供 route 统一调用：换 token */
@@ -277,5 +615,29 @@ export async function exchangeCode(
   env: ProviderEnv,
   code: string,
 ): Promise<TokenSet> {
-  return provider === "feishu" ? feishuExchangeCode(env, code) : dingtalkExchangeCode(env, code);
+  if (provider === "feishu") {
+    const t = await feishuExchangeCode(env, code);
+    if (!t.externalId || !t.displayName) {
+      /* 用 user_access_token 补 open_id 与昵称 */
+      try {
+        const u = await feishuFetchUserInfo(t.accessToken);
+        t.externalId = t.externalId ?? u.openId;
+        t.displayName = t.displayName ?? u.name;
+      } catch {
+        /* 拿不到不阻断授权；同步时会再试一次（见 sync.ts 的自愈） */
+      }
+    }
+    return t;
+  }
+  const t = await dingtalkExchangeCode(env, code);
+  if (!t.externalId || !t.displayName) {
+    try {
+      const u = await dingtalkFetchUserInfo(t.accessToken);
+      t.externalId = t.externalId ?? u.openId;
+      t.displayName = t.displayName ?? u.name;
+    } catch {
+      /* 同上 */
+    }
+  }
+  return t;
 }

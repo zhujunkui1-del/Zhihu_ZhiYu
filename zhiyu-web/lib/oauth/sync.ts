@@ -11,7 +11,14 @@
  */
 
 import { prisma } from "@/lib/db";
-import { dingtalkPullDocs, feishuPullMessages, type PulledItem } from "./clients";
+import {
+  dingtalkFetchUserInfo,
+  dingtalkPullDocs,
+  feishuFetchUserInfo,
+  feishuPullDocs,
+  feishuPullMessages,
+  type PulledItem,
+} from "./clients";
 import { PROVIDER_META, type OAuthProvider } from "./platforms";
 import { readAccessToken } from "./store";
 import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
@@ -53,13 +60,30 @@ async function pull(
   provider: OAuthProvider,
   token: string,
   externalId: string | null,
+  displayName: string | null,
 ): Promise<{ items: PulledItem[]; detail: Record<string, unknown> }> {
   if (provider === "feishu") {
-    const r = await feishuPullMessages(token, externalId ?? "");
-    return { items: r.items, detail: { chats: r.chats, scanned: r.scanned } };
+    /* ① 群聊消息（私聊飞书不提供列表接口，见 platforms.ts 的说明）
+       ② 云文档：文档 / Wiki / 多维表格 —— 调用链与 distilly 一致 */
+    const msgs = await feishuPullMessages(token, externalId ?? "");
+    const docs = await feishuPullDocs(token, externalId ?? "", displayName ?? "");
+    return {
+      items: [...msgs.items, ...docs.items],
+      detail: {
+        chats: msgs.chats,
+        scanned: msgs.scanned,
+        messages: msgs.items.length,
+        docs: docs.docs,
+        docsFound: docs.found,
+        docChunks: docs.items.length,
+      },
+    };
   }
-  const r = await dingtalkPullDocs(token);
-  return { items: r.items, detail: { workspaces: r.workspaces, docs: r.docs } };
+  const r = await dingtalkPullDocs(token, { keyword: displayName ?? "" });
+  return {
+    items: r.items,
+    detail: { workspaces: r.workspaces, docs: r.docs, bitables: r.bitables },
+  };
 }
 
 /**
@@ -86,10 +110,43 @@ export async function syncProvider(
     throw new SyncError("TOKEN_EXPIRED", `${meta.label}的授权已过期，请重新授权`);
   }
 
+  /**
+   * 自愈：早期授权时没存下 open_id / 昵称（那时还没接 `user_info` 那一步），
+   * 而拉消息要靠 open_id 判断"哪条是我发的"、搜文档要用昵称当关键词。
+   * 这里用已有的 token 补一次并回写 —— 用户**不需要重新授权**。
+   */
+  let externalId = auth.externalId;
+  let displayName = auth.displayName;
+  if (!externalId || !displayName) {
+    try {
+      const u =
+        provider === "feishu"
+          ? await feishuFetchUserInfo(auth.token)
+          : await dingtalkFetchUserInfo(auth.token);
+      externalId = externalId ?? u.openId;
+      displayName = displayName ?? u.name;
+      if (externalId || displayName) {
+        await prisma.linkedAccount.updateMany({
+          where: { userId, provider },
+          data: { externalId, displayName },
+        });
+      }
+    } catch {
+      /* 补不到就按没有处理：下面会给出可读的失败原因，而不是静默读到 0 条 */
+    }
+  }
+
+  if (provider === "feishu" && !externalId) {
+    throw new SyncError(
+      "NO_OPEN_ID",
+      "拿不到你在飞书的 open_id（无法区分哪些消息是你发的）。请重新授权一次。",
+    );
+  }
+
   let pulled: PulledItem[];
   let detail: Record<string, unknown>;
   try {
-    const r = await pull(provider, auth.token, auth.externalId);
+    const r = await pull(provider, auth.token, auth.externalId, auth.displayName);
     pulled = r.items;
     detail = r.detail;
   } catch (e) {

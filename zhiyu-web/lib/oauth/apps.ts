@@ -15,7 +15,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { decryptToken, encryptToken } from "./store";
 import {
   PROVIDER_META,
   isOAuthProvider,
@@ -30,7 +30,7 @@ export async function resolveProviderEnv(provider: OAuthProvider): Promise<Provi
   if (row) {
     let secret = "";
     try {
-      secret = decryptSecret(row.appSecretEnc);
+      secret = decryptToken(row.appSecretEnc);
     } catch {
       /* 解密失败（换过密钥）→ 当作没配，引导重新填，而不是抛 500 */
       return null;
@@ -107,7 +107,7 @@ export async function savePlatformApp(
 
   const data = {
     appId: id,
-    appSecretEnc: encryptSecret(secret),
+    appSecretEnc: encryptToken(secret),
     redirectUri: redirectUri?.trim() || null,
   };
   await prisma.platformApp.upsert({

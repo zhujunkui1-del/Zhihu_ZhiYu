@@ -62,25 +62,26 @@ export const PROVIDER_META: Record<OAuthProvider, ProviderMeta> = {
     provider: "feishu",
     label: "飞书",
     connectLabel: "授权飞书并同步",
-    summary: "授权后，网站会以你自己的身份读取你的飞书会话消息与文档，用于生成你的人格画像。",
+    summary: "授权后，网站会以你自己的身份读取你的飞书群聊消息与云文档，用于生成你的人格画像。",
     capability: {
       canPull: [
-        "你所在的群聊与你发出的消息（含私聊，需要 im:message 权限）",
-        "会话列表（im:chat 权限）",
+        "你所在**群聊**里你发出的消息",
+        "你的飞书文档与 Wiki 正文",
+        "你的多维表格记录",
       ],
       cannotPull: [
         {
-          what: "飞书文档 / Wiki 正文",
-          why: "需要额外申请 docx:document、wiki:wiki 权限；本期先打通消息链路，文档可用下方的「手动导入」补。",
+          what: "**私聊**消息",
+          why:
+            "飞书没有「列出我的私聊」接口 —— `GET /im/v1/chats` 只返回群聊，这是平台限制。distilly 的办法是「向对方发一条消息、从返回值里取 chat_id」，那会在对方聊天框里留痕，属于打扰行为，本站不擅自做。",
         },
       ],
     },
     setupSteps: [
       "打开飞书开放平台 → 开发者后台 → 创建「企业自建应用」",
-      "在「权限管理」里开通：im:message（读取消息）、im:chat（读取会话列表）",
+      "在「权限管理」里开通下面列出的权限（消息 / 云文档 / 多维表格）",
       "在「安全设置 → 重定向 URL」里加入本站回调地址（下方有确切值）",
-      "把 App ID / App Secret 填进 Vercel 环境变量：FEISHU_APP_ID / FEISHU_APP_SECRET / FEISHU_OAUTH_REDIRECT_URI",
-      "回到本页点「授权飞书并同步」，在飞书页面点同意即可",
+      "回到本页把 App ID / App Secret 粘进向导第 3 步即可",
     ],
     envKeys: {
       appId: "FEISHU_APP_ID",
@@ -88,7 +89,8 @@ export const PROVIDER_META: Record<OAuthProvider, ProviderMeta> = {
       redirectUri: "FEISHU_OAUTH_REDIRECT_URI",
     },
     consoleUrl: "https://open.feishu.cn/app",
-    scope: "im:message im:chat",
+    scope:
+      "im:message im:chat search:message docx:document:readonly wiki:wiki:readonly bitable:app:readonly",
   },
   dingtalk: {
     provider: "dingtalk",
