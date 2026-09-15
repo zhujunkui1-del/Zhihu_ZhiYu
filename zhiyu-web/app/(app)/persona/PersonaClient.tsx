@@ -16,6 +16,7 @@ import ImportDataDialog, {
   type ImportMode,
 } from "@/components/ImportDataDialog";
 import ProviderLink from "@/components/ProviderLink";
+import SyncSetup from "@/components/SyncSetup";
 import { IMPORT_SOURCE_LABEL, isImportSource, type ImportSource } from "@/lib/import/parse";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
 import styles from "./persona.module.css";
@@ -299,6 +300,31 @@ export default function PersonaClient({
   } | null>(null);
   const [importMsg, setImportMsg] = useState("");
   const [importDetail, setImportDetail] = useState<ImportFileResult | null>(null);
+
+  /**
+   * 「同步数据」的配置向导 —— **全页只有一份**，由页面渲染在中央。
+   *
+   * ⚠️ 不要在源卡片里渲染（原先就是那样，用户实测出问题）：
+   *   · 每张卡各一份 → 页面上同时出现两个弹窗；
+   *   · 卡片 hover 有 transform，会让 `position: fixed` 相对卡片定位，
+   *     弹窗歪到一边、不在屏幕中央。
+   * 另外服务端说"还没配凭证"时会回跳 `?link=<provider>_unconfigured`，
+   * 这里读一次就**把参数清掉**，否则任何重挂载都会再弹一次（闪屏）。
+   */
+  const [syncSetup, setSyncSetup] = useState<"feishu" | "dingtalk" | null>(null);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const link = sp.get("link") ?? "";
+    const m = /^(feishu|dingtalk)_unconfigured$/.exec(link);
+    if (!m) return;
+    setSyncSetup(m[1] as "feishu" | "dingtalk");
+    sp.delete("link");
+    const q = sp.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+    /* 只在首次挂载读一次：依赖为空数组，避免刷新时反复触发 */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onImported = useCallback(
     (r: ImportFileResult) => {
@@ -689,7 +715,13 @@ export default function PersonaClient({
                         </button>
                       ) : isPlatformSource(c.type) ? (
                         <>
-                          <ProviderLink provider={c.type} onSynced={() => router.refresh()} />
+                          <ProviderLink
+                            provider={c.type}
+                            onSynced={() => router.refresh()}
+                            onNeedSetup={() =>
+                              setSyncSetup(c.type === "feishu" ? "feishu" : "dingtalk")
+                            }
+                          />
                           <button
                             type="button"
                             className="btn btnSecondary btnSm"
@@ -1207,6 +1239,20 @@ export default function PersonaClient({
           onClose={() => setImportState(null)}
           onImported={onImported}
         />
+      ) : null}
+
+      {/* 「同步数据」配置向导：**全页唯一一份**，渲染在页面级（不在卡片里），
+          这样才能稳定居中，也不会出现两个弹窗互相闪 */}
+      {syncSetup ? (
+        <SyncSetup
+          provider={syncSetup}
+          onClose={() => setSyncSetup(null)}
+          onSaved={() => {
+            const p = syncSetup;
+            setSyncSetup(null);
+            /* 存完凭证直接推去授权 —— 用户不需要再点一次 */
+            window.location.href = `/api/oauth/${p}`;
+          }}        />
       ) : null}
     </>
   );

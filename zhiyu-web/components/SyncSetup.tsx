@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { OAuthProvider } from "@/lib/oauth/platforms";
 import styles from "./SyncSetup.module.css";
 
@@ -45,20 +45,24 @@ export default function SyncSetup({
   const [msg, setMsg] = useState("");
   const [copied, setCopied] = useState(false);
 
-  /* 这些值在打开时由父组件传进来是不必要的耦合：向导自己拉一次最省事 */
+  /* 向导自己拉一次状态（回调地址、开放平台入口） */
   const [status, setStatus] = useState<ProviderStatus | null>(null);
-  useState(() => {
+  useEffect(() => {
+    let alive = true;
     void (async () => {
       try {
         const r = (await fetch("/api/oauth/status").then((x) => x.json())) as {
           providers: Record<string, ProviderStatus>;
         };
-        setStatus(r.providers?.[provider] ?? null);
+        if (alive) setStatus(r.providers?.[provider] ?? null);
       } catch {
-        /* 拿不到就只显示通用步骤，不阻塞 */
+        /* 拿不到就用下面的兜底值，不阻塞 */
       }
     })();
-  });
+    return () => {
+      alive = false;
+    };
+  }, [provider]);
 
   const redirectUri =
     status?.redirectUri ?? `${typeof location !== "undefined" ? location.origin : ""}/api/oauth/${provider}/callback`;

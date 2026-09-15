@@ -830,6 +830,58 @@ const wizard = await page.evaluate(() => {
   };
 });
 rec("点「同步数据」弹出配置向导", Boolean(wizard), wizard ? `provider=${wizard.provider}` : "(没弹出)");
+
+/* ── 用户实测报的 bug：点「同步数据」后在两个弹窗之间死循环闪屏 ──
+   症状根因有两个，这里逐条钉住：
+     ① 向导原先渲染在**源卡片里**（每张卡一份 → 同时出现两个弹窗；
+        卡片 hover 有 transform → position:fixed 相对卡片定位、不居中）
+     ② `?link=xxx_unconfigured` 一直留在 URL 上，任何重挂载都会再弹一次
+   所以断言：全页只允许一个弹窗、它必须居中、静置 4 秒不许出现二次弹出。 */
+const dlgDiag = await page.evaluate(() => {
+  const boxes = [
+    ...document.querySelectorAll("[data-sync-setup], [data-import-dialog], [data-sbti-result]"),
+  ];
+  const r = boxes[0]?.querySelector("div")?.getBoundingClientRect();
+  const w = boxes[0]?.firstElementChild?.nextElementSibling?.getBoundingClientRect();
+  const rect = w && w.width ? w : r;
+  return {
+    count: boxes.length,
+    centerX: rect ? rect.left + rect.width / 2 : 0,
+    centerY: rect ? rect.top + rect.height / 2 : 0,
+    vw: window.innerWidth,
+    vh: window.innerHeight,
+    url: window.location.search,
+  };
+});
+rec(
+  "⚠️ 页面上同时只有**一个**弹窗（原先卡片里各渲染一份 → 两个）",
+  dlgDiag.count === 1,
+  `${dlgDiag.count} 个弹窗`,
+);
+rec(
+  "⚠️ 弹窗**居中**（原先因卡片 transform 歪在卡片上方）",
+  Math.abs(dlgDiag.centerX - dlgDiag.vw / 2) < 60 &&
+    Math.abs(dlgDiag.centerY - dlgDiag.vh / 2) < 60,
+  `弹窗中心 (${Math.round(dlgDiag.centerX)}, ${Math.round(dlgDiag.centerY)}) vs 视口中心 (${dlgDiag.vw / 2}, ${dlgDiag.vh / 2})`,
+);
+rec(
+  "URL 里的 link 参数已被消费掉（否则重挂载会反复弹）",
+  !dlgDiag.url.includes("link="),
+  dlgDiag.url || "(无参数)",
+);
+
+/* 静置 4 秒：不许出现"弹了又关、关了又弹" */
+let flicker = 0;
+let prev = dlgDiag.count;
+for (let i = 0; i < 8; i += 1) {
+  await page.waitForTimeout(500);
+  const n = await page.evaluate(
+    () => document.querySelectorAll("[data-sync-setup]").length,
+  );
+  if (n !== prev || n !== 1) flicker += 1;
+  prev = n;
+}
+rec("⚠️ 静置 4 秒无闪屏（弹窗数量恒为 1）", flicker === 0, `${flicker} 次异常`);
 rec("向导是三步", wizard?.steps.length === 3, wizard?.steps.map((s) => s.n).join(","));
 rec(
   "第 1 步直接跳平台开放平台（新标签打开）",

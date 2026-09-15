@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { OAuthProvider } from "@/lib/oauth/platforms";
 import { reportError } from "@/lib/client/error-bus";
-import SyncSetup from "./SyncSetup";
 import styles from "./ProviderLink.module.css";
 
 /**
@@ -30,14 +29,24 @@ interface ProviderStatus {
 export default function ProviderLink({
   provider,
   onSynced,
+  onNeedSetup,
 }: {
   provider: OAuthProvider;
   onSynced: () => void;
+  /**
+   * 需要配置凭证时，通知**页面**去打开配置向导。
+   *
+   * ⚠️ 向导**不在卡片里渲染**（原先就是这么写的，用户实测出问题）：
+   *   · 每张卡各渲染一份 → 页面上同时存在两个弹窗；
+   *   · 卡片的 hover 有 transform，会让 `position: fixed` **相对卡片定位**，
+   *     弹窗就不在屏幕中央（用户截图里它歪在微信卡片上方）。
+   * 现在全页只有一份，由页面统一渲染在中央。
+   */
+  onNeedSetup: () => void;
 }) {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
-  const [wizard, setWizard] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -47,7 +56,7 @@ export default function ProviderLink({
       };
       if (r.ok) setStatus(r.providers?.[provider] ?? null);
     } catch {
-      /* 查不到就不显示按钮，不打断主流程 */
+      /* 查不到就不显示状态文字，按钮照样能点（见 onClick 的兜底） */
     }
   }, [provider]);
 
@@ -58,17 +67,18 @@ export default function ProviderLink({
   /* 授权回来时带上结果（callback 会顺手同步），直接展示，省一次点击 */
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
-    /* 服务端说"还没配凭证"时**自动打开向导** —— 用户点完「同步数据」
-       不该看到一个需要自己解读的参数 */
-    if (sp.get("link") === `${provider}_unconfigured`) {
-      setWizard(true);
-      return;
-    }
     if (sp.get("linked") !== provider) return;
     const pulled = sp.get("pulled");
     const failed = sp.get("syncFailed");
     if (pulled) setNote(`已同步 ${pulled} 条`);
     else if (failed) setNote(`已授权，但同步失败：${failed}`);
+    /* ⚠️ 结果读到就把参数清掉：不清的话任何一次重挂载都会再读一遍，
+       配上"自动开向导"的逻辑就会变成弹窗反复弹出（实测的闪屏）。 */
+    sp.delete("linked");
+    sp.delete("pulled");
+    sp.delete("syncFailed");
+    const q = sp.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
   }, [provider]);
 
   const sync = useCallback(async () => {
@@ -113,7 +123,7 @@ export default function ProviderLink({
     /**
      * 状态还没拿到（接口慢或失败）时**也让按钮可用**：
      * 直接交给服务端判断 —— 它要么跳平台授权页，要么带
-     * `link=<provider>_unconfigured` 回来，页面会把向导自动弹出来。
+     * `link=<provider>_unconfigured` 回来，页面会把向导弹出来。
      *
      * 为什么这么写：先前 `if (!status) return null` 会让按钮**整个消失**，
      * 一次接口抖动就等于功能不见了（e2e 因此偶发失败，实测）。
@@ -123,9 +133,10 @@ export default function ProviderLink({
       window.location.href = `/api/oauth/${provider}`;
       return;
     }
-    /* 没配凭证 → 向导；配了但没授权 → 直接跳授权页；都好了 → 同步 */
+    /* 没配凭证 → 让**页面**打开向导（全页只有一份，居中）；配了但没授权 → 跳授权页；
+       都好了 → 同步 */
     if (!status.configured) {
-      setWizard(true);
+      onNeedSetup();
       return;
     }
     if (!status.linked || status.linked.expired) {
@@ -133,7 +144,7 @@ export default function ProviderLink({
       return;
     }
     void sync();
-  }, [status, sync, provider]);
+  }, [status, sync, provider, onNeedSetup]);
 
   const state = !status
     ? "检查中…"
@@ -160,19 +171,6 @@ export default function ProviderLink({
       <span className={styles.state} data-provider-state-text="1">
         {note || state}
       </span>
-
-      {wizard ? (
-        <SyncSetup
-          provider={provider}
-          onClose={() => setWizard(false)}
-          onSaved={() => {
-            setWizard(false);
-            void load();
-            /* 存完凭证直接推去授权 —— 用户不需要再点一次 */
-            window.location.href = `/api/oauth/${provider}`;
-          }}
-        />
-      ) : null}
     </span>
   );
 }
