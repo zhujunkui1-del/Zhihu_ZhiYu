@@ -111,7 +111,13 @@ page.on("console", (m) => {
   if (m.type() === "error") errs.push(m.text());
 });
 
-/** 往隐藏的 file input 塞一个真 File 并触发 change（等价于用户选完文件） */
+/**
+ * 往隐藏的 file input 塞一个真 File 并触发 change（等价于用户选完文件）。
+ *
+ * ⚠️ 文件信息要在 dispatch **之前**读：弹窗的 onChange 里会 `e.target.value = ""`
+ * （为了允许"再选同一个文件"也能触发 change），那一行会立刻清空 `input.files`，
+ * 之后再读就是空数组（实测踩过）。
+ */
 const attachFile = (selector, name, text, mime = "application/json") =>
   page.evaluate(
     ({ sel, n, t, m }) => {
@@ -120,8 +126,9 @@ const attachFile = (selector, name, text, mime = "application/json") =>
       const dt = new DataTransfer();
       dt.items.add(new File([t], n, { type: m }));
       input.files = dt.files;
+      const picked = { name: input.files[0]?.name, size: input.files[0]?.size };
       input.dispatchEvent(new Event("change", { bubbles: true }));
-      return { ok: true, name: input.files[0]?.name, size: input.files[0]?.size };
+      return { ok: true, ...picked };
     },
     { sel: selector, n: name, t: text, m: mime },
   );
@@ -289,8 +296,12 @@ const sourceRow = await prisma.personaSource.findFirst({ where: { personaId, typ
 rec("PersonaSource 标记为已注入", sourceRow?.status === "injected", `${sourceRow?.status}`);
 rec(
   "源 meta 里留下了文件与解析方式的记录",
-  Boolean(sourceRow?.meta && sourceRow.meta.fileName === "wechat-chat.json"),
-  JSON.stringify(sourceRow?.meta ?? {}).slice(0, 140),
+  Boolean(
+    sourceRow?.meta &&
+      Array.isArray(sourceRow.meta.fileNames) &&
+      sourceRow.meta.fileNames[0] === "wechat-chat.json",
+  ),
+  JSON.stringify(sourceRow?.meta ?? {}).slice(0, 150),
 );
 
 /* ───────── ③ 页面上的状态跟着变 ───────── */
@@ -507,8 +518,115 @@ const bigMine = await page.evaluate(
 );
 rec("大文件也按文件自带的 isSend 判断", bigMine === "flag", `${bigMine}`);
 
-/* ───────── ⑧ 越权与错误路径 ───────── */
-console.log("\n== ⑧ 别人的卡片上不能导入（越权保护）==");
+/* ───────── ⑧ 多文件：一次选多份，合并成一个源 ───────── */
+console.log("\n== ⑧ 一次导入多个文件（用户问过：是覆盖还是追加）==");
+const CHAT_A = JSON.stringify({
+  session: { displayName: "小李", type: "私聊" },
+  messages: [
+    { content: "方案我建议先小范围灰度，出问题好回滚", isSend: 1, senderDisplayName: "演示用户", type: "文本消息" },
+    { content: "行，那我排一下时间", isSend: 0, senderDisplayName: "小李", type: "文本消息" },
+  ],
+});
+const CHAT_B = JSON.stringify({
+  session: { displayName: "老王", type: "私聊" },
+  messages: [
+    { content: "这个季度的复盘我想按项目拆，而不是按人拆，这样能看出系统性问题", isSend: 1, senderDisplayName: "演示用户", type: "文本消息" },
+    { content: "可以啊", isSend: 0, senderDisplayName: "老王", type: "文本消息" },
+    { content: "另外技术债那张表我想单独拉一条线跟踪", isSend: 1, senderDisplayName: "演示用户", type: "文本消息" },
+  ],
+});
+
+await page.evaluate(() => {
+  document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
+});
+await page.waitForTimeout(400);
+await gotoSources();
+await clickSel('[data-open-import="wechat"]');
+await page.waitForTimeout(500);
+
+/* 一次塞两个文件（模拟用户多选/拖入两个） */
+const multiAttach = await page.evaluate(
+  ({ a, b }) => {
+    const input = document.querySelector('[data-import-input="1"]');
+    if (!input) return { ok: false };
+    if (!input.multiple) return { ok: false, error: "input 没有 multiple 属性" };
+    const dt = new DataTransfer();
+    dt.items.add(new File([a], "chat-小李.json", { type: "application/json" }));
+    dt.items.add(new File([b], "chat-老王.json", { type: "application/json" }));
+    input.files = dt.files;
+    /* 先读数再 dispatch：onChange 里会清空 input.value（连带 files） */
+    const count = input.files.length;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return { ok: true, count };
+  },
+  { a: CHAT_A, b: CHAT_B },
+);
+rec("文件选择器支持多选（multiple）", multiAttach.ok && multiAttach.count === 2, JSON.stringify(multiAttach));
+
+await page.waitForTimeout(500);
+const listState = await page.evaluate(() => ({
+  items: document.querySelectorAll("[data-import-file-item]").length,
+  count: document.querySelector("[data-import-file-count]")?.getAttribute("data-import-file-count"),
+  note: document.querySelector("[data-import-replace-note]")?.textContent?.trim() ?? "",
+}));
+rec("两个文件都列出来了", listState.items === 2, `${listState.items} 个（count=${listState.count}）`);
+rec(
+  "⚠️ 页面上常显「这批文件会整体替换」的说明（用户实际问过覆盖还是追加）",
+  listState.note.includes("整体替换"),
+  listState.note.slice(0, 80),
+);
+
+await clickSel('[data-import-submit="1"]');
+const multiOk = await waitFor(() => Boolean(document.querySelector('[data-import-result="ok"]')), 60000);
+rec("多文件一起导入成功", multiOk);
+const multiText = await page.evaluate(
+  () => document.querySelector('[data-import-result="ok"]')?.textContent ?? "",
+);
+rec(
+  "结果里逐份列出了每个文件读到多少",
+  multiText.includes("chat-小李.json") && multiText.includes("chat-老王.json"),
+  multiText.replace(/\s+/g, " ").slice(0, 200),
+);
+const multiRows = await evidenceCount("wechat");
+rec(
+  "两份记录合并进同一个源（3 条我的消息，不是只剩最后一份）",
+  multiRows === 3,
+  `${multiRows} 条`,
+);
+const bothPartners = await prisma.personaEvidence.findMany({
+  where: { personaId, source: "wechat" },
+  select: { note: true },
+});
+rec(
+  "两个会话的内容都在（证明是合并而不是互相覆盖）",
+  bothPartners.some((r) => (r.note ?? "").includes("灰度")) &&
+    bothPartners.some((r) => (r.note ?? "").includes("技术债")),
+  bothPartners.map((r) => (r.note ?? "").slice(0, 14)).join(" ⏐ "),
+);
+
+/* 再单独导一份：应当是**替换**（只剩这一份） */
+await page.evaluate(() => {
+  document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
+});
+await page.waitForTimeout(400);
+await gotoSources();
+await clickSel('[data-open-import="wechat"]');
+await page.waitForTimeout(500);
+await attachFile('[data-import-input="1"]', "chat-老王.json", CHAT_B);
+await clickSel('[data-import-submit="1"]');
+await waitFor(() => Boolean(document.querySelector('[data-import-result="ok"]')), 60000);
+const afterSingle = await prisma.personaEvidence.findMany({
+  where: { personaId, source: "wechat" },
+  select: { note: true },
+});
+rec(
+  "只选一份时是**替换**：旧的「小李」那份被清掉，只剩「老王」这份",
+  afterSingle.length === 2 && afterSingle.every((r) => !(r.note ?? "").includes("灰度")),
+  `${afterSingle.length} 条：${afterSingle.map((r) => (r.note ?? "").slice(0, 12)).join(" ⏐ ")}`,
+);
+
+/* ───────── ⑨ 越权与错误路径 ───────── */
+console.log("\n== ⑨ 别人的卡片上不能导入（越权保护）==");
 await page.evaluate(() => {
   document.querySelector('[data-import-dialog] button[aria-label="关闭"]')?.click();
 });

@@ -36,6 +36,19 @@ export interface ImportFileResult {
   counts?: { raw: number; items: number; evidence: number; chars: number };
   format?: string;
   encoding?: string;
+  /** 替换语义：这个源的旧数据被这批文件整体替换 */
+  replaced?: boolean;
+  /** 逐份文件的解析结果（多文件时用） */
+  files?: {
+    name: string;
+    size: number;
+    format: string;
+    encoding: string;
+    rawCount: number;
+    items: number;
+    session: { partnerName: string | null; type: string | null } | null;
+    mineDetectedBy: "flag" | "nickname" | "none";
+  }[];
   speakers?: string[];
   /** 会话信息（对方名字 / 私聊还是群聊） */
   session?: { partnerName: string | null; type: string | null } | null;
@@ -156,12 +169,21 @@ export default function ImportDataDialog({
 }) {
   const guide = GUIDE[source];
   const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  /**
+   * 可以一次选**多个**文件。
+   *
+   * 为什么：这个接口是**替换**语义（这批文件 = 这个源的全部数据）。
+   * 如果一次只能给一个文件，用户导入第二个聊天记录时就会把第一份冲掉 ——
+   * 而"我和好几个人的聊天记录"才是常态。所以允许多选，
+   * 选中的文件合起来定义这个源；要增删就重新选一遍。
+   */
+  const [files, setFiles] = useState<File[]>([]);
   const [selfName, setSelfName] = useState("");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [result, setResult] = useState<ImportFileResult | null>(null);
   const [localError, setLocalError] = useState("");
+  const [showReplaceNote, setShowReplaceNote] = useState(false);
 
   /* 弹窗打开即弹出系统文件选择窗口 —— 需求："点击按钮后要能跳出用户的电脑窗口" */
   useEffect(() => {
@@ -178,39 +200,61 @@ export default function ImportDataDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, onClose]);
 
-  const pick = useCallback(
-    (f: File | null | undefined) => {
-      setLocalError("");
-      setResult(null);
-      if (!f) return;
+  /** 校验一批文件；合格就**追加**进列表（重复文件名替换旧的） */
+  const addFiles = useCallback((list: FileList | File[] | null | undefined) => {
+    setLocalError("");
+    setResult(null);
+    const incoming = list ? Array.from(list) : [];
+    if (incoming.length === 0) return;
+
+    const bad: string[] = [];
+    const ok: File[] = [];
+    for (const f of incoming) {
       const ext = (/\.[^./\\]+$/.exec(f.name.toLowerCase())?.[0] ?? "") as string;
       if (!(IMPORT_EXTENSIONS as readonly string[]).includes(ext)) {
-        setLocalError(
-          `不支持「${ext || "无扩展名"}」。可用格式：${IMPORT_EXTENSIONS.join(" / ")}。`,
-        );
-        return;
+        bad.push(`「${f.name}」格式不支持（${ext || "无扩展名"}）`);
+        continue;
+      }
+      if (f.size === 0) {
+        bad.push(`「${f.name}」是空文件`);
+        continue;
       }
       if (f.size > IMPORT_MAX_BYTES) {
-        setLocalError(
-          `文件 ${humanSize(f.size)} 超过 ${humanSize(IMPORT_MAX_BYTES)} 上限，` +
-            `请拆分后再导入（例如按月导出）。`,
-        );
-        return;
+        bad.push(`「${f.name}」${humanSize(f.size)} 超过单文件上限 ${humanSize(IMPORT_MAX_BYTES)}`);
+        continue;
       }
-      setFile(f);
-    },
-    [],
-  );
+      ok.push(f);
+    }
+
+    setFiles((prev) => {
+      const next = [...prev];
+      for (const f of ok) {
+        const i = next.findIndex((x) => x.name === f.name && x.size === f.size);
+        if (i >= 0) next[i] = f;
+        else next.push(f);
+      }
+      return next.slice(0, 20);
+    });
+
+    if (bad.length) setLocalError(`${bad.join("；")}。可用格式：${IMPORT_EXTENSIONS.join(" / ")}。`);
+  }, []);
+
+  const removeFile = useCallback((idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setResult(null);
+  }, []);
+
+  const totalSize = useMemo(() => files.reduce((s, f) => s + f.size, 0), [files]);
 
   const submit = useCallback(async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setBusy(true);
     setLocalError("");
     try {
       const fd = new FormData();
       fd.append("source", source);
       fd.append("personaId", personaId);
-      fd.append("file", file);
+      for (const f of files) fd.append("file", f);
       if (selfName.trim()) fd.append("selfName", selfName.trim());
 
       const res = await fetch("/api/import", {
@@ -256,7 +300,7 @@ export default function ImportDataDialog({
     } finally {
       setBusy(false);
     }
-  }, [file, onImported, personaId, selfName, source]);
+  }, [files, onImported, personaId, selfName, source]);
 
   const dims = useMemo(() => {
     const v = result?.facet?.values ?? {};
@@ -294,13 +338,18 @@ export default function ImportDataDialog({
         <input
           ref={inputRef}
           type="file"
+          multiple
           className={styles.fileInput}
           accept={guide.accept}
           data-import-input="1"
-          onChange={(e) => pick(e.target.files?.[0])}
+          onChange={(e) => {
+            addFiles(e.target.files);
+            /* 清空 value，这样"再选同一个文件"也会触发 change */
+            e.target.value = "";
+          }}
         />
 
-        {/* ① 选文件 */}
+        {/* ① 选文件（可多选） */}
         <div
           className={`${styles.drop} ${dragging ? styles.dropOn : ""}`}
           data-import-drop="1"
@@ -312,23 +361,52 @@ export default function ImportDataDialog({
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            pick(e.dataTransfer?.files?.[0]);
+            addFiles(e.dataTransfer?.files);
           }}
         >
-          {file ? (
+          {files.length ? (
             <div className={styles.fileBox} data-import-file="1">
-              <span className={styles.fileName}>{file.name}</span>
-              <span className={styles.fileMeta}>
-                {humanSize(file.size)} · {file.type || "未知类型"}
-              </span>
-              <button
-                type="button"
-                className={styles.reselect}
-                onClick={() => inputRef.current?.click()}
-                disabled={busy}
-              >
-                重新选择
-              </button>
+              <ul className={styles.fileList}>
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${f.size}`} data-import-file-item="1">
+                    <span className={styles.fileName}>{f.name}</span>
+                    <span className={styles.fileMeta}>{humanSize(f.size)}</span>
+                    <button
+                      type="button"
+                      className={styles.removeFile}
+                      onClick={() => removeFile(i)}
+                      disabled={busy}
+                      aria-label={`移除 ${f.name}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.fileTotal} data-import-file-count={files.length}>
+                已选 <b>{files.length}</b> 个文件，合计 {humanSize(totalSize)}
+              </p>
+              <div className={styles.fileBtns}>
+                <button
+                  type="button"
+                  className={styles.reselect}
+                  onClick={() => inputRef.current?.click()}
+                  disabled={busy}
+                >
+                  继续添加文件
+                </button>
+                <button
+                  type="button"
+                  className={styles.reselect}
+                  onClick={() => {
+                    setFiles([]);
+                    setResult(null);
+                  }}
+                  disabled={busy}
+                >
+                  清空
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -342,11 +420,34 @@ export default function ImportDataDialog({
                 选择文件
               </button>
               <p className={styles.dropNote}>
-                支持 {IMPORT_EXTENSIONS.join(" / ")}，单文件 ≤ {humanSize(IMPORT_MAX_BYTES)}
+                支持一次选<b>多个</b>文件（{IMPORT_EXTENSIONS.join(" / ")}），单个 ≤{" "}
+                {humanSize(IMPORT_MAX_BYTES)}
               </p>
             </>
           )}
         </div>
+
+        {/* 覆盖说明：这是替换语义，必须讲清楚（用户实际问过这个） */}
+        <p className={styles.replaceNote} data-import-replace-note="1">
+          这批文件会<b>整体替换</b>「{guide.title.replace(/^导入/, "")}」这个源上一次导入的数据
+          （其它数据源不受影响，兴趣标签只增不减）。
+          <button
+            type="button"
+            className={styles.moreLink}
+            onClick={() => setShowReplaceNote((v) => !v)}
+          >
+            {showReplaceNote ? "收起" : "想保留多份记录？"}
+          </button>
+        </p>
+        {showReplaceNote ? (
+          <p className={styles.replaceMore}>
+            把要保留的聊天记录<b>一次全选进来</b>（按住 Ctrl / Shift 多选，或分几次
+            「继续添加文件」），它们会合并成这个源的完整数据。
+            <br />
+            如果只想补一份新的、又不确定会不会覆盖掉旧的：先把现在这份和新的<b>一起选中</b>
+            再导入，就万无一失了。
+          </p>
+        ) : null}
 
         {/* ② 昵称：只蒸馏"我"说的话 */}
         <label className={styles.field}>
@@ -420,6 +521,21 @@ export default function ImportDataDialog({
                       ? "只提取了你自己发出的消息（依据你填的昵称）"
                       : "⚠️ 没能判断哪些是你发的，本次把文件里所有人的话都算进来了"}
                 </p>
+
+                {result.files && result.files.length > 1 ? (
+                  <ul className={styles.fileReports} data-import-file-reports="1">
+                    {result.files.map((f) => (
+                      <li key={`${f.name}-${f.rawCount}`}>
+                        <span className={styles.fileName}>{f.name}</span>
+                        <span className={styles.fileMeta}>
+                          读到 {f.rawCount} 条 · 可用 {f.items} 条
+                          {f.session?.partnerName ? ` · ${f.session.partnerName}` : ""}
+                          {f.mineDetectedBy === "none" ? " · ⚠️ 未识别发送方向" : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
 
                 {result.speakers?.length ? (
                   <p className={styles.resultMeta}>
@@ -497,9 +613,9 @@ export default function ImportDataDialog({
             className="btn btnPrimary"
             data-import-submit="1"
             onClick={() => void submit()}
-            disabled={!file || busy}
+            disabled={files.length === 0 || busy}
           >
-            {busy ? "正在解析并写入…" : "开始导入"}
+            {busy ? "正在解析并写入…" : `开始导入${files.length > 1 ? `（${files.length} 个文件）` : ""}`}
           </button>
         </div>
       </div>

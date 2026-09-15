@@ -10,7 +10,9 @@ import {
   isImportSource,
   parseImportFile,
   topEvidence,
+  type ImportItem,
   type ImportSource,
+  type SessionInfo,
 } from "@/lib/import/parse";
 import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
@@ -21,6 +23,22 @@ export const maxDuration = 60;
 
 /** 证据表里最多写多少条（解析仍用全部内容，见 lib/import/parse.ts） */
 const MAX_EVIDENCE_ROWS = 200;
+/** 一次最多几个文件（多个聊天记录一起导入是常态，但也要有个上限） */
+const MAX_FILES = 20;
+/** 一批文件合计上限。Vercel 请求体上限 4.5MB，留 multipart 开销余量 */
+const IMPORT_MAX_BYTES_TOTAL = 4 * 1024 * 1024;
+
+/** 单个文件的解析结果（如实回报给用户，便于定位是哪一份出了问题） */
+interface ImportFileReport {
+  name: string;
+  size: number;
+  format: string;
+  encoding: string;
+  rawCount: number;
+  items: number;
+  session: SessionInfo | null;
+  mineDetectedBy: "flag" | "nickname" | "none";
+}
 
 function bad(error: string, extra: Record<string, unknown> = {}, status = 400) {
   return NextResponse.json({ ok: false, error, ...extra }, { status });
@@ -100,28 +118,56 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   }
   const source: ImportSource = sourceRaw;
 
-  const file = form.get("file");
-  if (!(file instanceof File)) {
+  /**
+   * 一次可以传**多个文件**，它们合起来构成这个源的全部数据。
+   *
+   * 为什么要支持多选：这个接口是**替换**语义（见下面的 deleteMany），
+   * 一次只给一个文件的话，用户导入第二个聊天记录时就会把第一份冲掉。
+   * 而"我和好几个人的聊天记录"才是常态 —— 所以让用户一次选完，
+   * 这一批文件共同定义这个源；要增删就重新选一遍。
+   */
+  const files = form.getAll("file").filter((f): f is File => f instanceof File);
+  if (files.length === 0) {
     return bad("没有收到文件。", { code: "NO_FILE" });
   }
-
-  const name = file.name || "未命名文件";
-  const ext = (/\.[^./\\]+$/.exec(name.toLowerCase())?.[0] ?? "") as string;
-  if (!(IMPORT_EXTENSIONS as readonly string[]).includes(ext)) {
+  if (files.length > MAX_FILES) {
     return bad(
-      `不支持的文件格式「${ext || "无扩展名"}」。` +
-        `目前支持：${IMPORT_EXTENSIONS.join(" / ")}。`,
-      { code: "BAD_EXT" },
+      `一次最多导入 ${MAX_FILES} 个文件（收到 ${files.length} 个）。请分批导入。`,
+      { code: "TOO_MANY_FILES" },
     );
   }
-  if (file.size === 0) return bad("文件是空的。", { code: "EMPTY_FILE" });
-  if (file.size > IMPORT_MAX_BYTES) {
+
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  if (totalSize > IMPORT_MAX_BYTES_TOTAL) {
     return bad(
-      `文件 ${(file.size / 1024 / 1024).toFixed(1)}MB 超过上限 ` +
-        `${IMPORT_MAX_BYTES / 1024 / 1024}MB。请拆分后再导入（例如按月导出）。`,
-      { code: "TOO_LARGE" },
+      `这批文件合计 ${(totalSize / 1024 / 1024).toFixed(1)}MB，超过 ` +
+        `${IMPORT_MAX_BYTES_TOTAL / 1024 / 1024}MB 上限。请分批导入。`,
+      { code: "TOTAL_TOO_LARGE" },
       413,
     );
+  }
+
+  /* 逐个文件先做格式与大小校验，任何一个不合格就整体拒绝 ——
+     部分成功会让"这批文件 = 这个源"的语义变得含糊。 */
+  for (const f of files) {
+    const n = f.name || "未命名文件";
+    const e = (/\.[^./\\]+$/.exec(n.toLowerCase())?.[0] ?? "") as string;
+    if (!(IMPORT_EXTENSIONS as readonly string[]).includes(e)) {
+      return bad(
+        `「${n}」的格式不支持（${e || "无扩展名"}）。` +
+          `目前支持：${IMPORT_EXTENSIONS.join(" / ")}。`,
+        { code: "BAD_EXT", file: n },
+      );
+    }
+    if (f.size === 0) return bad(`「${n}」是空文件。`, { code: "EMPTY_FILE", file: n });
+    if (f.size > IMPORT_MAX_BYTES) {
+      return bad(
+        `「${n}」${(f.size / 1024 / 1024).toFixed(1)}MB 超过单文件上限 ` +
+          `${IMPORT_MAX_BYTES / 1024 / 1024}MB。请拆分后再导入（例如按月导出）。`,
+        { code: "TOO_LARGE", file: n },
+        413,
+      );
+    }
   }
 
   /* 越权保护：导入 = 往某个 persona 写人格数据，只能写自己的 */
@@ -132,27 +178,77 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
 
   const selfName = String(form.get("selfName") ?? "").trim() || null;
 
-  /* ── 解码 + 解析 ── */
-  const bytes = await file.arrayBuffer();
-  const decoded = decodeBytes(bytes);
-  const parsed = parseImportFile(source, name, decoded.text, { selfName });
+  /* ── 解码 + 逐个解析，再合成一份 ── */
+  const multi = files.length > 1;
+  const items: ImportItem[] = [];
+  const warnings: string[] = [];
+  const fileReports: ImportFileReport[] = [];
+  const speakerSet = new Map<string, number>();
+  let rawTotal = 0;
+  let emptyFiles = 0;
 
-  const warnings = [...parsed.warnings];
-  if (decoded.warning) warnings.push(decoded.warning);
+  for (const f of files) {
+    const name = f.name || "未命名文件";
+    const bytes = await f.arrayBuffer();
+    const decoded = decodeBytes(bytes);
+    const parsed = parseImportFile(source, name, decoded.text, { selfName });
 
-  if (parsed.items.length === 0) {
-    return bad("没能从这个文件里读出可用于蒸馏的内容。", {
-      code: "NO_CONTENT",
-      warnings,
+    /* 多文件时把警告按文件归组，用户才知道是哪一份出的问题 */
+    const tag = multi ? `【${name}】` : "";
+    if (decoded.warning) warnings.push(`${tag}${decoded.warning}`);
+    for (const w of parsed.warnings) warnings.push(`${tag}${w}`);
+
+    for (const s of parsed.speakers) {
+      const m = /^(.+?)（(\d+) 条）$/.exec(s);
+      const who = m?.[1] ?? s;
+      const n = Number(m?.[2] ?? 1);
+      speakerSet.set(who, (speakerSet.get(who) ?? 0) + n);
+    }
+
+    rawTotal += parsed.rawCount;
+    if (parsed.items.length === 0) emptyFiles += 1;
+    items.push(...parsed.items);
+
+    fileReports.push({
+      name,
+      size: f.size,
       format: parsed.format,
-      speakers: parsed.speakers,
+      encoding: decoded.encoding,
       rawCount: parsed.rawCount,
+      items: parsed.items.length,
+      session: parsed.session,
+      mineDetectedBy: parsed.mineDetectedBy,
     });
   }
 
-  const contents = parsed.items.map((it) => ({ text: it.text, heat: it.heat }));
-  const totalChars = parsed.items.reduce((s, it) => s + it.text.length, 0);
-  const evidenceRows = topEvidence(parsed.items, MAX_EVIDENCE_ROWS);
+  const speakers = [...speakerSet.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([s, n]) => `${s}（${n} 条）`);
+
+  if (items.length === 0) {
+    return bad(
+      multi
+        ? `这 ${files.length} 个文件里都没读出可用于蒸馏的内容。`
+        : "没能从这个文件里读出可用于蒸馏的内容。",
+      {
+        code: "NO_CONTENT",
+        warnings,
+        speakers,
+        rawCount: rawTotal,
+        files: fileReports,
+      },
+    );
+  }
+  if (emptyFiles > 0) {
+    warnings.push(
+      `有 ${emptyFiles} 个文件没读出内容（已跳过），其余文件照常导入。`,
+    );
+  }
+
+  const contents = items.map((it) => ({ text: it.text, heat: it.heat }));
+  const totalChars = items.reduce((s, it) => s + it.text.length, 0);
+  const evidenceRows = topEvidence(items, MAX_EVIDENCE_ROWS);
 
   const persona = await prisma.persona.findUnique({
     where: { id: personaId },
@@ -161,7 +257,7 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   if (!persona) return bad("Persona 不存在", { code: "NO_PERSONA" }, 404);
 
   /* ── 落库：替换该源旧证据 + 标记已注入 + 合并兴趣 ── */
-  const detectedInterests = interestsFromTexts(parsed.items.map((it) => it.text));
+  const detectedInterests = interestsFromTexts(items.map((it) => it.text));
   const oldInterests = Array.isArray(persona.interests)
     ? (persona.interests as unknown[]).filter((x): x is string => typeof x === "string")
     : [];
@@ -169,12 +265,11 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   const addedInterests = detectedInterests.filter((x) => !oldInterests.includes(x));
 
   const meta = {
-    files: 1,
-    fileName: name,
-    format: parsed.format,
-    encoding: decoded.encoding,
-    rawCount: parsed.rawCount,
-    items: parsed.items.length,
+    files: files.length,
+    fileNames: fileReports.map((r) => r.name),
+    formats: [...new Set(fileReports.map((r) => r.format))],
+    rawCount: rawTotal,
+    items: items.length,
     evidenceRows: evidenceRows.length,
     chars: totalChars,
     selfName,
@@ -258,18 +353,26 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     ok: true,
     source,
+    /** 本次替换语义：这个源的旧证据被这一批文件整体替换 */
+    replaced: true,
     counts: {
-      raw: parsed.rawCount,
-      items: parsed.items.length,
+      raw: rawTotal,
+      items: items.length,
       evidence: evidenceRows.length,
       chars: totalChars,
     },
-    format: parsed.format,
-    encoding: decoded.encoding,
-    speakers: parsed.speakers,
+    /* 多文件时逐份回报，用户才知道每份读到了什么 */
+    files: fileReports,
+    format: fileReports.length === 1 ? fileReports[0].format : `${fileReports.length} 个文件`,
+    encoding: fileReports[0]?.encoding ?? "utf-8",
+    speakers,
     /* 会话信息 + "我发的"是怎么判定的：用户据此判断结果可不可信 */
-    session: parsed.session,
-    mineDetectedBy: parsed.mineDetectedBy,
+    session: fileReports.length === 1 ? fileReports[0].session : null,
+    mineDetectedBy: fileReports.every((r) => r.mineDetectedBy === "flag")
+      ? "flag"
+      : fileReports.some((r) => r.mineDetectedBy === "nickname")
+        ? "nickname"
+        : "none",
     addedInterests,
     warnings,
     facet: facet

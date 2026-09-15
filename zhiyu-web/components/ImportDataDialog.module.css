@@ -112,10 +112,61 @@
   display: grid;
   gap: 4px;
   justify-items: center;
+  width: 100%;
+}
+/* 多文件列表：每行"文件名 + 大小 + 移除" */
+.fileList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-height: 168px;
+  overflow: auto;
+}
+.fileList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 22px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1.4px solid var(--line-soft);
+  border-radius: var(--r-hand);
+  background: rgba(255, 255, 255, 0.7);
+  text-align: left;
+}
+.fileTotal {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.fileTotal b {
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+.fileBtns {
+  display: flex;
+  gap: 8px;
+}
+.removeFile {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.removeFile:hover:not(:disabled) {
+  background: rgba(201, 80, 58, 0.12);
+  color: #c9503a;
 }
 .fileName {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--fg);
   word-break: break-all;
@@ -123,6 +174,7 @@
 .fileMeta {
   color: var(--muted);
   font-size: 11.5px;
+  white-space: nowrap;
 }
 .reselect {
   margin-top: 6px;
@@ -137,6 +189,44 @@
 .reselect:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent-deep);
+}
+
+/* 「这批文件会整体替换」的说明 —— 用户实际问过"是覆盖还是追加"，
+   所以这句话必须常显，不能只在帮助里写 */
+.replaceNote {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 5px;
+  background: rgba(226, 102, 79, 0.07);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.replaceNote b {
+  color: var(--accent-deep);
+}
+.moreLink {
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-deep);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.replaceMore {
+  margin: 8px 0 0;
+  padding: 9px 12px;
+  border-radius: 5px;
+  background: var(--fg-softer, rgba(0, 0, 0, 0.04));
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.85;
+}
+.replaceMore b {
+  color: var(--fg);
 }
 
 .field {
@@ -261,6 +351,21 @@
 }
 .resultTags :global(.badge) {
   margin-left: 5px;
+}
+
+/* 多文件时逐份列出：哪一份读到了多少、有没有识别出会话对象 */
+.fileReports {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+.fileReports li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .dims {
