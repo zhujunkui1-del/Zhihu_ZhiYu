@@ -2,6 +2,7 @@
 
 import PersonaRadar from "@/components/PersonaRadar";
 import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
+import { zhihuAbsoluteUrl, zhihuProfileUrl } from "@/lib/zhihu/links";
 import {
   SOURCE_LABEL,
   SOURCE_SUB,
@@ -68,7 +69,32 @@ export default function PersonaCard({
           <span className={styles.avatarFallback} aria-hidden="true" />
         )}
         <div className={styles.headText}>
-          <h3 className={styles.name}>{data.displayName}</h3>
+          {/**
+           * 昵称：有知乎 url_token 时点它直接打开 TA 的知乎主页
+           * （`https://www.zhihu.com/people/<url_token>`）。
+           * 没有 token 就保持纯文本 —— 不给一个点进去 404 的链接。
+           */}
+          {zhihuProfileUrl(data.zhihuUrlToken) ? (
+            <h3 className={styles.name}>
+              <a
+                /* 昵称链接外观**不做下划线**（看起来仍是标题），
+                   只加一个很轻的 ↗ 提示可以点 */
+                style={{ color: "inherit", textDecoration: "none" }}
+                href={zhihuProfileUrl(data.zhihuUrlToken) as string}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-zhihu-profile={data.zhihuUrlToken}
+                title="打开 TA 的知乎主页"
+              >
+                {data.displayName}
+                <span className="meta" style={{ marginLeft: 6, fontSize: 12 }}>
+                  ↗
+                </span>
+              </a>
+            </h3>
+          ) : (
+            <h3 className={styles.name}>{data.displayName}</h3>
+          )}
           <p className={styles.metaLine}>
             {[
               data.region.province && data.region.city
@@ -218,10 +244,16 @@ export default function PersonaCard({
                   <li key={e.id} className={styles.evItem}>
                     <span className={styles.evTrait}>{e.trait}</span>
                     <span className={styles.evNote}>{e.note ?? "(无说明)"}</span>
-                    {e.url ? (
+                    {/**
+                     * ⚠️ 链接必须过 `zhihuAbsoluteUrl`：库里存的是**相对路径**
+                     * （`/pins/1533…`），直接塞进 href 会变成
+                     * `https://www.zhiyuapp.site/pins/…`（实测打不开）。
+                     * 取不到合法地址时**不渲染链接**，不给坏链。
+                     */}
+                    {zhihuAbsoluteUrl(e.url) ? (
                       <a
                         className={styles.evLink}
-                        href={e.url}
+                        href={zhihuAbsoluteUrl(e.url) as string}
                         target="_blank"
                         rel="noreferrer noopener"
                       >

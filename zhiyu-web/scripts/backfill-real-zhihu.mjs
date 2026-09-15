@@ -26,6 +26,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { fetchPublicPerson } from "../lib/zhihu/public-profile.ts";
 import { facetFromContents } from "../lib/persona/fusion.ts";
+import { zhihuAbsoluteUrl } from "../lib/zhihu/links.ts";
 
 const APPLY = process.argv.includes("--apply");
 const ONLY = (() => {
@@ -212,7 +213,7 @@ for (const r of rows) {
           trait: "想法",
           value: pin.likeCount,
           note: note.slice(0, 2000),
-          url: pin.url || null,
+          url: zhihuAbsoluteUrl(pin.url),
         },
       });
     }

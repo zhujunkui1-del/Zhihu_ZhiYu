@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { facetFromContents } from "@/lib/persona/fusion";
 import { facetOptionsFor } from "@/lib/persona/facet-opts";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
+import { zhihuAbsoluteUrl } from "@/lib/zhihu/links";
 import {
   fetchContents,
   fetchFollowees,
@@ -146,7 +147,9 @@ export async function syncZhihuToPersona(params: {
           trait: it.contentType || "content",
           value: it.likeCount,
           note: (it.title || "").trim().slice(0, 2000),
-          url: it.url || null,
+          /* 开放平台返回的 url 是站内相对路径（`/pins/…`），
+             这里补成绝对地址再落库，避免前端拿到坏链 */
+          url: zhihuAbsoluteUrl(it.url),
         },
       });
     }
