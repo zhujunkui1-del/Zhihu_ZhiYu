@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { toDisplayPercentText } from "@/lib/score";
 import styles from "./SbtiResultModal.module.css";
 
 /**
@@ -156,7 +157,13 @@ export default function SbtiResultModal({
                 <>未精确命中类型库 · 已回退到最接近的一种</>
               ) : (
                 <>
-                  匹配度 <b>{Math.round(result.similarity)}%</b>
+                  {/* 展示值收进 [1,99]（产品要求界面上不出现 0% / 100%）。
+                      这里的"匹配度"是 15 位等级码与类型库原型的**模式匹配率**，
+                      满分在数学上可能出现，但宣称"100% 就是你"并不合适。 */}
+                  匹配度{" "}
+                  <b data-sbti-similarity="1">
+                    {toDisplayPercentText(result.similarity / 100)}
+                  </b>
                   <span className={styles.simDivider}>·</span>
                   维度命中{" "}
                   <b>

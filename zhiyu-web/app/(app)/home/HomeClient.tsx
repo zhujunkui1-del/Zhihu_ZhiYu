@@ -8,6 +8,7 @@ import BoardRadar from "@/components/BoardRadar";
 import PersonaCardModal from "@/components/PersonaCardModal";
 import { locText } from "@/lib/regions";
 import { formatDate } from "@/lib/datetime";
+import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import type { HomeData } from "@/lib/home";
 import type { DiscoverCandidate } from "@/lib/discover";
 import styles from "./home.module.css";
@@ -131,7 +132,11 @@ export default function HomeClient({
               <ul className={styles.metricList}>
                 <li>
                   <span className={styles.metricLabel}>人格完整度</span>
-                  <span className={styles.metricValue}>{board.completeness}%</span>
+                  {/* 完整度是覆盖率推断（四类来源加权），不宣称 0% / 100%：
+                      具体到了哪一档旁边的 "x/4"、"x/6" 已经说清楚了 */}
+                  <span className={styles.metricValue} data-home-completeness="1">
+                    {toDisplayPercentText(board.completeness / 100)}
+                  </span>
                 </li>
                 <li>
                   <span className={styles.metricLabel}>已覆盖来源类别</span>
@@ -145,7 +150,10 @@ export default function HomeClient({
 
               <div className={styles.progress}>
                 <span className="track">
-                  <i className="trackFill" style={{ width: `${board.completeness}%` }} />
+                  <i
+                    className="trackFill"
+                    style={{ width: `${toDisplayPercent(board.completeness / 100) ?? 0}%` }}
+                  />
                 </span>
                 <p className="meta" style={{ marginTop: 8 }}>
                   完整度按「生活私域 / 职场 / 公共 / 显性」四类来源覆盖计算，不是按来源数量简单相加。
@@ -155,14 +163,23 @@ export default function HomeClient({
               {/* 综合画像：与人格页同一套判定（六型倾向 + 匹配度） */}
               {board.fused ? (
                 <p className="meta" style={{ marginTop: 14 }} data-home-fused="1">
-                  综合画像：<b>{board.fused.type}</b>（匹配度 {board.fused.similarity}%）
+                  综合画像：<b>{board.fused.type}</b>（匹配度{" "}
+                  {toDisplayPercentText(board.fused.similarity / 100)}）
                   <br />
                   {board.fused.blurb}
+                  {/* 只有自评时要说清楚 —— 否则等于把 SBTI 当成观察结论（曾经就是这么错的） */}
+                  {board.fused.selfReportOnly ? (
+                    <span data-home-fused-self-only="1">
+                      <br />
+                      目前只有 SBTI 自评这一份人格数据，这个倾向是自评折算的结果；
+                      注入知乎 / 微信等源后会重新融合。
+                    </span>
+                  ) : null}
                 </p>
               ) : (
                 <p className="meta" style={{ marginTop: 14 }}>
-                  还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉）后，
-                  这里会给出由多源融合判定的人格倾向。
+                  还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
+                  或完成一次 SBTI 自评，这里会给出融合判定的人格倾向。
                 </p>
               )}
 
@@ -301,23 +318,43 @@ export default function HomeClient({
                   ))}
                 </span>
 
-                <span className={styles.dcSim}>
-                  <span className="track">
-                    <i className="trackFill" style={{ width: `${p.sim}%` }} />
-                  </span>
-                </span>
+                {/* 相似度：我这边画像没就绪时 `sim` 是 0（哨兵值，代表"没算过"），
+                    此时整块不显示 —— 既不能写成 0%（绝对结论），
+                    也不该硬凑成 1%（产品要求区间是 1~99，但没数据就是没数据）。 */}
+                {data.meReady ? (
+                  <>
+                    <span className={styles.dcSim}>
+                      <span className="track">
+                        <i
+                          className="trackFill"
+                          style={{ width: `${toDisplayPercent(p.sim / 100) ?? 0}%` }}
+                        />
+                      </span>
+                    </span>
 
-                <span className={styles.dcFoot}>
-                  <span className={styles.simLbl}>
-                    与你的相似度 <b>{p.sim}%</b>
+                    <span className={styles.dcFoot}>
+                      <span className={styles.simLbl}>
+                        与你的相似度 <b>{toDisplayPercentText(p.sim / 100)}</b>
+                      </span>
+                      <span className={styles.dcGo}>
+                        查看人格卡
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                          <path d="M5 12h14M13 6l6 6-6 6" />
+                        </svg>
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles.dcFoot}>
+                    <span className={styles.simLbl}>完善我的人格后可比相似度</span>
+                    <span className={styles.dcGo}>
+                      查看人格卡
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </span>
                   </span>
-                  <span className={styles.dcGo}>
-                    查看人格卡
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                      <path d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
-                  </span>
-                </span>
+                )}
               </button>
             ))}
           </div>

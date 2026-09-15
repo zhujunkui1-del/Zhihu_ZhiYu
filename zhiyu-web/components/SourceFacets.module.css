@@ -13,6 +13,18 @@
 .lead b {
   color: var(--fg);
 }
+/* 块首那句"含自评成分"的补充说明：要看得见，但不能盖过正文 */
+.selfNote {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(226, 102, 79, 0.08);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
 .empty {
   margin: 0;
   padding: 28px 4px;
@@ -52,6 +64,27 @@
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--muted);
+}
+/* 源的性质标签：观察数据 vs 本人自评 —— 两者含义不同，必须一眼可辨 */
+.tagObserved,
+.tagSelf {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+.tagObserved {
+  border: 1.4px solid var(--line-soft);
+  color: var(--muted);
+}
+.tagSelf {
+  border: 1.4px solid rgba(226, 102, 79, 0.55);
+  background: rgba(226, 102, 79, 0.1);
+  color: var(--accent-deep);
+  font-weight: 700;
 }
 .summary {
   margin: 0 0 14px;

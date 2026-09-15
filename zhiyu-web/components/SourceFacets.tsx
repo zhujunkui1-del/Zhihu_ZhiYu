@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  VALUE_LABEL,
-  VALUE_KEYS,
-  type SourceFacet,
-} from "@/lib/persona/fusion";
+import { VALUE_LABEL, VALUE_KEYS } from "@/lib/persona/fusion";
+import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import styles from "./SourceFacets.module.css";
 
 /**
@@ -14,12 +11,15 @@ import styles from "./SourceFacets.module.css";
  *   「你把之前对知乎、微信等注入的数据分别进行简单介绍解析的模块搞丢了。
  *     网站应该在获取到某个源数据后的第一时间就可以解析出用户在微信或是 QQ
  *     或是知乎或是 SBTI 等等的人格特征，然后在『我的人格』页中展示出来。」
+ *   「现在，马上把 SBTI 的结果也列为人格数据里面，也要进行蒸馏。」
  *
  * 确实丢过：早先只有"整源蒸馏"一步，分源解析既没做也没展示。
- * 现在每个源都有一份 facet（六维 + 结论 + 依据条数），在这里逐源列出。
+ * 现在每个源都有一份 facet（六维 + 结论 + 依据条数），在这里逐源列出，
+ * **SBTI 也在其中**（用户明确要求它算人格数据并参与蒸馏）。
  *
- * 与「综合画像」的关系要讲清楚，所以块首有一句话说明：
- *   下面是**分源**看；上面那块是**融合**后的结论。
+ * ⚠️ 但 SBTI 是**本人自报**，其余是观察到的行为 —— 卡片上照实打标
+ * （自评 / 观察），块首也说明"综合画像里可能含自评成分"。
+ * 让自评参与，但不让自评冒充观察结论。
  */
 
 const SOURCE_NAME: Record<string, string> = {
@@ -28,31 +28,59 @@ const SOURCE_NAME: Record<string, string> = {
   qq: "QQ",
   feishu: "飞书",
   dingtalk: "钉钉",
+  sbti: "SBTI",
   profile: "已有六维",
 };
+
+/**
+ * 本组件拿到的 facet 视图。
+ *
+ * 自成一型（而不是直接复用 `fusion.SourceFacet`）是因为这里多了一个
+ * `selfReport`：它由 `source-facets.ts` 按源的**性质**判定后注入，
+ * 组件只负责显示，不该自己去猜哪个源是自评。
+ */
+export interface FacetView {
+  source: string;
+  label: string;
+  summary: string;
+  itemCount: number;
+  values: Record<string, number>;
+  /** 该源只有标题、没有正文（依赖文本长度的维度因此缺失） */
+  titleOnly: boolean;
+  /** 该源是**本人自评**（SBTI），不是观察数据 */
+  selfReport: boolean;
+}
 
 export default function SourceFacets({
   facets,
   /** 每个源解析出的兴趣方向（可选） */
   interests,
 }: {
-  facets: SourceFacet[];
+  facets: FacetView[];
   interests?: Record<string, string[]>;
 }) {
   if (facets.length === 0) {
     return (
       <p className={styles.empty}>
-        还没有可分源解析的数据。注入任意一个数据源（知乎 / 微信 / QQ / 飞书 / 钉钉）后，
-        这里会按源分别给出解析结果。
+        还没有可分源解析的数据。注入任意一个数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
+        或完成一次 SBTI 自评，这里就会按源分别给出解析结果。
       </p>
     );
   }
+
+  const hasSelfReport = facets.some((f) => f.selfReport);
 
   return (
     <div className={styles.wrap} data-source-facets="1">
       <p className={styles.lead}>
         每个数据源<b>单独</b>解析出来的特征。上方「综合画像」是这些源融合后的结论 ——
         两者看的是同一批数据，但角度不同。
+        {hasSelfReport ? (
+          <span className={styles.selfNote} data-facet-self-note="1">
+            其中 <b>SBTI 是本人自报</b>（你眼中的自己），其余是观察到的行为；
+            融合结论里因此含自评成分，已逐源标注。
+          </span>
+        ) : null}
       </p>
 
       <div className={styles.grid}>
@@ -65,8 +93,20 @@ export default function SourceFacets({
             <article key={f.source} className={styles.card} data-facet-source={f.source}>
               <header className={styles.head}>
                 <h4 className={styles.name}>{name}</h4>
+                <span
+                  className={f.selfReport ? styles.tagSelf : styles.tagObserved}
+                  data-facet-kind={f.selfReport ? "self-report" : "observed"}
+                >
+                  {f.selfReport ? "本人自评" : "观察数据"}
+                </span>
                 <span className={styles.count}>
-                  {f.itemCount > 0 ? `${f.itemCount} 条依据` : "无逐条依据"}
+                  {/* 问卷的"依据"是维度，不是内容条数 —— 写"15 条依据"会让人
+                      以为有 15 条内容。措辞按源的性质区分。 */}
+                  {f.itemCount > 0
+                    ? f.selfReport
+                      ? `${f.itemCount} 个维度`
+                      : `${f.itemCount} 条依据`
+                    : "无逐条依据"}
                 </span>
               </header>
 
@@ -81,11 +121,11 @@ export default function SourceFacets({
                       <span className="track">
                         <i
                           className="trackFill"
-                          style={{ width: `${Math.round((f.values[k] ?? 0) * 100)}%` }}
+                          style={{ width: `${toDisplayPercent(f.values[k]) ?? 0}%` }}
                         />
                       </span>
                       <span className={`num ${styles.dimVal}`}>
-                        {Math.round((f.values[k] ?? 0) * 100)}%
+                        {toDisplayPercentText(f.values[k])}
                       </span>
                     </div>
                   ))}

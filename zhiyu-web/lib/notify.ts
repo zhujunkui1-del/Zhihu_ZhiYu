@@ -52,10 +52,11 @@ function categoryOf(type: string): { category: NotifyCategory; label: string } {
 
 /* overallScore 在库里是 0~1 的小数（如 0.52），页面要显示百分数。
    换算逻辑统一在 lib/score.ts —— 原先这里自己抄了一份，散在多处迟早不一致。 */
-import { toPercent as scoreToPercent } from "@/lib/score";
+import { clampPercent, toPercent as scoreToPercent } from "@/lib/score";
 
 function toPercent(v: unknown): number | null {
-  return scoreToPercent(typeof v === "number" ? v : null);
+  /* 展示值再收进 [1, 99]：产品要求界面上不出现 0% / 100%。 */
+  return clampPercent(scoreToPercent(typeof v === "number" ? v : null));
 }
 
 function str(v: unknown): string {

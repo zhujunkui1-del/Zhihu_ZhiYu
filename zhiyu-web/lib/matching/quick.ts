@@ -1,5 +1,19 @@
 // MVP 快速匹配：基于现有结构化字段做规则化评分，不做 LLM 对话。
 
+import { clampPercent } from "@/lib/score";
+
+/**
+ * 分值统一收进 [1, 99]。
+ *
+ * 产品要求：界面上不许出现 0% / 100% 这种绝对化数值。
+ * 这一层（评分的产出处）就收口，是因为下面的发现页、快速匹配、Agent 匹配
+ * 都直接消费这些数字 —— 与其在每处展示时各夹一次（迟早漏一处），
+ * 不如让**算出来的那一刻**就已经是合法值。
+ *
+ * `null` 原样保留：它表示"这一维没有数据"，不能变成 1%。
+ */
+const pct = (v: number | null): number | null => clampPercent(v);
+
 export interface MatchablePersona {
   id: string;
   displayName: string;
@@ -119,12 +133,12 @@ export function scoreAll(
       personalitySim == null ? null : Math.max(0, 100 - personalitySim);
 
     const dims: Record<string, QuickDimensionScore> = {
-      interest: { score: interestSim, label: "兴趣同频" },
-      personality: { score: personalitySim, label: "人格画像相似" },
-      topics: { score: topicSim, label: "话题重合" },
-      values: { score: valueSim, label: "价值观适配" },
-      communication: { score: commSim, label: "沟通适配" },
-      complementarity: { score: complementarity, label: "互补程度" },
+      interest: { score: pct(interestSim), label: "兴趣同频" },
+      personality: { score: pct(personalitySim), label: "人格画像相似" },
+      topics: { score: pct(topicSim), label: "话题重合" },
+      values: { score: pct(valueSim), label: "价值观适配" },
+      communication: { score: pct(commSim), label: "沟通适配" },
+      complementarity: { score: pct(complementarity), label: "互补程度" },
     };
 
     const weights: Record<string, number> = {
@@ -144,23 +158,25 @@ export function scoreAll(
         totalWeight += weights[key] ?? 0;
       }
     }
-    const overall = totalWeight > 0 ? Math.round(weighted / totalWeight) : 0;
+    const overall = totalWeight > 0 ? pct(Math.round(weighted / totalWeight)) ?? 1 : 1;
 
     const reasons: string[] = [];
-    if (personalitySim != null && personalitySim >= 60) {
-      reasons.push(`SBTI 人格画像相似度 ${Math.round(personalitySim)}%`);
+    if (dims.personality.score != null && dims.personality.score >= 60) {
+      reasons.push(`SBTI 人格画像相似度 ${dims.personality.score}%`);
     }
-    if (interestSim != null && interestSim >= 30) {
-      reasons.push(`兴趣重合 ${Math.round(interestSim)}%（如：${stringArray(c.interests).slice(0, 3).join("、")}）`);
+    if (dims.interest.score != null && dims.interest.score >= 30) {
+      reasons.push(
+        `兴趣重合 ${dims.interest.score}%（如：${stringArray(c.interests).slice(0, 3).join("、")}）`,
+      );
     }
-    if (topicSim != null && topicSim >= 30) {
+    if (dims.topics.score != null && dims.topics.score >= 30) {
       reasons.push(`共同关注 ${stringArray(c.topics).slice(0, 2).join("、")} 等话题`);
     }
-    if (valueSim != null && valueSim >= 60) {
-      reasons.push(`价值观适配 ${Math.round(valueSim)}%`);
+    if (dims.values.score != null && dims.values.score >= 60) {
+      reasons.push(`价值观适配 ${dims.values.score}%`);
     }
-    if (complementarity != null && complementarity >= 60) {
-      reasons.push(`人格互补度 ${Math.round(complementarity)}%，可能有思想碰撞`);
+    if (dims.complementarity.score != null && dims.complementarity.score >= 60) {
+      reasons.push(`人格互补度 ${dims.complementarity.score}%，可能有思想碰撞`);
     }
     if (reasons.length === 0) {
       reasons.push("候选特征有限，建议完善人格数据后再精确匹配");

@@ -250,7 +250,12 @@ export default function AgentMatchClient({
                       <span className={styles.scoreLbl}>综合匹配度</span>
                       <span className={styles.miniBars}>
                         {r.dimensions.map((d) => (
-                          <span key={d.key} className={styles.miniBar} title={`${d.label} ${d.value ?? "—"}%`}>
+                          <span
+                            key={d.key}
+                            className={styles.miniBar}
+                            /* 没数据的维度写 "—"，不能拼成 "—%" */
+                            title={d.value == null ? `${d.label} —` : `${d.label} ${d.value}%`}
+                          >
                             <span
                               className={styles.miniFill}
                               style={{ width: `${d.value ?? 0}%` }}

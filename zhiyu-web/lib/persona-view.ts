@@ -64,9 +64,8 @@ export interface PersonaBoard {
   sourceChips: SourceChip[];
   injectedCount: number;
   /**
-   * 五轴画像。
-   * 来自 SBTI 自评（15 维聚合），没有 SBTI 时回退到公开内容的观察值。
-   * 未做 SBTI 且没有观察数据时各轴 value 为 null —— 调用方据此显示"等待蒸馏"。
+   * 五轴画像（逐维补全：多源融合值 → 蒸馏产物 → SBTI 自评聚合）。
+   * 未做 SBTI 且没有任何数据时各轴 value 为 null —— 调用方据此显示"等待蒸馏"。
    */
   axes: Axis[];
   /**
@@ -78,12 +77,26 @@ export interface PersonaBoard {
    */
   axesSource: "self-report" | "observed" | "none";
   /**
-   * **综合画像**：把观察到的多源数据融合后判定的人格倾向。
+   * 五轴里是否**含自评折算**成分。
+   *
+   * SBTI 现在参与融合（产品要求），所以"来自观察"不再等于"没有自评"。
+   * `axesSource === "observed"` 且本字段为 true 时，界面要写成
+   * "由公开内容观察推断（含 SBTI 自评折算）" —— 不能只说"非本人自评"。
+   */
+  axesIncludesSelfReport: boolean;
+  /**
+   * **综合画像**：把多源数据融合后判定的人格倾向。
    *
    * 与 `sbti` 是两件事，别混：
-   *   · `sbti` 是本人自评问卷的结果（"僧人 MONK"）
-   *   · `fused` 是多源观察融合出的倾向（"深度思考型"）
+   *   · `sbti` 是本人自评问卷的结果（"僧人 MONK"，25 型沙雕人格之一）
+   *   · `fused` 是多源融合出的倾向（六型之一：深度思考型 / 好奇探索型 …）
    * 之前页面把前者当成了综合画像，属于概念性错误。
+   *
+   * ⚠️ 2026-09 产品要求：**SBTI 也要算人格数据、也要参与融合**，
+   * 所以 `usedSources` 里可能出现 `sbti`。但自评与观察性质不同，
+   * 故另给 `selfReportSources` / `observedSources` / `selfReportOnly`：
+   * 界面必须照实标注这份结论里有多少自评成分 —— 尤其 `selfReportOnly`
+   * 为 true 时，等于"只听了你自己说的"，不能装作是观察结论。
    * 数据不足时为 null（不硬猜），界面显示"暂无数据"。
    */
   fused: {
@@ -93,9 +106,15 @@ export interface PersonaBoard {
     runnerUp: { type: string; similarity: number }[];
     /** 融合用了哪几个源 */
     usedSources: string[];
+    /** 其中属于**本人自报**的源（SBTI） */
+    selfReportSources: string[];
+    /** 其中属于**非自报**的源 */
+    observedSources: string[];
+    /** 参与融合的源里**只有自评**：这份"综合画像"目前只反映自评 */
+    selfReportOnly: boolean;
   } | null;
   /**
-   * **分源解析**：每个数据源各自解析出的特征与结论。
+   * **分源解析**：每个数据源各自解析出的特征与结论。**含 SBTI**。
    *
    * 产品要求："拿到某个源的数据后就该能解析出这个源里的人是什么样的"，
    * 并在「我的人格」页分别展示。facet 在**写入时**按完整原文算好并持久化
@@ -109,6 +128,8 @@ export interface PersonaBoard {
     values: Record<string, number>;
     /** 该源只有标题、没有正文（依赖文本长度的维度因此缺失） */
     titleOnly: boolean;
+    /** 该源是**本人自评**（SBTI），不是观察数据 —— 界面要标出来 */
+    selfReport: boolean;
   }[];
   /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
   selfReport: {
@@ -173,8 +194,10 @@ export async function buildPersonaBoard(
      优先级低于多源融合（见下方 fusedAxes）。 */
   const axesFromSbti = axesFromDimensions(sbti?.dimensions);
 
-  /* 综合画像：由**观察到的**多源证据融合后判定人格倾向。
-     注意这里刻意不用 sbti —— 自评问卷不参与"融合"，它是独立的一面。 */
+  /* 综合画像：由**多源证据**融合后判定人格倾向。
+     2026-09 产品要求把 SBTI 也纳入融合（自评也是人格数据），
+     所以这里不再排除 sbti —— 但 `selfReportSources` / `selfReportOnly`
+     会如实回报自评占比，页面据此标注，不让自评冒充观察结论。 */
   const facets = await buildPersonaFacets(persona.id);
   const fused = facets?.type
     ? {
@@ -183,6 +206,9 @@ export async function buildPersonaBoard(
         blurb: facets.type.blurb,
         runnerUp: facets.type.runnerUp.map((r) => ({ type: r.type, similarity: r.similarity })),
         usedSources: facets.usedSources,
+        selfReportSources: facets.selfReportSources,
+        observedSources: facets.observedSources,
+        selfReportOnly: facets.selfReportOnly,
       }
     : null;
 
@@ -190,7 +216,7 @@ export async function buildPersonaBoard(
    * 雷达画什么：**逐维补全**，而不是整组二选一。
    *
    * 每一维单独按优先级取值：
-   *   ① 多源融合值（纯观察数据，最可信）
+   *   ① 多源融合值（`facets.fused`，含 SBTI 折算 —— 产品要求它参与）
    *   ② 蒸馏产物 `Persona.values`（LLM 归纳，证据包里可能含自评）
    *   ③ SBTI 自评的 15 维聚合（前两者都给不出时才用）
    *
@@ -198,27 +224,36 @@ export async function buildPersonaBoard(
    * （知乎只返回标题 → 依赖文本长度的三维如实留空）时，雷达就只剩 2 条轴、
    * 另外 3 条变 `—`。用户重新蒸馏后看到的就是"雷达图被干没了"（实际被投诉）。
    * 分源缺维是**正常情况**，不该拖垮整张图。
-   *
-   * 注意：「综合画像」的**倾向型判定**仍然只用 `facets.fused`（纯观察值）——
-   * 那是结论，含义不同，不能拿自评掺进去。逐维补全只用于画图与展示。
    */
   const mergedValues: Record<string, number> = {};
   const personaValues = (persona.values ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(personaValues)) {
     if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
   }
-  /* 融合值覆盖同名的蒸馏值（观察优先，逐维） */
+  /* 融合值覆盖同名的蒸馏值（逐维，融合值更接近原始观察） */
   for (const [k, v] of Object.entries(facets?.fused ?? {})) {
     if (typeof v === "number" && Number.isFinite(v)) mergedValues[k] = v;
   }
 
   const mergedAxes = axesFromObservedValues(mergedValues);
   const axes = axesHaveValue(mergedAxes) ? mergedAxes : axesFromSbti;
+  /**
+   * 五轴的来源必须如实标注。
+   * 现在 SBTI 也进融合了，所以"有值"不再等于"来自观察"——
+   * 若融合里只有自评（`selfReportOnly`），画出来的图就得标成自评，
+   * 否则用户会以为我们观察到了什么。
+   */
   const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
     ? axesHaveValue(mergedAxes)
-      ? "observed"
+      ? facets?.selfReportOnly
+        ? "self-report"
+        : "observed"
       : "self-report"
     : "none";
+
+  /* 图上到底有没有自评成分：只要 SBTI 的 facet 参与了融合，就有 */
+  const axesIncludesSelfReport =
+    axesHaveValue(mergedAxes) && (facets?.selfReportSources.length ?? 0) > 0;
 
   return {
     id: persona.id,
@@ -235,8 +270,9 @@ export async function buildPersonaBoard(
     /* 五轴来自 SBTI 自评，或回退到公开内容的观察值 —— 都是真实数据，不是占位 */
     axes,
     axesSource,
+    axesIncludesSelfReport,
     fused,
-    sourceFacets: (facets?.observed ?? []).map((f) => ({
+    sourceFacets: (facets?.sources ?? []).map((f) => ({
       source: f.source,
       label: f.label,
       summary: f.summary,
@@ -245,6 +281,7 @@ export async function buildPersonaBoard(
         Object.entries(f.values).filter(([, v]) => typeof v === "number") as [string, number][],
       ),
       titleOnly: f.titleOnly === true,
+      selfReport: (facets?.selfReportSources ?? []).includes(f.source),
     })),
     selfReport: facets?.selfReport ?? null,
   };

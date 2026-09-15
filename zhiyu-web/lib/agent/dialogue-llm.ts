@@ -1,5 +1,6 @@
 // 真实 LLM（BYOK）版 Agent 对话与 Judge。
 import type { ChatMessage } from "@/lib/llm/chat";
+import { clampUnit } from "@/lib/score";
 import {
   QUESTIONS,
   type DialoguePersona,
@@ -29,9 +30,16 @@ function personaSystem(p: DialoguePersona): string {
   );
 }
 
+/**
+ * 0~1 区间内取值，**并收进 [0.01, 0.99]**。
+ *
+ * 原来只收 [0, 1]，于是 LLM 给 1 分就会在报告里显示「综合匹配度 100%」、
+ * 某一维显示 100%。这是几轮模拟对话后的主观判断，宣称满分并不诚实，
+ * 产品也明确要求界面上不许出现 0% / 100%。缺省仍是 0.5（中性）。
+ */
 function clamp01(v: unknown): number {
   const n = Number(v);
-  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5;
+  return clampUnit(Number.isFinite(n) ? n : 0.5) ?? 0.5;
 }
 
 interface ParsedJudge extends JudgeDimensions {
@@ -101,10 +109,18 @@ export async function runLlmAgentDialogue(
   ]);
 
   const parsed = parseJudgeJson(judgeRaw);
+  /* 五维已各自收进 [0.01, 0.99]，均值自然也落在区间内；
+     走 `??` 兜底时同样过一次 clampUnit，避免将来有人改掉上面那层。 */
   const overall =
-    parsed.overall ??
-    (parsed.interest + parsed.thinking + parsed.values + parsed.communication + parsed.complementarity) /
-      5;
+    clampUnit(
+      parsed.overall ??
+        (parsed.interest +
+          parsed.thinking +
+          parsed.values +
+          parsed.communication +
+          parsed.complementarity) /
+          5,
+    ) ?? 0.5;
 
   const dimensions: JudgeDimensions = {
     interest: parsed.interest,

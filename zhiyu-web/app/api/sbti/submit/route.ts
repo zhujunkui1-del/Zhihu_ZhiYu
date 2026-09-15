@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { scoreSbti, questions } from "@/lib/sbti/scoring";
 import { denyIfCrossSite } from "@/lib/auth/csrf";
 import { resolveIdentity } from "@/lib/auth/current-user";
+import { facetFromSbti } from "@/lib/persona/fusion";
+import { persistSourceFacet } from "@/lib/persona/source-facets";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +76,7 @@ export async function POST(req: NextRequest) {
             similarity: result.similarity,
             fallback: result.fallback,
             dimensions: result.dimensionScores,
+            submittedAt: new Date().toISOString(),
           },
         } as unknown as Prisma.InputJsonValue,
       },
@@ -90,6 +93,35 @@ export async function POST(req: NextRequest) {
     }),
   ]);
 
+  /**
+   * ⭐ 产品要求：**SBTI 的结果也算人格数据，要参与蒸馏。**
+   *
+   * 所以这里把 15 维**当做一个数据源**解析并落库（`facets:sbti`），
+   * 与知乎/微信等源的 facet 同构。之后 `buildPersonaFacets()` 会把它
+   * 和其它源一起融合出「综合画像」，`SourceFacets` 也会把它单列一张卡。
+   *
+   * 落库失败不该把"测试已提交成功"变成 500 —— 数据已经写进去了，
+   * 只是分源解析没算出来。所以捕获异常并在响应里如实回报，
+   * 让调用方（和排障的我们）知道发生了什么，而不是静默吞掉。
+   */
+  let facetPersisted = false;
+  let facetError: string | null = null;
+  try {
+    const facet = facetFromSbti(result.dimensionScores, result.codesFormatted, {
+      typeTitle: result.type.title,
+      type: result.type.name,
+    });
+    if (facet) {
+      await persistSourceFacet(persona.id, facet);
+      facetPersisted = true;
+    } else {
+      facetError = "15 维数据不足，未生成分源解析";
+    }
+  } catch (e) {
+    facetError = (e as Error).message;
+    console.error("[sbti/submit] persistSourceFacet 失败", e);
+  }
+
   return NextResponse.json({
     ok: true,
     codes: result.codesFormatted,
@@ -97,6 +129,8 @@ export async function POST(req: NextRequest) {
     similarity: result.similarity,
     fallback: result.fallback,
     dimensions: result.dimensionScores,
+    facetPersisted,
+    facetError,
     /* 结果弹窗要展示"完整解读"：点睛短句 + 长文。
        人格库本来就带着这两段（greeting / description），
        以前没往外传，前端只能显示一行「刚完成 SBTI：死者」。 */

@@ -79,6 +79,7 @@ export async function GET(_req: Request, { params }: Params) {
     sbti: board.sbti,
     axes: board.axes,
     axesSource: board.axesSource,
+    axesIncludesSelfReport: board.axesIncludesSelfReport,
     sources: board.sourceChips.map((c) => ({
       type: c.type,
       label: c.label,

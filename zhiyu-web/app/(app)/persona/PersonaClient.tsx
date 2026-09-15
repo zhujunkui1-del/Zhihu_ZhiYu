@@ -8,6 +8,7 @@ import PersonaRadar from "@/components/PersonaRadar";
 import type { PersonaBoard, SourceChip } from "@/lib/persona-view";
 import { formatDate } from "@/lib/datetime";
 import { reportError } from "@/lib/client/error-bus";
+import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import SbtiResultModal, { type SbtiResultData } from "@/components/SbtiResultModal";
 import SourceFacets from "@/components/SourceFacets";
 import { sbtiGreetingOf, sbtiDescriptionOf } from "@/lib/sbti/personalities";
@@ -437,10 +438,15 @@ export default function PersonaClient({
             <div className={styles.featHead}>
               <h3>综合画像 · 融合特征</h3>
               {/* 这里以前显示的是 SBTI 的等级码 —— 那是**自评结果**，
-                  不是综合画像。综合画像应是多源融合的产物，标记改为来源说明。 */}
+                  不是综合画像。综合画像应是多源融合的产物，标记改为来源说明。
+                  SBTI 现在也参与融合（产品要求），所以还要标明自评占比。 */}
               {board.fused ? (
-                <span className="meta">
-                  由 {board.fused.usedSources.join(" + ") || "已有数据"} 融合
+                <span className="meta" data-fused-sources="1">
+                  由{" "}
+                  {board.fused.usedSources
+                    .map((s) => (board.fused!.selfReportSources.includes(s) ? `${s}（自评）` : s))
+                    .join(" + ") || "已有数据"}{" "}
+                  融合
                 </span>
               ) : null}
             </div>
@@ -457,24 +463,38 @@ export default function PersonaClient({
                       <span className={styles.typeName} data-fused-type="1">
                         {board.fused.type}
                       </span>
-                      <span className="meta">匹配度 {board.fused.similarity}%</span>
+                      <span className="meta">
+                        匹配度 {toDisplayPercentText(board.fused.similarity / 100)}
+                      </span>
                     </div>
                     <p className={styles.hint} style={{ marginTop: 8 }}>
                       {board.fused.blurb}
                     </p>
+                    {/* 只有自评时，必须说清这份"综合画像"目前等于把自评折算了一遍 */}
+                    {board.fused.selfReportOnly ? (
+                      <p className={styles.selfOnlyNote} data-fused-self-only="1">
+                        目前只有 <b>SBTI 自评</b>这一份人格数据，因此这个倾向是
+                        <b>自评折算</b>的结果 —— 还没观察到你公开内容里的行为特征。
+                        注入知乎 / 微信等源后会重新融合。
+                      </p>
+                    ) : board.fused.selfReportSources.length ? (
+                      <p className={styles.selfMixNote} data-fused-self-mix="1">
+                        这份结论含 <b>SBTI 自评</b>成分，其余来自观察到的数据。
+                      </p>
+                    ) : null}
                     {board.fused.runnerUp.length ? (
                       <p className="meta" style={{ marginTop: 6 }}>
                         次接近：
                         {board.fused.runnerUp
-                          .map((r) => `${r.type} ${r.similarity}%`)
+                          .map((r) => `${r.type} ${toDisplayPercentText(r.similarity / 100)}`)
                           .join("、")}
                       </p>
                     ) : null}
                   </>
                 ) : (
                   <p className={styles.hint}>
-                    还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉）后，
-                    这里会给出由多源融合判定的人格倾向。
+                    还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
+                    或完成一次 SBTI 自评，这里会给出融合判定的人格倾向。
                   </p>
                 )}
 
@@ -504,11 +524,11 @@ export default function PersonaClient({
                       <span className="track">
                         <i
                           className="trackFill"
-                          style={{ width: `${Math.round((a.value ?? 0) * 100)}%` }}
+                          style={{ width: `${toDisplayPercent(a.value) ?? 0}%` }}
                         />
                       </span>
                       <span className={`num ${styles.axisVal}`}>
-                        {a.value == null ? "—" : `${Math.round(a.value * 100)}%`}
+                        {toDisplayPercentText(a.value)}
                       </span>
                     </div>
                   ))}

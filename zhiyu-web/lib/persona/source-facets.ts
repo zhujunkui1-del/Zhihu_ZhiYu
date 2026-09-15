@@ -5,20 +5,29 @@
  * ── 产品要求（用户原话整理）────────────────────────────────────────────
  *   · 拿到某个源的数据后，就应该能解析出"这个人在这个源里表现出什么特征"
  *   · 「我的人格」页要把每个源的解析分别展示出来
- *   · 「综合画像」是**多源蒸馏融合**的结果，不是 SBTI 自评结果
+ *   · 「综合画像」是**多源蒸馏融合**的结果，不是 SBTI 自评结果的复述
+ *   · **SBTI 的结果也算人格数据，也要参与蒸馏**（用户 2026-09 追加要求）
  *
  * 之前的实现只有"整体蒸馏"这一步，且把 SBTI 结果当成综合画像；
  * 分源解析与融合判定都不存在。本模块补上这两层。
  *
- * 数据来源：`PersonaEvidence`（source / trait / value / note / url）。
- * 知乎同步与回填脚本都把内容写在这里，SBTI 也写了一条，
- * 所以这里能一次性拿到"每个源各自有什么"。
+ * ── SBTI 现在是"源"之一，但性质要标注清楚 ─────────────────────────────
+ * 知乎/微信/QQ/飞书/钉钉是**观察到的行为**，SBTI 是**本人自报**。
+ * 两者都进入融合（产品要求），但融合结果必须带
+ * `selfReportSources` / `observedSources`，并且当**只有自评**时
+ * 置 `selfReportOnly`，界面据此说明"这版画像目前只反映你自己说的"——
+ * 让自评参与，但不让自评冒充观察结论。
+ *
+ * 数据来源：`PersonaEvidence`（source / trait / value / note / url）
+ * 用于观察类源；SBTI 的六维折算则直接读 `Persona.personality.sbti`
+ * （那才是唯一事实来源，且 `facetFromSbti` 是纯函数、无需 LLM）。
  */
 
 import { prisma } from "@/lib/db";
 import { personalities } from "@/lib/sbti/scoring";
 import {
   facetFromContents,
+  facetFromSbti,
   fuseSourceFacets,
   matchPersonaType,
   isObservedSource,
@@ -83,10 +92,40 @@ const SOURCE_LABEL: Record<string, string> = {
   distill: "Agent 蒸馏",
 };
 
+/**
+ * 展示顺序：先观察类源（按注入的常见顺序），再兜底六维，最后自评。
+ * 自评放最后是有意的 —— 让人先看"观察到了什么"，再看"你自己怎么说"。
+ */
+const SOURCE_ORDER: Record<string, number> = {
+  zhihu: 0,
+  wechat: 1,
+  qq: 2,
+  feishu: 3,
+  dingtalk: 4,
+  profile: 5,
+  sbti: 6,
+};
+
 export interface PersonaFacets {
-  /** 每个**观察到的**源各自解析出的 facet（SBTI 不在其中，它是自评） */
-  observed: SourceFacet[];
-  /** SBTI 单独作为一面：本人自评的结果 */
+  /**
+   * 每个源各自解析出的 facet —— **含 SBTI**。
+   * 产品要求 SBTI 也是人格数据，所以它在这份列表里占一席；
+   * 它是不是"自报"由 `selfReportSources` 标明，不靠调用方猜。
+   */
+  sources: SourceFacet[];
+  /** 其中属于**本人自报**的源（目前只有 sbti） */
+  selfReportSources: string[];
+  /** 其中属于**观察到的行为**的源（知乎/微信/QQ/飞书/钉钉…） */
+  observedSources: string[];
+  /** 参与融合的源里**只有自评**：此时综合画像约等于"把自评折算了一遍" */
+  selfReportOnly: boolean;
+  /** 多源融合出的六维 */
+  fused: Partial<Record<ValueKey, number>>;
+  /** 参与融合的源 */
+  usedSources: string[];
+  /** 由融合六维判定的人格倾向；数据不足时为 null（不硬猜） */
+  type: TypeMatch | null;
+  /** SBTI 自评那一面的展示信息（类型名 / 等级码 / 解读） */
   selfReport: {
     type: string | null;
     typeTitle: string | null;
@@ -94,12 +133,6 @@ export interface PersonaFacets {
     /** 自评结果的一句话解读（来自 sbti-skill 的人格库） */
     blurb: string | null;
   } | null;
-  /** 多源融合出的六维 */
-  fused: Partial<Record<ValueKey, number>>;
-  /** 参与融合的源 */
-  usedSources: string[];
-  /** 由融合六维判定的人格倾向；数据不足时为 null（不硬猜） */
-  type: TypeMatch | null;
 }
 
 /** PersonaFeature 里存"分源解析结果"用的 key 前缀 */
@@ -160,9 +193,12 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
    * 演示人格的六维就是预置在那里的；真实用户若跑过整源蒸馏也会有。
    * **绝不拿被裁过的 note 硬算** —— 那只会产出假特征。
    */
-  const observed: SourceFacet[] = await loadSourceFacets(personaId);
+  const loaded = await loadSourceFacets(personaId);
+  /* SBTI 的 facet 一律**现算**：`personality.sbti` 是唯一事实来源，
+     重测后会变；从库里读旧 facet 会拿到过期结论，故丢弃重算。 */
+  const sources: SourceFacet[] = loaded.filter((f) => f.source !== "sbti");
 
-  if (observed.length === 0) {
+  if (sources.length === 0) {
     const v = persona.values as Record<string, unknown> | null;
     const nums: Partial<Record<ValueKey, number>> = {};
     if (v && typeof v === "object") {
@@ -172,7 +208,7 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
       }
     }
     if (Object.keys(nums).length) {
-      observed.push({
+      sources.push({
         source: "profile",
         label: "已有六维（无逐源明细）",
         values: nums,
@@ -182,11 +218,15 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
     }
   }
 
-  const { fused, usedSources } = fuseSourceFacets(observed);
-
-  /* SBTI 自评单独一面（不参与融合） */
+  /* SBTI 自评的那一面（展示用）+ 折算成六维的 facet（参与融合用）。
+     两者都来自同一条 `personality.sbti`，不会各说各话。 */
   const sbti = ((persona.personality ?? {}) as Record<string, unknown>).sbti as
-    | { type?: string; typeTitle?: string; codes?: string }
+    | {
+        type?: string;
+        typeTitle?: string;
+        codes?: string;
+        dimensions?: Record<string, { score?: number; level?: string }>;
+      }
     | undefined;
   const selfReport = sbti?.type
     ? {
@@ -197,12 +237,52 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
       }
     : null;
 
+  /**
+   * ⭐ 产品要求：**SBTI 的结果也是人格数据，也要参与蒸馏。**
+   *
+   * 所以这里把 15 维折算成六维，作为一个和其它源同构的 facet 放进列表，
+   * 一起交给 `fuseSourceFacets` —— 它会如实回报哪些源是自报。
+   *
+   * `facetFromSbti` 在**一个维度都提取不到**时返回 null。实测演示数据就是这种：
+   * `personality.sbti` 里只有 `{type, codes}`，`codes` 还是占位串 ——
+   * 从等级码反推分数会得到清一色 0.5，把 16 个演示人格的画像全拖向中间型。
+   * 所以那种情况**宁可不出这一项**：SBTI 自评那面照常显示（上面的 `selfReport`），
+   * 只是不假装自己有逐维数据。
+   */
+  const sbtiFacet = facetFromSbti(sbti?.dimensions, sbti?.codes, {
+    typeTitle: sbti?.typeTitle,
+    type: sbti?.type,
+  });
+  if (sbtiFacet) sources.push(sbtiFacet);
+
+  /* 展示顺序固定，避免每次刷新顺序乱跳 */
+  sources.sort(
+    (a, b) =>
+      (SOURCE_ORDER[a.source] ?? 99) - (SOURCE_ORDER[b.source] ?? 99) ||
+      a.source.localeCompare(b.source),
+  );
+
+  const { fused, usedSources, selfReportSources, observedSources } = fuseSourceFacets(sources);
+
+  /**
+   * "是不是只有自评"要按**行为源**判，不能只看非自报源：
+   * 一个只做过 SBTI 的用户会同时拿到 `profile`（上次蒸馏留下的六维，
+   * 而那次蒸馏的证据本来就是 SBTI 自评），此时若按 `observedSources` 判，
+   * 就会把"纯自评"说成"观察得出结论"。这里收窄到真正的行为源。
+   */
+  const behaviorSources = usedSources.filter(
+    (s) => isObservedSource(s) && !selfReportSources.includes(s),
+  );
+
   return {
-    observed,
-    selfReport,
+    sources,
+    selfReportSources,
+    observedSources,
+    selfReportOnly: behaviorSources.length === 0 && selfReportSources.length > 0,
     fused,
     usedSources,
     type: matchPersonaType(fused),
+    selfReport,
   };
 }
 

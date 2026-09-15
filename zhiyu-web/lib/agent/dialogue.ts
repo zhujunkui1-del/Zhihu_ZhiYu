@@ -1,6 +1,8 @@
 // Agent-to-Agent 演示对话 + Judge（确定性规则版）。
 // 后续接入 LLM 时替换 answer()/judge() 内部实现，接口与数据模型保持不变。
 
+import { clampUnit } from "@/lib/score";
+
 export interface DialoguePersona {
   id: string;
   displayName: string;
@@ -238,7 +240,7 @@ export function runMockAgentDialogue(a: DialoguePersona, b: DialoguePersona): {
     rounds,
     judge: {
       /* 库里 overallScore 的约定是 0~1 —— 与 LLM 路径的 clamp01 一致 */
-      overall: overall / 100,
+      overall: clampUnit(overall / 100) ?? 0.5,
       dimensions,
       summary: `综合匹配度 ${overall}%——${reasons.join("；")}。`,
       reasons,
@@ -247,6 +249,14 @@ export function runMockAgentDialogue(a: DialoguePersona, b: DialoguePersona): {
   };
 }
 
+/**
+ * 0~100 的百分数 → 0~1，**并收进 [0.01, 0.99]**。
+ *
+ * 原来是 `clamp(0,1)`，于是"五项全满"会算出 `overall = 1` →
+ * 报告里出现「综合匹配度 100%」。这是从几轮模拟对话里推断出来的数字，
+ * 宣称 100% 并不诚实，产品也明确要求界面上不许出现 0% / 100%。
+ * 下界同理（`0` → 1%），避免"看起来像完全不合"这种绝对结论。
+ */
 function round1(pct: number): number {
-  return Math.max(0, Math.min(1, pct / 100));
+  return clampUnit(pct / 100) ?? 0.5;
 }

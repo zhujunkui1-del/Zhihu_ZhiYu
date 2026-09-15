@@ -7,6 +7,7 @@ import Avatar from "@/components/radar/Avatar";
 import PersonaCardModal from "@/components/PersonaCardModal";
 import AgentMeetButton from "@/components/AgentMeetButton";
 import { citiesOf, locText } from "@/lib/regions";
+import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import { reportError, reportSuccess } from "@/lib/client/error-bus";
 import type { DiscoverCandidate, DiscoverResult } from "@/lib/discover";
 import styles from "./find.module.css";
@@ -153,10 +154,14 @@ export default function DiscoverClient({
         <div className={styles.simBlock}>
           <div className={styles.simTop}>
             <span>与你的相似度</span>
-            <span className={`num ${styles.simNum}`}>{p.sim}%</span>
+            {/* 分值在 lib/matching/quick.ts 里已收进 [1,99]（产品要求不出现 0%/100%），
+                这里再走一次展示换算只是双保险 */}
+            <span className={`num ${styles.simNum}`} data-card-sim="1">
+              {toDisplayPercentText(p.sim / 100)}
+            </span>
           </div>
           <span className="track">
-            <i className="trackFill" style={{ width: `${p.sim}%` }} />
+            <i className="trackFill" style={{ width: `${toDisplayPercent(p.sim / 100) ?? 0}%` }} />
           </span>
         </div>
       ) : null}

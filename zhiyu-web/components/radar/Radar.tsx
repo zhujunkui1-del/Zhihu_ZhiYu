@@ -310,7 +310,7 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
     );
   }
 
-  const { stageW, stageH, centre, nodes, rings, dots, maxSim, minSim } = layout;
+  const { stageW, stageH, centre, nodes, rings, dots, maxSim, minSim, hasSim } = layout;
 
   return (
     <div className={className} ref={rootRef}>
@@ -379,21 +379,25 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
             ))}
           </svg>
 
-          {/* 轨道环上的相似度标注：放在左侧中部，避开右上角控件与其他节点 */}
-          {rings.map((ring, i) =>
-            ring.inner ? null : (
-              <div
-                key={`tag-${i}-${ring.sim}`}
-                className={styles.ringTag}
-                style={{
-                  left: Math.round(centre.x + Math.cos((188 * Math.PI) / 180) * ring.r),
-                  top: Math.round(centre.y + Math.sin((188 * Math.PI) / 180) * ring.r),
-                }}
-              >
-                ≈ {ring.sim}%
-              </div>
-            ),
-          )}
+          {/* 轨道环上的相似度标注：放在左侧中部，避开右上角控件与其他节点。
+              `hasSim` 为 false 时整块不画 —— 那是"没算过相似度"，
+              画成 0% 等于宣称"跟你一点都不像"（产品要求不出现 0%）。 */}
+          {hasSim
+            ? rings.map((ring, i) =>
+                ring.inner ? null : (
+                  <div
+                    key={`tag-${i}-${ring.sim}`}
+                    className={styles.ringTag}
+                    style={{
+                      left: Math.round(centre.x + Math.cos((188 * Math.PI) / 180) * ring.r),
+                      top: Math.round(centre.y + Math.sin((188 * Math.PI) / 180) * ring.r),
+                    }}
+                  >
+                    ≈ {ring.sim}%
+                  </div>
+                ),
+              )
+            : null}
 
           {/* 中心「我」 */}
           <div
@@ -450,8 +454,12 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
                     height: dotPx,
                     borderWidth: Math.max(1.5, 2.5 * viewRef.current.k),
                   }}
-                  aria-label={`查看 ${n.person.title} 的人格卡（相似度 ${n.sim}%）`}
-                  title={`${n.person.title} · ${n.sim}%`}
+                  aria-label={
+                    hasSim
+                      ? `查看 ${n.person.title} 的人格卡（相似度 ${n.sim}%）`
+                      : `查看 ${n.person.title} 的人格卡`
+                  }
+                  title={hasSim ? `${n.person.title} · ${n.sim}%` : n.person.title}
                 />
               );
             }
@@ -493,7 +501,7 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
                     <b className={styles.name}>{n.person.title}</b>
                     <span className={styles.sub}>
                       <em className={styles.type}>{n.person.type ?? ""}</em>
-                      <em className={styles.sim}>{n.sim}%</em>
+                      {hasSim ? <em className={styles.sim}>{n.sim}%</em> : null}
                     </span>
                   </span>
                 ) : null}
@@ -529,17 +537,21 @@ export default function Radar({ people, onOpenProfile, selfAvatarUrl, className 
           <span className={styles.hint}>拖动平移 · 滚轮缩放 · 点头像看人格卡</span>
         </div>
 
-        {/* 左下角统计 */}
+        {/* 左下角统计。没算过相似度时不显示"最近/最远"——0% 是哨兵值 */}
         <div className={styles.stats}>
           <span>
             雷达上 <b>{nodes.length}</b> 位
           </span>
-          <span>
-            最近 <b>{maxSim}%</b>
-          </span>
-          <span>
-            最远 <b>{minSim}%</b>
-          </span>
+          {hasSim ? (
+            <>
+              <span>
+                最近 <b>{maxSim}%</b>
+              </span>
+              <span>
+                最远 <b>{minSim}%</b>
+              </span>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

@@ -22,6 +22,8 @@
  * 现在提到这里作为**唯一来源**，演示数据与真实用户判定共用同一套基准。
  */
 
+import { clampPercent } from "@/lib/score";
+
 /** 六维价值观的键（顺序固定，便于展示与比较） */
 export const VALUE_KEYS = [
   "learning",
@@ -165,14 +167,154 @@ export function matchPersonaType(
 /* ── 分源解析 ──────────────────────────────────────────────────────────── */
 
 /**
- * 哪些源属于**观察到的**数据（可用于融合出综合画像）。
+ * SBTI 的 15 个维度 → 它的**六维价值观**。
  *
- * SBTI 被**排除**在外，这点很关键：它是本人自评问卷，
- * 只能说明"他希望自己是什么样"，不能证明"他实际是什么样"。
- * 综合画像的职责是把**观察到的行为**融成结论，所以自评不参与融合，
- * 而是单独作为一个面（facet）展示，与观察结论并列。
+ * 为什么需要这一层：SBTI 的雷达轴（自我/情感/观念/行动/社交）与
+ * "综合画像"用的六维价值观（learning/creation/career/social/stability/autonomy）
+ * **不是同一套坐标系**，直接拿 SBTI 的类型名当综合画像，就是之前那个概念错误。
+ * 只有把 15 维折算到六维，SBTI 才能作为**一个数据源**参与蒸馏与融合
+ * （产品要求："SBTI 的结果也要列为人格数据，也要进行蒸馏"）。
+ *
+ * 映射依据是每个维度的中文语义，不是凑数：
+ *   autonomy  独立自主 ← 自我清晰度 + 核心价值 + 动机导向 + 执行模式
+ *                        （对自己要什么清楚、且按自己的动机行事）
+ *   learning  学习成长 ← 世界观倾向 + 人生意义感 + 自我清晰度
+ *                        （世界怎么运转、活着为什么、我是谁 —— 都是"想弄明白"）
+ *   creation  创造表达 ← 规则与灵活度 + 表达与真实度
+ *                        （不循规蹈矩、愿意真实表达）
+ *   stability 稳定安全 ← 自尊自信 + 依恋安全感 + 人际边界感 + 执行模式
+ *                        （内心稳、关系稳、有边界、能落地）
+ *   social    社交连接 ← 情感投入度 + 边界与依赖 + 社交主动性 + 表达与真实度
+ *   career    事业成就 ← **无对应维度**
+ *                        （这份题库没有职业取向题，所以不给值、不编造）
  */
-export const OBSERVED_SOURCES = ["zhihu", "wechat", "qq", "feishu", "dingtalk"] as const;
+const SBTI_TO_VALUES: Record<ValueKey, string[]> = {
+  autonomy: ["S2", "S3", "Ac1", "Ac3"],
+  learning: ["A1", "A3", "S2"],
+  creation: ["A2", "So3"],
+  stability: ["S1", "E1", "So2", "Ac3"],
+  social: ["E2", "E3", "So1", "So3"],
+  career: [],
+};
+
+/** 把 0~1 的值收进 [0.01, 0.99]（展示层不许出现 0%/100%） */
+const toDisplayUnit = (x: number) => Math.max(0.01, Math.min(0.99, x));
+
+/**
+ * 从 SBTI 的作答里提取"每个维度的归一化值（0~1）"。
+ *
+ * 兼容两种落库形态（都来自**真实提交**，`app/api/sbti/submit` 写的就是第一种）：
+ *   · `{ S1: { score: 4, level: "M" } }` —— submit 路由写的
+ *   · `{ S1: 4 }`                          —— 早期/精简形态
+ *
+ * ⚠️ **不从 `codes` 反推**（曾经这么干过，是错的）。
+ * 等级码是 `score` 的函数，拿它反推分数属于把导数当原函数：
+ *   · 演示数据里的 `codes` 是**占位串**（如 `MMM-MMM-MMM-MMM-MMM`），
+ *     反推出来是清一色 0.5，于是 16 个演示人格的 SBTI 都成了"全面中性"，
+ *     一进融合就把它们各自预置的画像拖向中间型（实测全变成"理性辩手型"）。
+ *   · 真实的 `{score, level}` 本来就在库里，没有反推的必要。
+ * 所以：**没有 dimensions 就没有 SBTI 分源解析** —— 缺就如实缺，不编。
+ *
+ * @returns 维度 key → 0~1；拿不到任何维度时返回空对象
+ */
+export function sbtiDimensionUnits(dimensions: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+
+  if (dimensions && typeof dimensions === "object" && !Array.isArray(dimensions)) {
+    for (const [k, v] of Object.entries(dimensions as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v)) {
+        out[k] = (v - 2) / 4; // DIM_MIN=2, DIM_MAX=6
+      } else if (v && typeof v === "object") {
+        const rec = v as { score?: unknown; level?: unknown };
+        if (typeof rec.score === "number" && Number.isFinite(rec.score)) {
+          out[k] = (rec.score - 2) / 4;
+        } else if (typeof rec.level === "string") {
+          out[k] = levelUnit(rec.level);
+        }
+      }
+    }
+  }
+
+  /* 统一收到 [0.01, 0.99] */
+  for (const k of Object.keys(out)) out[k] = toDisplayUnit(out[k]);
+  return out;
+}
+
+/** 等级字母 → 0~1（L/M/H 取组中点，避免又出现 0 和 1） */
+function levelUnit(level: string): number {
+  const c = level.trim().toUpperCase()[0];
+  if (c === "L") return 0.25;
+  if (c === "H") return 0.75;
+  return 0.5;
+}
+
+/**
+ * 把 SBTI 的 15 维折算成**六维价值观**，产出一个和其它源同构的 facet。
+ *
+ * 这样 SBTI 就能像知乎/微信一样参与：分源解析展示、多源融合、以及
+ * 交给 LLM 蒸馏时作为独立来源的权重。
+ *
+ * @param dimensions `personality.sbti.dimensions`（**必须来自真实提交**）
+ * @param codesFormatted 15 位等级码，仅用于 summary 里展示依据
+ * @param extra 展示补充信息（类型名等），只用于 label
+ * @returns facet；**一个维度都提取不到时返回 null**（不编造、不从等级码反推）
+ */
+export function facetFromSbti(
+  dimensions: unknown,
+  codesFormatted?: string | null,
+  extra?: { typeTitle?: string | null; type?: string | null; itemCount?: number },
+): SourceFacet | null {
+  const units = sbtiDimensionUnits(dimensions);
+  const keys = Object.keys(units);
+  if (keys.length === 0) return null;
+
+  const values: Partial<Record<ValueKey, number>> = {};
+  for (const [valueKey, sbtiKeys] of Object.entries(SBTI_TO_VALUES) as [
+    ValueKey,
+    string[],
+  ][]) {
+    const picked = sbtiKeys.map((k) => units[k]).filter((v): v is number => typeof v === "number");
+    if (picked.length === 0) continue; // 该维无对应题目 → 留空，不用中性值凑
+    values[valueKey] = toDisplayUnit(picked.reduce((s, x) => s + x, 0) / picked.length);
+  }
+
+  const label = extra?.typeTitle
+    ? `SBTI · 显性自评（${extra.typeTitle}${extra.type ? ` / ${extra.type}` : ""}）`
+    : "SBTI · 显性自评";
+
+  return {
+    source: "sbti",
+    label,
+    values,
+    /* "依据条数"对问卷没有意义，用参与折算的维度数更诚实 */
+    itemCount: keys.length,
+    /* 纯文本，不要写 markdown 记号 —— 这段会原样渲染在卡片上
+       （之前写了 `**本人自报**`，界面上就是一堆星号） */
+    summary:
+      `自评问卷 ${keys.length} 个维度折算而来（${codesFormatted ?? "无等级码"}）。` +
+      `这是本人自报，与其它源的观察数据含义不同 —— 融合时会一并标注来源。`,    titleOnly: false,
+  };
+}
+
+/**
+ * 参与「综合画像」的源。
+ *
+ * ⚠️ SBTI **在列**（产品明确要求：SBTI 的结果也是人格数据，也要参与蒸馏）。
+ * 但它与其它源的性质不同 —— 它是**本人自报**，其它是**观察到的行为**。
+ * 所以融合结果里会带 `selfReportSources`，界面照实标注
+ * "这版画像含自评成分"，不让自评冒充观察结论。
+ */
+export const OBSERVED_SOURCES = [
+  "zhihu",
+  "wechat",
+  "qq",
+  "feishu",
+  "dingtalk",
+  "sbti",
+] as const;
+
+/** 其中属于"本人自报"的源 */
+export const SELF_REPORT_SOURCES: readonly string[] = ["sbti"];
 
 export type ObservedSource = (typeof OBSERVED_SOURCES)[number];
 
@@ -207,6 +349,17 @@ export interface SourceContent {
 }
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
+
+/**
+ * 把画像维度值收进 [0.01, 0.99]。
+ *
+ * 界面上不许出现 0% / 100%（最多 99%、最少 1%），所以在**算出来的那一刻**
+ * 就收边界，而不是让每个展示处各自记得处理 —— 展示路径有雷达、进度条、
+ * 分源卡、匹配度好几条，靠"每处都记得"必然漏。
+ *
+ * 与 `clamp01` 的区别：`clamp01` 是数学上的 0~1，这个再向内收 1%。
+ */
+const clampDisplay = (x: number) => Math.max(0.01, Math.min(0.99, clamp01(x)));
 
 /**
  * 领域词典：命中即认为与该领域相关（与 `scripts/backfill-real-zhihu.mjs`、
@@ -294,20 +447,25 @@ export function facetFromContents(
     ...(looksLikeTitlesOnly
       ? {}
       : {
-          learning: clamp01(avgChars / 600),
-          creation: clamp01(1 - shortRatio),
+          learning: clampDisplay(avgChars / 600),
+          creation: clampDisplay(1 - shortRatio),
           stability: contentConsistency(lens, avgChars),
         }),
-    social: clamp01(avgHeat / 300),
-    autonomy: clamp01(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
+    social: clampDisplay(avgHeat / 300),
+    autonomy: clampDisplay(domains.length ? 1 - (domains.length - 1) / 8 : 0.5),
   };
 
   const top = domains.slice(0, 3);
+  /* 结论里出现的百分比同样要收进 [1,99]（产品要求界面不出现 0% / 100%）。
+     这里 `shortRatio < 0.8` 才走这一支，所以新数据本来就不会到 100%，
+     但**旧数据里存着按老逻辑算出的 "100% 为短内容"** —— 加上收口后，
+     即使将来阈值调整也不会再写出越界文案。 */
+  const shortPct = clampPercent(Math.round(shortRatio * 100)) ?? 50;
   const summary = looksLikeTitlesOnly
     ? `${n} 条内容（只有标题、无正文），平均互动 ${Math.round(avgHeat)}；` +
       `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。` +
       `表达密度与长文比例需要正文，该源无法提供。`
-    : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${(shortRatio * 100).toFixed(0)}% 为短内容）；` +
+    : `${n} 条内容，平均 ${Math.round(avgChars)} 字（${shortPct}% 为短内容）；` +
       `主要涉及${top.length ? top.join("、") : "暂无明确领域"}。`;
 
   return { source, label, values, itemCount: n, summary, titleOnly: looksLikeTitlesOnly };
@@ -324,7 +482,7 @@ function contentConsistency(lens: number[], avgChars: number): number {
   if (lens.length < 2 || avgChars <= 0) return 0.5; // 单条无从谈波动，给中性
   const variance = lens.reduce((s, x) => s + (x - avgChars) ** 2, 0) / lens.length;
   const cv = Math.sqrt(variance) / avgChars;
-  return clamp01(1 - Math.min(cv, 1));
+  return clampDisplay(1 - Math.min(cv, 1));
 }
 
 /**
@@ -336,13 +494,25 @@ function contentConsistency(lens: number[], avgChars: number): number {
  * 与其编一个权重，不如老实用等权平均，并在返回里如实给出 `usedSources`，
  * 让界面能说明"这份结论由哪几个源支撑"。
  *
+ * **自评与观察分开记账**：SBTI 是本人自报，其余源是观察到的行为。
+ * 平均时一视同仁（产品要求 SBTI 参与蒸馏），但会单独回传
+ * `selfReportSources` / `observedSources`，让界面必须把"这版画像里有多少自评成分"
+ * 说出来，不能让自评冒充观察结论。
+ *
  * @returns fused 六维（只含至少一个源提供的维度）；usedSources 参与的源
+ *          selfReportSources 其中的自报源；observedSources 其中的非自报源
+ *          （`profile`「已有六维」这类蒸馏产物也归入非自报 —— 它不是本人自评；
+ *            判断"是不是只有自评"请用 `isObservedSource` 收窄到行为源）
  */
 export function fuseSourceFacets(facets: SourceFacet[]): {
   fused: Partial<Record<ValueKey, number>>;
   usedSources: string[];
+  selfReportSources: string[];
+  observedSources: string[];
 } {
   const usedSources = facets.map((f) => f.source);
+  const selfReportSources = usedSources.filter((s) => SELF_REPORT_SOURCES.includes(s));
+  const observedSources = usedSources.filter((s) => !SELF_REPORT_SOURCES.includes(s));
   const fused: Partial<Record<ValueKey, number>> = {};
 
   for (const key of VALUE_KEYS) {
@@ -354,6 +524,6 @@ export function fuseSourceFacets(facets: SourceFacet[]): {
     }
   }
 
-  return { fused, usedSources };
+  return { fused, usedSources, selfReportSources, observedSources };
 }
 

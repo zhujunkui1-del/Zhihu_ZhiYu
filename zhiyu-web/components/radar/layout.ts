@@ -101,6 +101,15 @@ export interface Layout {
   dots: DecorDot[];
   maxSim: number;
   minSim: number;
+  /**
+   * 这份布局里是否**真的算过**相似度。
+   *
+   * 调用方（`sim` 全为 0）表示"当前用户画像没就绪、算不出相似度"，
+   * 此时环上的 `sim` 标注与节点的 `x%` 都是无意义的 0 ——
+   * 界面应当整块不显示，而不是画满 0%。
+   * （产品要求：界面上不出现 0% / 100% 这类绝对化数值。）
+   */
+  hasSim: boolean;
 }
 
 /** 排名 → 半径。单调递增，保证「排名越前离中心越近」。 */
@@ -178,6 +187,8 @@ export function computeLayout(people: RadarPerson[]): Layout | null {
   const sims = list.map((p) => (typeof p.sim === "number" ? p.sim : 0));
   const maxSim = Math.max(...sims);
   const minSim = Math.min(...sims);
+  /* 全都 <= 0 ⇒ 没算过（0 是哨兵值，不是"0% 像"） */
+  const hasSim = sims.some((s) => s > 0);
 
   /* 按相似度降序：排名越前 → 半径越小 → 越靠近中心的「我」 */
   const ranked = [...list].sort(
@@ -214,6 +225,7 @@ export function computeLayout(people: RadarPerson[]): Layout | null {
     dots: decorDots(maxR),
     maxSim,
     minSim,
+    hasSim,
   };
 }
 

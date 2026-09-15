@@ -31,9 +31,17 @@ export const AXIS_GROUPS: { prefix: string; label: string }[] = [
   { prefix: "So", label: "社交" },
 ];
 
-/** 单维归一化到 0~1 */
+/**
+ * 单维归一化到 **[0.01, 0.99]**（不是 0~1）。
+ *
+ * 为什么留余量：全 L 会算出 0、全 H 会算出 1，界面上就是「0%」和「100%」。
+ * 产品要求不许出现这种绝对化数值（最多 99%、最少 1%）。
+ * 而且从道理上讲，15 道自评题不该得出"100% 自主"这种断言 ——
+ * 留 1% 余量比宣称绝对更诚实。
+ */
 export function normDim(score: number): number {
-  return Math.max(0, Math.min(1, (score - DIM_MIN) / (DIM_MAX - DIM_MIN)));
+  const raw = (score - DIM_MIN) / (DIM_MAX - DIM_MIN);
+  return Math.max(0.01, Math.min(0.99, raw));
 }
 
 /** 前缀匹配要小心：Ac 与 A 都以 A 开头，必须先匹配更长的前缀 */

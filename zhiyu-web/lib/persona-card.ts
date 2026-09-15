@@ -56,6 +56,12 @@ export interface PersonaCardData {
    *   self-report = 本人 SBTI 自评　observed = 公开内容观察推断　none = 无依据
    */
   axesSource: "self-report" | "observed" | "none";
+  /**
+   * 五轴里是否含**自评折算**成分。
+   * SBTI 已参与多源融合（产品要求），所以 observed 也可能掺了自评，
+   * 界面得说清楚，不能笼统地宣称"非本人自评"。
+   */
+  axesIncludesSelfReport: boolean;
   sources: CardSource[];
   traits: {
     interests: string[];

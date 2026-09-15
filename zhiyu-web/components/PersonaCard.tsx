@@ -1,6 +1,7 @@
 "use client";
 
 import PersonaRadar from "@/components/PersonaRadar";
+import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import {
   SOURCE_LABEL,
   SOURCE_SUB,
@@ -79,7 +80,9 @@ export default function PersonaCard({
               .join("　·　") || "暂无公开资料"}
           </p>
           <p className={styles.statLine}>
-            人格完整度 <b>{Math.round(data.completeness)}%</b>
+            {/* 完整度收进 [1,99]：它是四类来源覆盖率的加权推断，
+                0% / 100% 都是绝对结论，而旁边的 "x/6"、"x/4" 已经给足了精确信息 */}
+            人格完整度 <b data-card-completeness="1">{toDisplayPercentText(data.completeness / 100)}</b>
             <span className={styles.dot}>·</span>
             已注入数据源 <b>{data.sources.filter((s) => s.injected).length}/6</b>
             <span className={styles.dot}>·</span>
@@ -108,12 +111,16 @@ export default function PersonaCard({
       <p className={styles.eyebrow}>
         综合画像 · 融合特征
         {data.axesSource === "observed" ? (
+          /* SBTI 已参与融合（产品要求），所以这里要区分"纯观察"与"掺了自评"。
+             笼统写"非本人自评"在掺了自评之后就是假话。 */
           <span className={styles.sourceNote} data-axes-source="observed">
-            由公开内容观察推断（非本人自评）
+            {data.axesIncludesSelfReport
+              ? "由公开内容观察推断（含 SBTI 自评折算）"
+              : "由公开内容观察推断（非本人自评）"}
           </span>
         ) : data.axesSource === "self-report" ? (
           <span className={styles.sourceNote} data-axes-source="self-report">
-            来自本人 SBTI 自评
+            来自本人 SBTI 自评（暂无观察数据）
           </span>
         ) : null}
       </p>
@@ -124,7 +131,9 @@ export default function PersonaCard({
             <div className={styles.typeBadge}>
               <span className={styles.typeName}>{data.sbti.typeTitle ?? data.sbti.type}</span>
               {typeof data.sbti.similarity === "number" && data.sbti.similarity > 0 ? (
-                <span className="meta">匹配度 {Math.round(data.sbti.similarity)}%</span>
+                <span className="meta">
+                  匹配度 {toDisplayPercentText(data.sbti.similarity)}
+                </span>
               ) : null}
             </div>
           ) : (
@@ -142,11 +151,11 @@ export default function PersonaCard({
                 <span className="track">
                   <i
                     className="trackFill"
-                    style={{ width: `${Math.round((a.value ?? 0) * 100)}%` }}
+                    style={{ width: `${toDisplayPercent(a.value) ?? 0}%` }}
                   />
                 </span>
                 <span className={`num ${styles.axisVal}`}>
-                  {a.value == null ? "—" : `${Math.round(a.value * 100)}%`}
+                  {toDisplayPercentText(a.value)}
                 </span>
               </div>
             ))}
@@ -176,9 +185,9 @@ export default function PersonaCard({
               <div key={k} className={styles.valueRow}>
                 <span className={styles.valueLabel}>{VALUE_LABEL[k] ?? k}</span>
                 <span className="track">
-                  <i className="trackFill" style={{ width: `${Math.round(v * 100)}%` }} />
+                  <i className="trackFill" style={{ width: `${toDisplayPercent(v) ?? 0}%` }} />
                 </span>
-                <span className={`num ${styles.valueVal}`}>{Math.round(v * 100)}%</span>
+                <span className={`num ${styles.valueVal}`}>{toDisplayPercentText(v)}</span>
               </div>
             ))}
           </div>

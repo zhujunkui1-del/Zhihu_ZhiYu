@@ -11,6 +11,7 @@ import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
 import { PROVINCES } from "@/lib/regions";
 import { matchPersonaType } from "@/lib/persona/fusion";
+import { clampPercent } from "@/lib/score";
 
 /** 发现页需要展示的候选视图 */
 export interface DiscoverCandidate {
@@ -179,7 +180,9 @@ export async function buildDiscover(
       /* 标签取兴趣前 3 项；不够时用 topics 补 */
       tags: [...interests, ...stringArray(p.topics)].slice(0, 4),
       agentOpen: p.agentOpen,
-      sim: r?.overall ?? 0,
+      /* 分值在 scoreAll 里已收进 [1, 99]；`?? 0` 只在"我这边还没法算"时出现，
+         调用方据 `meReady` 决定不显示（0 是哨兵，不是"0% 像"）。 */
+      sim: clampPercent(r?.overall) ?? 0,
       dimensions: r?.dimensions ?? {},
       reasons: r?.reasons ?? [],
     };

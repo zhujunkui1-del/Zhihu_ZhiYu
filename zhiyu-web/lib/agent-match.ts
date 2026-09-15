@@ -10,7 +10,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import { toPercent } from "@/lib/score";
+import { clampPercent, toPercent } from "@/lib/score";
 
 /** Judge 的五个维度（与 lib/agent/dialogue.ts 的 JudgeDimensions 一致） */
 export const JUDGE_DIMENSIONS: { key: string; label: string }[] = [
@@ -86,7 +86,14 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-/** 从 result.dimensions（0~1 小数）整理成 0~100 的展示值 */
+/**
+ * 从 result.dimensions（0~1 小数）整理成 0~100 的展示值。
+ *
+ * 产出即收进 [1, 99]：这些是 Judge Agent 的主观评分，
+ * "某一维 100%"（完全契合）与"0%"（毫无共同点）都是从几轮对话里
+ * 推不出来的绝对结论，产品也明确要求界面上不出现 0% / 100%。
+ * `null` 仍然表示"这一维没有数据"，保持原样，不伪装成 1%。
+ */
 function toDimensions(raw: unknown): DimensionView[] {
   const o = (raw ?? {}) as Record<string, unknown>;
   return JUDGE_DIMENSIONS.map((d) => {
@@ -96,7 +103,7 @@ function toDimensions(raw: unknown): DimensionView[] {
     }
     /* 兼容小数与百分数两种存储 */
     const pct = v <= 1 ? v * 100 : v;
-    return { key: d.key, label: d.label, value: Math.round(pct) };
+    return { key: d.key, label: d.label, value: clampPercent(Math.round(pct)) };
   });
 }
 
@@ -155,7 +162,7 @@ export async function buildReportView(
   const result = (m.report.result ?? {}) as Record<string, unknown>;
   return {
     matchId: m.id,
-    overall: toPercent(m.report.overallScore) ?? 0,
+    overall: clampPercent(toPercent(m.report.overallScore)) ?? 1,
     summary: m.report.summary ?? "",
     dimensions: toDimensions(result.dimensions),
     reasons: Array.isArray(result.reasons)
@@ -232,7 +239,7 @@ export async function buildAgentMatch(personaId: string): Promise<AgentMatchData
     const result = (m.report.result ?? {}) as Record<string, unknown>;
     reports.push({
       matchId: m.id,
-      overall: toPercent(m.report.overallScore) ?? 0,
+      overall: clampPercent(toPercent(m.report.overallScore)) ?? 1,
       summary: m.report.summary ?? "",
       dimensions: toDimensions(result.dimensions),
       reasons: Array.isArray(result.reasons)

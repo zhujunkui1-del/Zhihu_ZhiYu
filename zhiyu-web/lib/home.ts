@@ -37,6 +37,14 @@ export interface HomeData {
   previewPool: DiscoverCandidate[];
   notify: NotifyItem[];
   unread: number;
+  /**
+   * 当前用户的画像是否已就绪（决定"相似度"能不能显示）。
+   *
+   * 没就绪时所有候选的 `sim` 都是 0 —— 那是"**没算过**"，
+   * 不是"跟你 0% 像"。产品要求界面上不出现 0%，所以这种情况
+   * 干脆不显示相似度，而不是把它渲染成"0%"或硬凑成"1%"。
+   */
+  meReady: boolean;
 }
 
 /** 从通知 payload 里提炼一句可读文案 */
@@ -148,5 +156,6 @@ export async function buildHome(personaId: string, userId: string): Promise<Home
     previewPool: pool,
     notify: notify.slice(0, 4),
     unread: notify.filter((n) => !n.read).length,
+    meReady: discover.meReady,
   };
 }

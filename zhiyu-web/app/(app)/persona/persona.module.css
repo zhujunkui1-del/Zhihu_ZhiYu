@@ -204,6 +204,33 @@
   color: var(--accent-deep);
 }
 
+/* 「只有自评」时的说明条。
+   SBTI 参与融合后，一个人可能只做过自评 —— 这时综合画像其实是自评折算，
+   必须明说，否则又变成"把 SBTI 当成观察结论"（正是之前被指出的概念错误）。 */
+.selfOnlyNote {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 5px;
+  background: rgba(226, 102, 79, 0.08);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.selfOnlyNote b {
+  color: var(--accent-deep);
+}
+/* 掺了自评但不是只有自评：一句话提醒即可，不要抢视觉 */
+.selfMixNote {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.selfMixNote b {
+  color: var(--fg);
+}
+
 .axisList {
   display: grid;
   gap: 9px;
