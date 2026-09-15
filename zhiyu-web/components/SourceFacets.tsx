@@ -190,10 +190,7 @@ export default function SourceFacets({
                 </p>
               ) : null}
 
-              {/* 一个能解释的都没有时，才说这一句（不解释"我们做不到什么"） */}
-              {!behaviorRows.length && !dims.length && !b?.facts.length ? (
-                <p className={styles.noDim}>这个源还不足以推断维度。</p>
-              ) : null}
+              
 
               {top.length ? (
                 <p className={styles.topics}>
