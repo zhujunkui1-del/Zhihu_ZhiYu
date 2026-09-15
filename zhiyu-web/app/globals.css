@@ -69,6 +69,22 @@
   --gap-md: 20px;
   --gap-lg: 28px;
   --gap-xl: 40px;
+
+  /* 纸纹背景（body 与各卡片共用）。
+     原 PNG 是 1024×1024 / 1.27 MB —— 一次冷访问里它占了登录页传输量的 61%，
+     手机端「加载太慢」很大一块就是它。同分辨率的 WebP 只有 88 KB（1/15），
+     纸纹这种高频细节在 q=85 下看不出差别。
+     写法：先给 PNG 兜底，再用 image-set 按类型选 WebP。
+     不认识 image-set(type()) 的浏览器会整条忽略，自然回落到 PNG，不会白屏。 */
+  --paper-texture: url("/assets/textures/paper.png");
+  --paper-texture: -webkit-image-set(
+    url("/assets/textures/paper.webp") type("image/webp"),
+    url("/assets/textures/paper.png") type("image/png")
+  );
+  --paper-texture: image-set(
+    url("/assets/textures/paper.webp") type("image/webp"),
+    url("/assets/textures/paper.png") type("image/png")
+  );
 }
 
 /* ── ② 基础重置与纸感底 ─────────────────────────────────────────────────── */
@@ -86,7 +102,7 @@ html {
 body {
   margin: 0;
   background-color: var(--bg);
-  background-image: url("/assets/textures/paper.png");
+  background-image: var(--paper-texture);
   background-size: 620px 620px;
   background-attachment: fixed;
   color: var(--fg);
@@ -573,7 +589,7 @@ textarea:focus-visible {
   border: 2px solid var(--line);
   border-radius: var(--r-hand-lg);
   background-color: #fff9eb;
-  background-image: url("/assets/textures/paper.png");
+  background-image: var(--paper-texture);
   background-size: 620px 620px;
   box-shadow: var(--shadow-lg);
   padding: 26px;

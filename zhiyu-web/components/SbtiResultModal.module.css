@@ -25,7 +25,7 @@
   border: 2px solid var(--line);
   border-radius: var(--r-hand-lg);
   background-color: #fff9eb;
-  background-image: url("/assets/textures/paper.png");
+  background-image: var(--paper-texture);
   background-size: 620px 620px;
   box-shadow: var(--shadow-lg);
   padding: 26px;

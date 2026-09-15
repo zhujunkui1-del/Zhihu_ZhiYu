@@ -194,7 +194,7 @@
 .authCard {
   position: relative;
   background-color: rgba(255, 251, 239, 0.9);
-  background-image: url("/assets/textures/paper.png");
+  background-image: var(--paper-texture);
   background-size: 620px 620px;
   border: 1.8px solid var(--line);
   border-radius: var(--r-hand-lg);
@@ -613,7 +613,7 @@
 /* ── 收尾 CTA ───────────────────────────────────────────────────────────── */
 .ctaShell {
   background-color: rgba(255, 251, 239, 0.9);
-  background-image: url("/assets/textures/paper.png");
+  background-image: var(--paper-texture);
   background-size: 620px 620px;
   border: 1.8px solid var(--line);
   border-radius: var(--r-hand-lg);

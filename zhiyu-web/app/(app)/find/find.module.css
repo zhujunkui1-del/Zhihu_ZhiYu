@@ -395,7 +395,7 @@
     /* 细网格：给拖拽一个参照物，否则平移时看不出画布在动 */
     linear-gradient(rgba(83, 42, 23, 0.055) 1px, transparent 1px),
     linear-gradient(90deg, rgba(83, 42, 23, 0.055) 1px, transparent 1px),
-    url("/assets/textures/paper.png");
+    var(--paper-texture);
   background-size:
     26px 26px,
     26px 26px,
