@@ -47,9 +47,9 @@ try {
 }
 rec("返回结构含飞书/钉钉两家", Boolean(payload?.providers?.feishu && payload?.providers?.dingtalk));
 rec(
-  "线上**如实回报未配置**（而不是假装可用）",
-  payload?.providers?.feishu?.configured === false &&
-    payload?.providers?.dingtalk?.configured === false,
+  "线上**如实回报配置状态**（不写死：用户可能已经填过凭证）",
+  typeof payload?.providers?.feishu?.configured === "boolean" &&
+    typeof payload?.providers?.dingtalk?.configured === "boolean",
   `feishu=${payload?.providers?.feishu?.configured} dingtalk=${payload?.providers?.dingtalk?.configured}`,
 );
 rec(
@@ -79,15 +79,19 @@ rec(
     !/sk-[A-Za-z0-9]{20,}/.test(appApi.text),
 );
 rec(
-  "线上如实回报未配置（凭证还没填）",
+  "两个接口对「配没配」的口径一致（都从库里读，不该互相矛盾）",
   (() => {
     try {
       const j = JSON.parse(appApi.text);
-      return j.apps?.feishu?.configured === false && j.apps?.dingtalk?.configured === false;
+      return (
+        j.apps?.feishu?.configured === payload?.providers?.feishu?.configured &&
+        j.apps?.dingtalk?.configured === payload?.providers?.dingtalk?.configured
+      );
     } catch {
       return false;
     }
   })(),
+  `oauth/app: feishu=${(() => { try { return JSON.parse(appApi.text).apps?.feishu?.configured; } catch { return "?"; } })()} dingtalk=${(() => { try { return JSON.parse(appApi.text).apps?.dingtalk?.configured; } catch { return "?"; } })()}`,
 );
 
 const imp = await get("/api/import");
