@@ -4,5 +4,5 @@ neon环境变量.md
 素材/
 *.txt
 !zhiyu-web/public/*.txt
-RECON/
+/RECON/
 zhiyu-site/

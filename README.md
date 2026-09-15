@@ -225,7 +225,7 @@ npm run dev
 
 ## 验证
 
-不是「写完就算」——每个关键行为都有自动化断言。`zhiyu-web/scripts/` 下有 **90 个脚本**（测试 / 端到端 / 诊断 / 回填），常用这些：
+不是「写完就算」——每个关键行为都有自动化断言。`zhiyu-web/scripts/` 下有 **90 个脚本**（测试 / 端到端 / 诊断 / 回填），`zhiyu-web/scripts/recon/` 下另有 **36 个页面级验证脚本**（真实浏览器点页面、量尺寸、截图，截图统一落到仓库根的 `RECON/`，该目录被 gitignore，只存本地产物）。常用这些：
 
 ```bash
 cd zhiyu-web
@@ -246,6 +246,14 @@ node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/ver
 node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-fusion-ui.mjs       # 人格页
 node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-no-jump-and-sync.mjs # 首页与人格页同源
 node --no-warnings --import ./scripts/ts-resolve.mjs --env-file=.env scripts/verify-login-instant.mjs   # 手机端登录可用性
+
+# 页面级（真实浏览器，需要 dev server 在 3000 端口；截图落 <仓库根>/RECON/）
+node scripts/recon/verify-web-login.mjs      # 登录页 15 项
+node scripts/recon/verify-web-persona.mjs    # 人格页
+node scripts/recon/verify-web-radar.mjs      # 相遇雷达
+node scripts/recon/test-radar-layout.mjs     # 雷达布局纯逻辑 22 项
+node scripts/recon/test-bugfix.mjs           # 历史 bug 回归
+
 node scripts/verify-live-deploy.mjs https://www.zhiyuapp.site                                          # 线上（只读）
 ```
 
@@ -269,6 +277,8 @@ node scripts/verify-live-deploy.mjs https://www.zhiyuapp.site                   
 │   │   └── auth/             会话 / CSRF / 身份
 │   ├── prisma/               schema（16 模型）+ 5 个迁移
 │   └── scripts/              90 个测试 / 端到端 / 诊断 / 回填脚本
+│       └── recon/            36 个页面级验证脚本（截图写到仓库根 RECON/）
+├── RECON/                    本地产物：截图与抓取物（gitignore，不进仓库）
 ├── 产品方案/                 产品与开发规范（唯一事实来源）
 ├── 前端UI/                   静态视觉原型（视觉唯一事实来源）
 └── AGENTS.md                 部署硬约束
