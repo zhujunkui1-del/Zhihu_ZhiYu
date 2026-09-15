@@ -388,8 +388,100 @@ export function behaviorFromItems(
   };
 }
 
-/** 0~1 → 展示百分比（收进 [1,99]，与全站一致） */
+/** 0~1 → 展示百分比（收进 [1,99]，用于进度条宽度） */
 export function behaviorPercent(v: number | undefined): number | null {
   if (typeof v !== "number" || !Number.isFinite(v)) return null;
   return Math.max(1, Math.min(99, Math.round(v * 100)));
+}
+
+/**
+ * 0~1 → 展示文案。
+ *
+ * ⚠️ 贴边时**不要**写 "1%" / "99%" —— 那正是用户骂过的"你不让写 0/100，
+ * 就整 99 和 1"。真实的 0.4% 就写 "<1%"，99.6% 就写 ">99%"：
+ * 既不出现绝对化的 0%/100%，也不假装那 1 个百分点存在。
+ */
+export function behaviorPercentText(v: number | undefined): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+  if (v < 0.005) return "<1%";
+  if (v > 0.995) return ">99%";
+  return `${Math.round(v * 100)}%`;
+}
+
+export interface MergedBehavior {
+  /** 个人属性：跨源等权平均 */
+  personal: Partial<Record<BehaviorKey, number>>;
+  /** 参与合并的源（按个人属性） */
+  sources: string[];
+  /** 每个个人属性的依据，形如 `{"activeDays": "微信 212/759 天、知乎 30/60 天"}` */
+  evidence: Partial<Record<BehaviorKey, string>>;
+  /** 关系属性：**不合并**，按来源单列（跟谁聊天的主动率不是一回事） */
+  relational: { source: string; key: BehaviorKey; value: number; evidence?: string }[];
+  /** 样本量最大的那个关系源（雷达取它作为"主动/回应"两条轴） */
+  primaryRelational: string | null;
+  facts: { source: string; label: string; display: string }[];
+  coverage: { items: number; days: number; spanDays: number; range: string | null };
+}
+
+/**
+ * 把多个源的行为解析结果合并成"这个人"的画像。
+ *
+ * 规则只有一条，但很关键：**个人属性合并、关系属性不合并**。
+ *   · 作息、表达丰富度、提问倾向、话题集中度 —— 这些是"这个人"的属性，
+ *     微信测出来和知乎测出来应该一致，取等权平均更稳
+ *   · 主动发起率、回应速度 —— 这些是"这段关系"的属性。
+ *     把"跟 A 聊天的主动率"和"跟 B 聊天的主动率"平均成一个数，
+ *     等于编了一个不存在的指标，所以按来源分开列。
+ */
+export function mergeBehavior(facets: BehaviorFacet[]): MergedBehavior {
+  const personal: Partial<Record<BehaviorKey, number>> = {};
+  const evidence: Partial<Record<BehaviorKey, string>> = {};
+  const sources: string[] = [];
+  const relational: MergedBehavior["relational"] = [];
+  const facts: MergedBehavior["facts"] = [];
+  const coverage = { items: 0, days: 0, spanDays: 0, range: null as string | null };
+
+  for (const f of facets) {
+    sources.push(f.source);
+    coverage.items += f.coverage.items;
+    coverage.days = Math.max(coverage.days, f.coverage.days);
+    coverage.spanDays = Math.max(coverage.spanDays, f.coverage.spanDays);
+    for (const x of f.facts) {
+      if (x.key === "balance" || x.key === "depth") {
+        facts.push({ source: f.source, label: x.label, display: x.display });
+      }
+    }
+  }
+
+  for (const key of PERSONAL_KEYS) {
+    const parts = facets
+      .map((f) => ({ source: f.source, v: f.variables[key] }))
+      .filter((x): x is { source: string; v: number } => typeof x.v === "number");
+    if (!parts.length) continue;
+    personal[key] = clamp01(parts.reduce((s, x) => s + x.v, 0) / parts.length);
+    evidence[key] = parts.map((x) => `${x.source} ${facetEvidence(facets, x.source, key)}`).join("；");
+  }
+
+  for (const f of facets) {
+    for (const key of RELATIONAL_KEYS) {
+      const v = f.variables[key];
+      if (typeof v === "number") {
+        relational.push({ source: f.source, key, value: v, evidence: f.evidence[key] });
+      }
+    }
+  }
+
+  /* 主关系源：按内容量最大的那个（它最能代表"这个人平时怎么聊"） */
+  const sorted = [...facets].sort((a, b) => b.coverage.items - a.coverage.items);
+  const primaryRelational =
+    sorted.find((f) => RELATIONAL_KEYS.some((k) => typeof f.variables[k] === "number"))?.source ??
+    null;
+
+  return { personal, sources, evidence, relational, primaryRelational, facts, coverage };
+}
+
+/** 取某个源某个变量的依据文案（用于合并后的 evidence） */
+function facetEvidence(facets: BehaviorFacet[], source: string, key: BehaviorKey): string {
+  const f = facets.find((x) => x.source === source);
+  return f?.evidence[key] ?? "—";
 }

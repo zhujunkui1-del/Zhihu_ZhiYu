@@ -25,6 +25,7 @@
 
 import { prisma } from "@/lib/db";
 import { personalities } from "@/lib/sbti/scoring";
+import { mergeBehavior, type BehaviorFacet, type MergedBehavior } from "./behavior";
 import {
   facetFromContents,
   facetFromSbti,
@@ -142,6 +143,16 @@ export interface PersonaFacets {
   warnings: FacetWarning[];
   /** 因零区分度被排除在平均之外的源 */
   skippedSources: string[];
+  /**
+   * 可数行为变量：按源列出 + 合并结果。
+   *
+   * 这是"性格"这一侧的**新坐标系** —— 价值观六维在观察数据上量不出东西
+   * （实测 ③ 之后 fused 直接为空），行为变量才是可数、可复现、能解释的。
+   */
+  behavior: {
+    bySource: BehaviorFacet[];
+    merged: MergedBehavior | null;
+  };
 }
 
 /** PersonaFeature 里存"分源解析结果"用的 key 前缀 */
@@ -183,6 +194,42 @@ export async function loadSourceFacets(personaId: string): Promise<SourceFacet[]
   return out.sort((a, b) => a.source.localeCompare(b.source));
 }
 
+/* ── 可数行为变量（behavior:*) ──────────────────────────────────────────── */
+
+/** PersonaFeature 里存"行为解析结果"用的 key 前缀 */
+const BEHAVIOR_KEY_PREFIX = "behavior:";
+
+/**
+ * 持久化某个源的可数行为变量。
+ *
+ * 写入时算、存下来，理由与 facet 相同：时间戳与方向在**导入的那一刻**才有，
+ * 之后从库里读回来的证据只有文本（`note`），算不出主动发起率与回应速度。
+ */
+export async function persistBehaviorFacet(
+  personaId: string,
+  facet: BehaviorFacet,
+): Promise<void> {
+  const key = `${BEHAVIOR_KEY_PREFIX}${facet.source}`;
+  await prisma.personaFeature.upsert({
+    where: { personaId_key: { personaId, key } },
+    update: { value: facet as never },
+    create: { personaId, key, value: facet as never },
+  });
+}
+
+/** 读回已持久化的行为变量（不含合并结果） */
+export async function loadBehaviorFacets(personaId: string): Promise<BehaviorFacet[]> {
+  const rows = await prisma.personaFeature.findMany({
+    where: { personaId, key: { startsWith: BEHAVIOR_KEY_PREFIX } },
+  });
+  const out: BehaviorFacet[] = [];
+  for (const r of rows) {
+    const v = r.value as unknown as BehaviorFacet | null;
+    if (v && typeof v === "object" && typeof v.source === "string" && v.variables) out.push(v);
+  }
+  return out.sort((a, b) => a.source.localeCompare(b.source));
+}
+
 /**
  * 读取一个人格的分源解析 + 综合画像。
  *
@@ -203,6 +250,8 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
    * **绝不拿被裁过的 note 硬算** —— 那只会产出假特征。
    */
   const loaded = await loadSourceFacets(personaId);
+  /* 行为变量单独一份（老数据没有这一份 → 空数组，界面据此留空而不是编数） */
+  const behaviorFacets = await loadBehaviorFacets(personaId);
   /* SBTI 的 facet 一律**现算**：`personality.sbti` 是唯一事实来源，
      重测后会变；从库里读旧 facet 会拿到过期结论，故丢弃重算。 */
   const sources: SourceFacet[] = loaded.filter((f) => f.source !== "sbti");
@@ -296,6 +345,10 @@ export async function buildPersonaFacets(personaId: string): Promise<PersonaFace
     /** 体检结论（零区分度自评 / 跨源同值），界面据此解释"为什么少了一块" */
     warnings,
     skippedSources,
+    behavior: {
+      bySource: behaviorFacets,
+      merged: behaviorFacets.length ? mergeBehavior(behaviorFacets) : null,
+    },
   };
 }
 

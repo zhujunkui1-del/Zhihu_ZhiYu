@@ -10,13 +10,15 @@ import {
   isImportSource,
   parseImportFile,
   topEvidence,
+  type BehaviorEntry,
   type ImportItem,
   type ImportSource,
   type SessionInfo,
 } from "@/lib/import/parse";
-import { facetFromContents, interestsFromTexts } from "@/lib/persona/fusion";
+import { facetFromContents, interestCountsFromTexts, interestsFromTexts } from "@/lib/persona/fusion";
 import { facetOptionsFor } from "@/lib/persona/facet-opts";
-import { persistSourceFacet } from "@/lib/persona/source-facets";
+import { persistBehaviorFacet, persistSourceFacet } from "@/lib/persona/source-facets";
+import { behaviorFromItems } from "@/lib/persona/behavior";
 
 export const dynamic = "force-dynamic";
 /** 解析大文件可能超过默认 10s（Vercel Hobby 上限 60s） */
@@ -194,6 +196,8 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
   /* ── 解码 + 逐个解析，再合成一份 ── */
   const multi = files.length > 1;
   const items: ImportItem[] = [];
+  /** 行为分析口径：含双方、带时间与方向（与 items 不同口径，见 parse.ts 说明） */
+  const behaviorEntries: BehaviorEntry[] = [];
   const warnings: string[] = [];
   const fileReports: ImportFileReport[] = [];
   const speakerSet = new Map<string, number>();
@@ -221,6 +225,8 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
     rawTotal += parsed.rawCount;
     if (parsed.items.length === 0) emptyFiles += 1;
     items.push(...parsed.items);
+    /* 行为口径：含双方、带时间与方向（多文件时合并成一条时间线） */
+    behaviorEntries.push(...parsed.behaviorEntries);
 
     fileReports.push({
       name,
@@ -361,6 +367,10 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
             value: it.heat ?? null,
             note: it.text.slice(0, 2000),
             url: it.url ?? null,
+            /* 行为变量（主动发起率/回应速度/活跃天/深夜）要用时间戳，
+               解析时手上有，之后就没了 —— 所以在这里落库。 */
+            occurredAt:
+              typeof it.occurredAt === "number" ? new Date(it.occurredAt * 1000) : null,
           })),
         });
       }
@@ -416,6 +426,29 @@ async function handleImport(req: NextRequest): Promise<NextResponse> {
       warnings.push(`分源解析刷新失败（数据已保存）：${(e as Error).message}`);
       console.error("[import] persistSourceFacet 失败", e);
     }
+  }
+
+  /* ── 刷新**可数行为变量**（behavior:*）──
+     用的是**含双方**的那一份（`behaviorEntries`）：主动发起率、回应速度、
+     互动平衡都需要看到对面，而 `items` 为了蒸馏人格只保留了我发的内容。
+     行为量在导入这一刻才算得准（时间戳与方向都在手上），所以写在这里。 */
+  try {
+    const entryList = behaviorEntries.filter((e) => e.text.trim().length > 0);
+    const behavior = behaviorFromItems(source, entryList, {
+      domainCounts: interestCountsFromTexts(entryList.map((e) => e.text)),
+    });
+    if (behavior) {
+      await persistBehaviorFacet(personaId, behavior);
+      if (behavior.unavailable.length && !behavior.coverage.range) {
+        warnings.push(
+          `这份文件里没有可识别的时间信息，因此「主动发起率/回应速度/活跃天/深夜」` +
+            `这类需要时间的指标暂时算不出来（其余指标照常）。`,
+        );
+      }
+    }
+  } catch (e) {
+    warnings.push(`行为变量计算失败（数据已保存）：${(e as Error).message}`);
+    console.error("[import] persistBehaviorFacet 失败", e);
   }
 
   if (mode === "append" && skippedDuplicates > 0) {

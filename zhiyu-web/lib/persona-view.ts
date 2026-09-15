@@ -9,6 +9,23 @@ import { prisma } from "@/lib/db";
 import type { Persona, PersonaSource } from "@prisma/client";
 import { computeCompleteness, type PersonaSourceType } from "@/lib/persona/completeness";
 import { axesFromDimensions, axesFromObservedValues, axesHaveValue, type Axis, type RawDimScore } from "@/lib/sbti/axes";
+import {
+  BEHAVIOR_LABEL,
+  type BehaviorFacet,
+  type BehaviorKey,
+  type MergedBehavior,
+} from "@/lib/persona/behavior";
+
+/** 雷达轴的固定顺序（七条，都由行为变量直接数出来） */
+const RADAR_ORDER: BehaviorKey[] = [
+  "initiative",
+  "replySpeed",
+  "activeDays",
+  "lateNight",
+  "lexical",
+  "inquiry",
+  "topicFocus",
+];
 import { buildPersonaFacets } from "@/lib/persona/source-facets";
 
 /** 六个数据源与展示顺序（首页的「人格数据源」行、我的人格页都用它） */
@@ -145,6 +162,16 @@ export interface PersonaBoard {
   facetWarnings: { code: string; text: string; sources: string[]; keys?: string[] }[];
   /** 因零区分度被排除在综合画像之外的源 */
   skippedSources: string[];
+  /**
+   * 可数行为变量（性格这一侧的新坐标系）。
+   * `bySource` 按源列出，`merged` 是合并后的（个人属性平均、关系属性单列）。
+   */
+  behavior: {
+    bySource: BehaviorFacet[];
+    merged: MergedBehavior | null;
+    /** 雷达画的是不是行为变量（false = 退回旧的价值观口径） */
+    radarIsBehavior: boolean;
+  };
   /** SBTI 自评那一面（与融合结论并列，不混为一谈） */
   selfReport: {
     type: string | null;
@@ -287,7 +314,43 @@ export async function buildPersonaBoard(
   }
 
   const mergedAxes = axesFromObservedValues(mergedValues);
-  const axes = axesHaveValue(mergedAxes) ? mergedAxes : axesFromSbti;
+
+  /**
+   * 雷达改画**可数行为变量**。
+   *
+   * 原来画的是"价值观五轴"，那五轴由文本形态（平均字数/长文比例/点赞数/
+   * 篇幅波动/领域数）折算而来，实测在真实数据上量不出东西（③ 之后 fused 为空）。
+   * 行为变量是直接数出来的：谁先开口、多久回、什么时候聊、用词单调不单调 ——
+   * 每一个都能指着原始数据说清怎么来的，也天然落在中间区间（实测 9%~66%）。
+   *
+   * 两条"关系属性"（主动发起率/回应速度）取**内容量最大的那个源**：
+   * 它们描述的是一段关系，不能跨源平均（见 behavior.ts 的说明）。
+   */
+  const RELATIONAL_AXES = new Set(["initiative", "replySpeed"]);
+  const primaryRelational = facets?.behavior?.merged?.primaryRelational ?? null;
+  const behaviorAxes: Axis[] = RADAR_ORDER.map((k) => {
+    const fromRelational = RELATIONAL_AXES.has(k)
+      ? facets?.behavior?.bySource.find((f) => f.source === primaryRelational)?.variables[k]
+      : undefined;
+    const v =
+      typeof fromRelational === "number"
+        ? fromRelational
+        : facets?.behavior?.merged?.personal[k as keyof typeof facets.behavior.merged.personal];
+    return {
+      key: k,
+      label: BEHAVIOR_LABEL[k],
+      value: typeof v === "number" ? v : null,
+      parts: typeof v === "number" ? [{ key: k, normalized: v }] : [],
+    };
+  });
+  /* 少于 3 个点连不成面（雷达组件的判据），那就退回旧口径，别给一张空图 */
+  const behaviorReady = behaviorAxes.filter((a) => a.value != null).length >= 3;
+
+  const axes = behaviorReady
+    ? behaviorAxes
+    : axesHaveValue(mergedAxes)
+      ? mergedAxes
+      : axesFromSbti;
   /**
    * 五轴的来源必须如实标注。
    * 现在 SBTI 也进融合了，所以"有值"不再等于"来自观察"——
@@ -295,11 +358,13 @@ export async function buildPersonaBoard(
    * 否则用户会以为我们观察到了什么。
    */
   const axesSource: "self-report" | "observed" | "none" = axesHaveValue(axes)
-    ? axesHaveValue(mergedAxes)
-      ? facets?.selfReportOnly
-        ? "self-report"
-        : "observed"
-      : "self-report"
+    ? behaviorReady
+      ? "observed"
+      : axesHaveValue(mergedAxes)
+        ? facets?.selfReportOnly
+          ? "self-report"
+          : "observed"
+        : "self-report"
     : "none";
 
   /* 图上到底有没有自评成分：只要 SBTI 的 facet 参与了融合，就有 */
@@ -330,6 +395,11 @@ export async function buildPersonaBoard(
     facetWarnings: facets?.warnings ?? [],
     /** 因零区分度被排除在综合画像之外的源（展示时标注"未计入综合画像"） */
     skippedSources: facets?.skippedSources ?? [],
+    behavior: {
+      bySource: facets?.behavior?.bySource ?? [],
+      merged: facets?.behavior?.merged ?? null,
+      radarIsBehavior: behaviorReady,
+    },
     sourceFacets: (facets?.sources ?? []).map((f) => ({
       source: f.source,
       label: f.label,

@@ -234,6 +234,12 @@ model PersonaEvidence {
   value     Float?
   note      String?
   url       String?
+  /// 这条内容发生的时间。
+  ///
+  /// 为什么要存：可数行为变量（主动发起率 / 回应速度 / 活跃天占比 / 深夜活跃）
+  /// 全靠时间戳，而原来的证据表只有文本 —— 时间在解析时被丢掉了。
+  /// 老数据这一列是 null，那几项指标会如实留空，重新导入一次即可补上。
+  occurredAt DateTime?
   persona   Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
 }
 

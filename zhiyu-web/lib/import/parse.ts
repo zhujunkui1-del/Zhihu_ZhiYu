@@ -44,8 +44,7 @@ export const IMPORT_SOURCE_LABEL: Record<ImportSource, string> = {
   dingtalk: "钉钉 · 职场沟通",
 };
 
-/** 允许的文件扩展名（与 distilly 的"上传文件"口径一致，去掉它那边的 PDF/图片） */
-export const IMPORT_EXTENSIONS = [".json", ".txt", ".md", ".csv", ".log"] as const;
+/** 允许的文件扩展名（与 distilly 的"上传文件"口径一致，去掉它那边的 PDF/图片） */export const IMPORT_EXTENSIONS = [".json", ".txt", ".md", ".csv", ".log"] as const;
 
 /** 单文件上限。Vercel 单体函数请求体上限 4.5MB，留出 multipart 开销余量 */
 export const IMPORT_MAX_BYTES = 4 * 1024 * 1024;
@@ -60,10 +59,63 @@ export interface ImportItem {
   /** 这条证据属于哪一类（长消息 / 决策类 / 日常 / 文档），直接显示在溯源里 */
   trait: string;
   url?: string | null;
+  /** 这条内容发生的时间（Unix 秒）。拿不到就留空，不编。 */
+  occurredAt?: number;
+}
+
+/** 行为分析用的条目（含双方、带时间与方向） */
+export interface BehaviorEntry {
+  text: string;
+  /** Unix 秒；拿不到就是 undefined */
+  at?: number;
+  /** true = 我发的 */
+  mine?: boolean;
+}
+
+/**
+ * 时间字符串 → Unix 秒。
+ *
+ * 各家导出格式五花八门，只认**能确定日期**的几种：
+ *   纯数字（10 位=秒 / 13 位=毫秒）、`YYYY-MM-DD HH:mm[:ss]`、
+ *   `YYYY/M/D HH:mm[:ss]`、`YYYY年M月D日 HH:mm`。
+ * **只有时刻、没有日期**（如 `10:30`）一律返回 null —— 硬补一个假日期
+ * 比没有更糟：会把两年的记录压到同一天，作息与活跃天数全错。
+ */
+export function parseTimeToUnix(s: string | null | undefined): number | null {
+  const t = String(s ?? "").trim();
+  if (!t) return null;
+  if (/^\d{10}$/.test(t)) return Number(t);
+  if (/^\d{13}$/.test(t)) return Math.floor(Number(t) / 1000);
+
+  const m = t.match(
+    /^(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})日?(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/,
+  );
+  if (!m) return null;
+  const [, y, mo, d, hh, mm, ss] = m;
+  const sec = Math.floor(
+    Date.UTC(
+      Number(y),
+      Number(mo) - 1,
+      Number(d),
+      Number(hh ?? 0) - 8, // 导出时间按北京时间（UTC+8）
+      Number(mm ?? 0),
+      Number(ss ?? 0),
+    ) / 1000,
+  );
+  return Number.isFinite(sec) ? sec : null;
 }
 
 export interface ParseResult {
   items: ImportItem[];
+  /**
+   * 行为分析用的原始条目：**包含双方**，且带时间与方向。
+   *
+   * 为什么要和 `items` 分开：`items` 只保留**我发的**内容（蒸馏人格用，
+   * 混入对方的话会把别人的人格算到你头上）；而"主动发起率""回应速度"
+   * 必须看到双方 —— 只有一条完整时间线才谈得上"谁先开口""多久回"。
+   * 两个口径用途不同，不能互相替代。
+   */
+  behaviorEntries: BehaviorEntry[];
   /** 过滤前读到的原始条数（用来解释"为什么只剩这么点"） */
   rawCount: number;
   /** 文件里出现的发言者（最多列 6 个，帮用户确认昵称填对了没） */
@@ -759,6 +811,7 @@ export function parseImportFile(
       speakers: [],
       format: "空文件",
       warnings: ["文件是空的（或者解码后没有任何字符）。"],
+      behaviorEntries: [],
       selfName,
       session: null,
       mineDetectedBy: "none",
@@ -784,6 +837,7 @@ export function parseImportFile(
           `这不是合法的 JSON（${(e as Error).message}）。` +
             `如果文件其实是纯文本，请把后缀改成 .txt 再导入。`,
         ],
+        behaviorEntries: [],
         selfName,
         session: null,
         mineDetectedBy: "none",
@@ -808,6 +862,7 @@ export function parseImportFile(
             "JSON 里找不到消息数组（支持的键：messages / records / data / msgList / chat.messages）。" +
               "请确认导出的是聊天记录或文档导出文件。",
           ],
+          behaviorEntries: [],
           selfName,
           session,
           mineDetectedBy: "none",
@@ -898,6 +953,7 @@ export function parseImportFile(
             speakers.join("、") || "（没读到发言者）"
           }。请核对昵称后重试；如果这是单人文档（没有发言人），把昵称留空即可。`,
         ],
+        behaviorEntries: [],
         selfName,
         session,
         mineDetectedBy: "none",
@@ -927,6 +983,17 @@ export function parseImportFile(
   const items: ImportItem[] = [];
   let truncated = false;
 
+  /* 行为分析口径：**所有**消息（含对方），带时间与方向。
+     与 items 的区别只有一个 —— 这里不按"是不是我发的"过滤。
+     放在过滤之前算，否则"谁先开口"就永远只有我一个人。 */
+  const behaviorEntries: BehaviorEntry[] = msgs
+    .map((m) => ({
+      text: String(m.content ?? "").trim(),
+      at: parseTimeToUnix(m.time) ?? undefined,
+      mine: m.mine,
+    }))
+    .filter((e) => e.text.length > 0);
+
   for (const m of filtered) {
     const t = m.content.trim();
     if (isNoise(t)) {
@@ -941,6 +1008,7 @@ export function parseImportFile(
       trait: classify(t, source === "feishu" || source === "dingtalk" ? "工作记录" : "日常"),
       url: null,
       ...(m.heat != null ? { heat: m.heat } : {}),
+      ...(parseTimeToUnix(m.time) != null ? { occurredAt: parseTimeToUnix(m.time) as number } : {}),
     });
     if (items.length >= MAX_PARSE_ITEMS) {
       truncated = true;
@@ -972,6 +1040,7 @@ export function parseImportFile(
 
   return {
     items,
+    behaviorEntries,
     rawCount,
     speakers,
     format,

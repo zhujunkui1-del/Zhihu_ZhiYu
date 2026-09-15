@@ -601,8 +601,18 @@ export default function PersonaClient({
                   </>
                 ) : (
                   <p className={styles.hint}>
-                    还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
-                    或完成一次 SBTI 自评，这里会给出融合判定的人格倾向。
+                    {board.behavior?.radarIsBehavior ? (
+                      <>
+                        价值观维度在**观察数据上量不出来**（内容形态反推不出"你多看重成长"），
+                        所以这里不再给一个凑出来的倾向。下面这张图是**数出来的行为特征** ——
+                        谁先开口、多久回、什么时候聊、聊得散不散，每一项都能指着原始数据说清。
+                      </>
+                    ) : (
+                      <>
+                        还没有综合画像。注入任一数据源（知乎 / 微信 / QQ / 飞书 / 钉钉），
+                        或完成一次 SBTI 自评，这里会给出融合判定的人格倾向。
+                      </>
+                    )}
                   </p>
                 )}
 
@@ -663,7 +673,10 @@ export default function PersonaClient({
             <div className={styles.featHead}>
               <h3>分源解析 · 每个数据源各自的结论</h3>
             </div>
-            <SourceFacets facets={board.sourceFacets} />
+            <SourceFacets
+              facets={board.sourceFacets}
+              behavior={board.behavior?.bySource}
+            />
           </div>
         </section>
       ) : null}

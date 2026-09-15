@@ -33,6 +33,7 @@ const {
   replySpeedScore,
   topicFocusScore,
   behaviorPercent,
+  behaviorPercentText,
   BEHAVIOR_KEYS,
   PERSONAL_KEYS,
   RELATIONAL_KEYS,
@@ -107,6 +108,20 @@ console.log("\n== ① 三个纯函数的边界 ==");
 
   rec("behaviorPercent：收进 [1,99]", behaviorPercent(0) === 1 && behaviorPercent(1) === 99);
   rec("behaviorPercent：缺失 → null", behaviorPercent(undefined) === null);
+  rec(
+    "behaviorPercentText：贴边写「<1%」「>99%」，不假装那一格存在",
+    behaviorPercentText(0.002) === "<1%" &&
+      behaviorPercentText(0) === "<1%" &&
+      behaviorPercentText(0.998) === ">99%" &&
+      behaviorPercentText(1) === ">99%",
+    [0.002, 0, 0.998, 1].map((x) => behaviorPercentText(x)).join(" "),
+  );
+  rec(
+    "behaviorPercentText：中间值照常",
+    behaviorPercentText(0.435) === "44%" && behaviorPercentText(0.09) === "9%",
+    [0.435, 0.09].map((x) => behaviorPercentText(x)).join(" "),
+  );
+  rec("behaviorPercentText：缺失 → 「—」", behaviorPercentText(undefined) === "—");
   rec("个人属性 + 关系属性 = 全部变量", PERSONAL_KEYS.length + RELATIONAL_KEYS.length === BEHAVIOR_KEYS.length);
 }
 

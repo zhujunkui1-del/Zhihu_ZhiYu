@@ -1,6 +1,7 @@
 "use client";
 
 import { VALUE_LABEL, VALUE_KEYS } from "@/lib/persona/fusion";
+import { BEHAVIOR_LABEL, behaviorPercent, behaviorPercentText, type BehaviorFacet } from "@/lib/persona/behavior";
 import { toDisplayPercent, toDisplayPercentText } from "@/lib/score";
 import styles from "./SourceFacets.module.css";
 
@@ -62,9 +63,12 @@ export default function SourceFacets({
   facets,
   /** 每个源解析出的兴趣方向（可选） */
   interests,
+  /** 每个源的**可数行为变量**（有它就用它画条，比价值观六维实在得多） */
+  behavior,
 }: {
   facets: FacetView[];
   interests?: Record<string, string[]>;
+  behavior?: BehaviorFacet[];
 }) {
   if (facets.length === 0) {
     return (
@@ -95,6 +99,22 @@ export default function SourceFacets({
           const name = SOURCE_NAME[f.source] ?? f.label;
           const dims = VALUE_KEYS.filter((k) => typeof f.values[k] === "number");
           const top = (interests?.[f.source] ?? []).slice(0, 4);
+          /**
+           * 优先画**行为变量**（这个源里数出来的：主动发起率/回应速度/活跃天…），
+           * 没有再退回价值观六维。SBTI 没有行为数据，所以它照旧画六维自评。
+           */
+          const b = behavior?.find((x) => x.source === f.source);
+          const behaviorRows = b
+            ? (Object.keys(BEHAVIOR_LABEL) as (keyof typeof BEHAVIOR_LABEL)[])
+                .filter((k) => typeof b.variables[k] === "number")
+                .map((k) => ({
+                  key: k as string,
+                  label: BEHAVIOR_LABEL[k],
+                  pct: behaviorPercent(b.variables[k]) ?? 0,
+                  text: behaviorPercentText(b.variables[k]),
+                  how: b.evidence[k] ?? "",
+                }))
+            : [];
 
           return (
             <article key={f.source} className={styles.card} data-facet-source={f.source}>
@@ -125,8 +145,22 @@ export default function SourceFacets({
 
               <p className={styles.summary}>{f.summary}</p>
 
-              {/* 该源的六维（只画算得出来的那些，缺的不编） */}
-              {dims.length ? (
+              {/* 优先画**行为变量**（这个源里直接数出来的），没有才退回价值观六维。
+                  六维靠文本形态反推，实测在真实数据上常常一根都算不出来；
+                  行为变量是数出来的，几乎每个源都能给出几条。 */}
+              {behaviorRows.length ? (
+                <div className={styles.dims} data-facet-behavior="1">
+                  {behaviorRows.map((r) => (
+                    <div key={r.key} className={styles.dimRow}>
+                      <span className={styles.dimLabel}>{r.label}</span>
+                      <span className="track">
+                        <i className="trackFill" style={{ width: `${r.pct}%` }} />
+                      </span>
+                      <span className={`num ${styles.dimVal}`}>{r.text}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : dims.length ? (
                 <div className={styles.dims}>
                   {dims.map((k) => (
                     <div key={k} className={styles.dimRow}>
@@ -143,9 +177,23 @@ export default function SourceFacets({
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : null}
+
+              {/* 事实行：不转百分比，直接给数字（转了就贴边，实测"互动平衡"是 94%） */}
+              {b?.facts.length ? (
+                <p className={styles.topics}>
+                  {b.facts.map((x) => (
+                    <span key={x.key} className={styles.topic}>
+                      {x.label} {x.display}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+
+              {/* 一个能解释的都没有时，才说这一句（不解释"我们做不到什么"） */}
+              {!behaviorRows.length && !dims.length && !b?.facts.length ? (
                 <p className={styles.noDim}>这个源还不足以推断维度。</p>
-              )}
+              ) : null}
 
               {top.length ? (
                 <p className={styles.topics}>
