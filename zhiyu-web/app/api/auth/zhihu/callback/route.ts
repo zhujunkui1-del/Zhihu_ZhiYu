@@ -21,6 +21,15 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
+ * 回调一律不允许缓存。
+ *
+ * 这里的响应会带 `Set-Cookie`（会话）或 `?oauth=<原因>`，
+ * 任何一个被中间层缓存下来都是事故：前者可能把别人的会话发给下一个人，
+ * 后者会让用户反复看到同一条失败提示却查不出所以然。
+ */
+const NO_STORE = { "Cache-Control": "no-store" } as const;
+
+/**
  * 知乎授权回调。
  *
  * 流程：校验并原子消费 state → 用 authorization_code 换 token →
@@ -39,7 +48,7 @@ export async function GET(req: NextRequest) {
       /* 开发环境带上细节便于排查；生产不带，避免泄密 */
       back.searchParams.set("detail", detail.slice(0, 160));
     }
-    return NextResponse.redirect(back);
+    return NextResponse.redirect(back, { headers: NO_STORE });
   };
 
   const cfg = readConfigFromEnv();
@@ -79,7 +88,9 @@ export async function GET(req: NextRequest) {
     });
     if (replay.kind === "replay") {
       console.warn("[zhihu-oauth] 检测到重复回调，复用上一次会话（幂等重放）");
-      const res = NextResponse.redirect(new URL(check.returnTo ?? "/home", origin));
+      const res = NextResponse.redirect(new URL(check.returnTo ?? "/home", origin), {
+        headers: NO_STORE,
+      });
       res.cookies.set(sessionCookieOptions(replay.sessionToken));
       return res;
     }
@@ -173,7 +184,7 @@ export async function GET(req: NextRequest) {
   if (check.ok && returnedState) await saveStateResult(returnedState, sessionToken);
 
   const dest = new URL(check.ok ? (check.returnTo ?? "/home") : "/home", origin);
-  const res = NextResponse.redirect(dest);
+  const res = NextResponse.redirect(dest, { headers: NO_STORE });
   res.cookies.set(sessionCookieOptions(sessionToken));
   return res;
 }

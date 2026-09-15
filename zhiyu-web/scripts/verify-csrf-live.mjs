@@ -171,6 +171,21 @@ rec(
   `status=${getNoOrigin.status}`,
 );
 
+/* ── ④b 授权入口/回调一律不可缓存 ───────────────────────────────────── */
+console.log("\n== ④b 授权链路不可被缓存 ==");
+const authEntry = await fetch(`${BASE}/api/auth/zhihu?returnTo=%2Fhome`, { redirect: "manual" });
+rec(
+  "授权入口 307 带 no-store（否则可能把旧 state 再发一次）",
+  authEntry.headers.get("cache-control") === "no-store",
+  `cache-control=${authEntry.headers.get("cache-control")}`,
+);
+const authCb = await fetch(`${BASE}/api/auth/zhihu/callback`, { redirect: "manual" });
+rec(
+  "回调 307 带 no-store（响应会带 Set-Cookie / 失败原因，不能被中间层留下）",
+  authCb.headers.get("cache-control") === "no-store",
+  `cache-control=${authCb.headers.get("cache-control")}；location=${String(authCb.headers.get("location")).replace(BASE, "")}`,
+);
+
 /* 浏览器侧诊断收集（放在最前，后面几步都要用） */
 const pageErrs = [];
 const navChain = [];
