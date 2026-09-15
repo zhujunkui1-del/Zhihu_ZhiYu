@@ -372,6 +372,8 @@ export default function PersonaClient({
     usedSources: string[];
     evidenceCount: number;
     llmError?: string;
+    /** 外发前脱敏的命中情况：有命中就必须告诉用户，不能悄悄改他的数据 */
+    privacy?: { hits: { rule: string; count: number }[]; total: number };
     distilled: {
       bio: string;
       interests: string[];
@@ -1053,6 +1055,17 @@ export default function PersonaClient({
                       本次<b>没有调用大模型</b>
                       {distillResult.llmError ? `（${distillResult.llmError}）` : ""}
                       ，只把已有标签做了归并。结果不代表模型对你的判断。
+                    </p>
+                  ) : null}
+
+                  {/* 脱敏如实交代：用户的数据被改过才发出去，这事必须让他知道 */}
+                  {distillResult.privacy && distillResult.privacy.total > 0 ? (
+                    <p className={styles.distillWarn} data-distill-privacy="1">
+                      外发前已脱敏 <b>{distillResult.privacy.total}</b> 处（
+                      {distillResult.privacy.hits
+                        .map((h) => `${h.rule}×${h.count}`)
+                        .join(" ")}
+                      ）—— 只替换了发给模型的文本，你库里的原文没有被改。
                     </p>
                   ) : null}
 

@@ -18,6 +18,7 @@
 
 import { prisma } from "@/lib/db";
 import { chatCompletion, type ChatMessage } from "@/lib/llm/chat";
+import { redactText } from "@/lib/privacy/redact";
 import { encryptionStatus } from "@/lib/crypto-box";
 import {
   facetFromContents,
@@ -64,6 +65,11 @@ export interface DistillResult {
   llmError?: string;
   /** 写入的证据条数 */
   written: number;
+  /**
+   * 外发前的脱敏结果。
+   * `total > 0` 时界面必须如实告诉用户"有 N 处敏感信息被替换后才交给模型"。
+   */
+  privacy: { hits: { rule: string; count: number }[]; total: number };
 }
 
 /** 源类型 → 展示名（与产品文案一致） */
@@ -325,6 +331,27 @@ function distillByRules(evidence: EvidenceItem[], displayName: string): Distille
 }
 
 /**
+ * 对证据包做外发脱敏，并统计命中。
+ *
+ * 返回**新的** items（不改原对象）：原文本还要留在库里给用户自己看，
+ * 就地打码等于把用户的数据弄坏。
+ */
+function redactEvidenceItems(items: EvidenceItem[]): {
+  items: EvidenceItem[];
+  hits: { rule: string; count: number }[];
+  total: number;
+} {
+  const counts = new Map<string, number>();
+  const safe = items.map((it) => {
+    const r = redactText(it.text);
+    for (const h of r.hits) counts.set(h.rule, (counts.get(h.rule) ?? 0) + h.count);
+    return r.total > 0 ? { ...it, text: r.text } : it;
+  });
+  const hits = [...counts].map(([rule, count]) => ({ rule, count }));
+  return { items: safe, hits, total: hits.reduce((s, h) => s + h.count, 0) };
+}
+
+/**
  * 执行蒸馏。
  *
  * @param personaId 目标人格
@@ -339,6 +366,16 @@ export async function distillPersona(
 
   const displayName = persona.displayName;
 
+  /**
+   * 外发前脱敏。
+   *
+   * 证据来自用户导入的**真实私聊/文档**，里面确实出现过手机号、身份证式长数字、
+   * base64 凭据串（实测一份微信私聊里就有）。`chatCompletion` 那层也有一道兜底，
+   * 但这里显式做一次是为了**拿到精确命中条数**并回报给用户 ——
+   * 悄悄改了他的数据再发出去是不诚实的。
+   */
+  const privacy = redactEvidenceItems(items);
+
   /* 证据太少时**直接拒绝**，而不是硬蒸出一个空壳。
      这是产品诚实性的一部分：没有数据就说没有数据。 */
   if (items.length === 0) {
@@ -350,6 +387,7 @@ export async function distillPersona(
       distilled: distillByRules([], displayName),
       llmError: "没有任何证据——请先注入至少一个数据源",
       written: 0,
+      privacy: { hits: [], total: 0 },
     };
   }
 
@@ -369,7 +407,7 @@ export async function distillPersona(
     llmError = "未配置大模型 API Key（平台 AI_API_KEY 或用户 BYOK）";
   } else {
     try {
-      const raw = await chatCompletion(chosen, buildMessages(items, displayName), {
+      const raw = await chatCompletion(chosen, buildMessages(privacy.items, displayName), {
         maxTokens: 1200,
         timeoutMs: 45000,
       });
@@ -462,6 +500,7 @@ export async function distillPersona(
     distilled,
     llmError,
     written,
+    privacy: { hits: privacy.hits, total: privacy.total },
   };
 }
 
