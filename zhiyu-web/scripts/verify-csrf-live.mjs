@@ -241,9 +241,9 @@ rec(
   `path=${errShown.path}`,
 );
 rec(
-  "错误参数已从地址栏清掉（刷新不会重复报错）",
-  !errShown.hasOauthParam,
-  `search 含 oauth= : ${errShown.hasOauthParam}`,
+  "错误原因保留在地址栏 + 页面上（即用户反馈的「看不到为什么失败」）",
+  errShown.hasOauthParam && errShown.mentionsDenied,
+  `search 含 oauth= : ${errShown.hasOauthParam}；页面提到拒绝：${errShown.mentionsDenied}`,
 );
 
 console.log("\n" + "=".repeat(80));

@@ -12,6 +12,10 @@ const STORAGE_KEY = "zhiyu_demo";
  *
  * 为什么要有这张表：以前 oauth 参数被**完全忽略**，
  * 用户授权失败后只看到登录页原样不动，只能猜是不是自己点错了。
+ *
+ * 为什么三个 state_* 要分开写：它们的原因和用户该做的事完全不同。
+ * 以前三条都被合并成「授权状态校验失败，请重新发起登录」，
+ * 结果手机上连续失败时**无法判断到底卡在哪一步**（实测踩过的坑）。
  */
 const OAUTH_ERROR_TEXT: Record<string, string> = {
   unconfigured: "服务端尚未配置知乎开放平台凭证，请稍后再试。",
@@ -19,19 +23,16 @@ const OAUTH_ERROR_TEXT: Record<string, string> = {
   code_missing: "知乎没有回传授权码，请重新发起登录。",
   no_uid: "没有读取到知乎账号标识，请重新授权。",
   exchange_failed: "用授权码换取访问令牌失败，请重新登录。",
-  state_mismatch: "授权状态校验失败（可能被重放），请重新发起登录。",
-  state_expired: "授权等待超时（超过 10 分钟），请重新发起登录。",
-  state_consumed: "这次授权已经用过了，请重新发起登录。",
+  state_mismatch: "这次授权不是本浏览器发起的（或授权链接已失效），请在本页重新点登录。",
+  state_expired: "这次授权等待超过 10 分钟，已自动失效，请重新登录。",
+  state_consumed: "这次授权已经完成过一次了（例如页面被刷新或重复打开），请重新登录。",
 };
 
 /** 把 `state_xxx` 之类的后缀原因转成人话 */
 function oauthErrorText(code: string, detail: string | null): string {
-  const base = OAUTH_ERROR_TEXT[code] ?? `授权未完成（${code}）。`;
-  /* state_ 前缀的原因是上面状态校验的分支，统一给一句可操作的提示 */
-  const stateMsg = code.startsWith("state_")
-    ? "授权状态校验失败，请重新发起登录。"
-    : base;
-  return detail ? `${stateMsg}（${detail}）` : stateMsg;
+  const base = OAUTH_ERROR_TEXT[code] ?? OAUTH_ERROR_TEXT[`state_${code}`];
+  const msg = base ?? `授权未完成（${code}）。`;
+  return detail ? `${msg}（${detail}）` : msg;
 }
 
 /* 认识三步：文案与原型一致 */
@@ -78,21 +79,44 @@ const REPORT = [
 
 const FLOW = ["你", "你的 Agent", "TA 的 Agent", "TA"];
 
+/** `/api/auth/session` 的返回：已登录？知乎 OAuth 配好了吗？ */
+type SessionProbe = { authenticated?: boolean; oauthConfigured?: boolean };
+
+/** 点击登录后最多等多久探测结果，超过就直接走真实授权（见 startLogin） */
+const PROBE_WAIT_MS = 1200;
+
 export default function LoginPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [checking, setChecking] = useState(true);
+  /** 失败原因的原样代码（如 state_expired），显示出来便于截图排查 */
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   /**
    * 本次页面加载**出现过**授权失败吗。
    *
    * 为什么要用 ref 记住：React 19 的 StrictMode 会把 effect 跑两遍
-   * （挂载 → 清理 → 再挂载），而第一遍会用 `replaceState` 把 `?oauth=` 清掉，
-   * 于是第二遍读到的是**干净的 URL**，会走进"已登录 → 跳 /home"的分支，
-   * 把刚设好的报错顶掉，用户永远看不到失败原因（实测症状）。
-   * 用 ref 记住"这次加载报过错"，第二遍就不会再跳转。
+   * （挂载 → 清理 → 再挂载），第二遍会重新读到 URL 并再次 setError，
+   * 同时**必须**避免它顺手把用户送进 /home 把报错顶掉。
+   * 用 ref 记住"这次加载报过错"，后续所有自动跳转都不做。
    */
   const sawAuthError = useRef(false);
+
+  /**
+   * `/api/auth/session` 只探一次，多处复用。
+   *
+   * 为什么：手机端首屏就等着这个请求，而它是一次跨洋 Serverless + 数据库往返。
+   * 以前「按钮可用」和「点下去能不能走」都各自等它一次，网络一慢就又卡又点不动。
+   * 现在挂载时探一次，登录点击复用同一个 Promise（或超时兜底）。
+   */
+  const probeRef = useRef<Promise<SessionProbe> | null>(null);
+  const probeSession = useCallback((): Promise<SessionProbe> => {
+    if (!probeRef.current) {
+      probeRef.current = fetch("/api/auth/session", { cache: "no-store" })
+        .then((r) => r.json() as Promise<SessionProbe>)
+        .catch(() => ({}) as SessionProbe);
+    }
+    return probeRef.current;
+  }, []);
 
   /**
    * 进来先看两件事：① 回调有没有带错误原因 ② 是不是已经登录了。
@@ -118,31 +142,32 @@ export default function LoginPage() {
     if (oauthErr) {
       sawAuthError.current = true;
       setError(oauthErrorText(oauthErr, detail));
-      setChecking(false);
-      /* 把参数清掉，避免用户刷新后又被同一条错误拦住 */
-      window.history.replaceState(null, "", "/");
+      setErrorCode(oauthErr);
+      /* ⚠️ 不要用 replaceState 把 `?oauth=` 从地址栏抹掉。
+         以前抹掉是为了"刷新不再被同一条错误拦住"，代价是失败原因彻底消失：
+         用户来反馈时既看不到原因，服务端日志也没有细节，只能靠猜。
+         现在保留参数（页面上也会显示错误代码），刷新会再次看到同一条提示，
+         点一次登录即可重试。 */
     }
 
     /* ② 已登录：直接进主界面（除非本次加载报过错，见 sawAuthError 说明）。
        手机端"授权后又跳回登录页"的最后一段就是这个：回调已经把会话 Cookie
        种好了，即使中间某一步判定未登录把用户送回 `/`，这里也能立刻把他送回
-       `/home`，而不是停在登录页让人以为没登上。 */
+       `/home`，而不是停在登录页让人以为没登上。
+
+       ⚠️ 这一步**不再影响按钮可用性**：探测慢的时候按钮依然能点（见 startLogin）。 */
     let cancelled = false;
     if (!sawAuthError.current) {
       void (async () => {
         try {
-          const s = (await fetch("/api/auth/session", { cache: "no-store" }).then((r) =>
-            r.json(),
-          )) as { authenticated?: boolean };
+          const s = await probeSession();
           /* 再次确认：等请求回来时若已出现过报错，就不要再跳走 */
           if (!cancelled && !sawAuthError.current && s?.authenticated) {
             router.replace("/home");
-            return;
           }
         } catch {
           /* 查不到就当未登录，正常展示登录卡片 */
         }
-        if (!cancelled) setChecking(false);
       })();
     }
 
@@ -154,7 +179,7 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, probeSession]);
 
   /**
    * 登录。
@@ -165,19 +190,26 @@ export default function LoginPage() {
    *              生产环境则报错提示，**不静默降级**（否则演示数据会被当成真实登录）
    *
    * 之前这里写死调 `/api/auth/demo`，导致即便配好了 OAuth 也永远跳不到知乎授权页。
+   *
+   * ⚠️ 这里**不能无限等**探测结果。手机端这个请求可能要一两秒，
+   *    按钮点下去毫无反应就会被当成"点不动"（用户实际反馈）。
+   *    所以最多等 PROBE_WAIT_MS：超时按"已配置"处理，直接跳真实授权 ——
+   *    万一真没配置，`/api/auth/zhihu` 会自己带 `?oauth=unconfigured` 回来，
+   *    页面上仍然给出明确提示，不会变成死胡同。
    */
   const startLogin = useCallback(async () => {
     setBusy(true);
     setError("");
+    setErrorCode(null);
     try {
-      /* ① 先看服务端配置状态 */
-      let oauthConfigured = false;
-      try {
-        const s = await fetch("/api/auth/session").then((r) => r.json());
-        oauthConfigured = s?.oauthConfigured === true;
-      } catch {
-        /* 查不到就按未配置处理，走下面的兜底 */
-      }
+      /* ① 探测服务端配置状态（复用挂载时那一次请求，超时兜底） */
+      const probe = await Promise.race<SessionProbe>([
+        probeSession(),
+        new Promise<SessionProbe>((resolve) =>
+          setTimeout(() => resolve({ oauthConfigured: true }), PROBE_WAIT_MS),
+        ),
+      ]);
+      const oauthConfigured = probe?.oauthConfigured !== false;
 
       if (oauthConfigured) {
         /* ② 走真实知乎授权（服务端会 302 到 openapi.zhihu.com/authorize） */
@@ -214,7 +246,7 @@ export default function LoginPage() {
       setError((e as Error).message);
       setBusy(false);
     }
-  }, [router]);
+  }, [router, probeSession]);
 
   return (
     <>
@@ -294,7 +326,7 @@ export default function LoginPage() {
                     className={`btn oauthBtn ${styles.oauthBtn}`}
                     type="button"
                     onClick={startLogin}
-                    disabled={busy || checking}
+                    disabled={busy}
                     aria-busy={busy}
                   >
                     {/* 知乎官方 logo 是白色描边，因此只放在知乎蓝实心按钮上 */}
@@ -316,11 +348,16 @@ export default function LoginPage() {
                   {error ? (
                     <p className={styles.terms} role="alert" style={{ color: "var(--danger)" }}>
                       登录失败：{error}
+                      {errorCode ? (
+                        <span className="meta" style={{ display: "block", marginTop: 4 }}>
+                          错误代码：{errorCode}
+                        </span>
+                      ) : null}
                     </p>
                   ) : null}
                 </section>
                 <p className="meta" style={{ textAlign: "center", marginTop: 12 }}>
-                  {checking ? "正在检查登录状态…" : "已接入知乎开放平台 · 授权后可同步你的公开内容"}
+                  已接入知乎开放平台 · 授权后可同步你的公开内容
                 </p>
               </div>
             </Reveal>
@@ -558,7 +595,7 @@ export default function LoginPage() {
                   className={`btn btnPrimary ${styles.ctaBtn}`}
                   type="button"
                   onClick={startLogin}
-                  disabled={busy || checking}
+                  disabled={busy}
                 >
                   {busy ? "正在登录…" : "使用知乎账号登录"}
                 </button>

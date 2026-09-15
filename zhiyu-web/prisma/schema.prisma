@@ -91,6 +91,14 @@ model OAuthState {
   /// 发起时所在的路径，回调后跳回
   returnTo  String?
   consumedAt DateTime?
+  /// 此次授权**成功**后发出的会话 token。
+  ///
+  /// 为什么要存：回调是 GET，手机端极易被请求第二次 —— 用户下拉刷新、
+  /// Safari/微信内置浏览器的预取或预渲染、前进/后退、扫码后重复打开。
+  /// 第一次已经把 state 消费掉、把一次性 code 换成 token 了，
+  /// 第二次再走一遍必然失败，用户看到的就是「授权状态校验失败」。
+  /// 存下结果后第二次可**幂等重放**：把同一张会话 Cookie 再种一遍直接进站。
+  resultSessionToken String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 

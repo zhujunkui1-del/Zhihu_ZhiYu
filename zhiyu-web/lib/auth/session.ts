@@ -150,9 +150,31 @@ export async function issueState(params: {
   return state;
 }
 
+/**
+ * 「幂等重放」窗口：同一个 state 在成功换到会话后多久内允许原样重放。
+ *
+ * 手机端回调被请求第二次是常态（下拉刷新、预取、前进后退、扫码重复打开），
+ * 而授权码是一次性的 —— 第二次必然失败。在这段时间内把第一次的结果
+ * 原样再给一次，用户就不会看到「授权状态校验失败」。
+ */
+export const STATE_REPLAY_MS = 5 * 60 * 1000;
+
+export type StateFailure = {
+  ok: false;
+  reason: "missing" | "mismatch" | "expired" | "consumed";
+  /** 这个 state 在库里是否真实存在（missing 恒为 false） */
+  exists: boolean;
+  /** 发起授权时的目标路径，重放时照旧跳回 */
+  returnTo: string | null;
+  /** 上一次成功换到的会话 token（仅 consumed 且当时成功过才有） */
+  resultSessionToken: string | null;
+  /** 距离上一次消费过去了多久（毫秒），无法判断时为 null */
+  consumedAgoMs: number | null;
+};
+
 export type StateCheck =
   | { ok: true; returnTo: string | null; sessionToken: string | null }
-  | { ok: false; reason: "missing" | "mismatch" | "expired" | "consumed" };
+  | StateFailure;
 
 /**
  * 校验并**原子消费** state。
@@ -163,19 +185,88 @@ export type StateCheck =
  * 并发情况下只有一个请求会真正改到行（updateMany 返回 count）。
  */
 export async function consumeState(returned: string | null | undefined): Promise<StateCheck> {
-  if (!returned) return { ok: false, reason: "missing" };
+  const none = (reason: StateFailure["reason"], exists: boolean, returnTo: string | null): StateFailure => ({
+    ok: false,
+    reason,
+    exists,
+    returnTo,
+    resultSessionToken: null,
+    consumedAgoMs: null,
+  });
+
+  if (!returned) return none("missing", false, null);
 
   /* 先看存在性与有效性，再尝试原子消费 */
   const row = await prisma.oAuthState.findUnique({ where: { state: returned } });
-  if (!row) return { ok: false, reason: "mismatch" };
-  if (row.consumedAt) return { ok: false, reason: "consumed" };
-  if (row.expiresAt.getTime() <= Date.now()) return { ok: false, reason: "expired" };
+  if (!row) return none("mismatch", false, null);
+  const consumed = (): StateFailure => ({
+    ok: false,
+    reason: "consumed",
+    exists: true,
+    returnTo: row.returnTo,
+    resultSessionToken: row.resultSessionToken,
+    consumedAgoMs: row.consumedAt ? Date.now() - row.consumedAt.getTime() : null,
+  });
+  if (row.consumedAt) return consumed();
+  if (row.expiresAt.getTime() <= Date.now()) return none("expired", true, row.returnTo);
 
   const claimed = await prisma.oAuthState.updateMany({
     where: { state: returned, consumedAt: null },
     data: { consumedAt: new Date() },
   });
-  if (claimed.count !== 1) return { ok: false, reason: "consumed" };
+  if (claimed.count !== 1) {
+    /* 并发：另一个请求抢先消费了。重读一次拿它的结果，仍可能救回这次回调 */
+    const again = await prisma.oAuthState.findUnique({ where: { state: returned } });
+    if (!again) return none("consumed", true, row.returnTo);
+    return {
+      ok: false,
+      reason: "consumed",
+      exists: true,
+      returnTo: again.returnTo,
+      resultSessionToken: again.resultSessionToken,
+      consumedAgoMs: again.consumedAt ? Date.now() - again.consumedAt.getTime() : null,
+    };
+  }
 
   return { ok: true, returnTo: row.returnTo, sessionToken: row.sessionToken };
+}
+
+/** 授权成功后把会话 token 记回 state 行，供重复回调幂等重放 */
+export async function saveStateResult(state: string, sessionToken: string): Promise<void> {
+  await prisma.oAuthState
+    .updateMany({ where: { state }, data: { resultSessionToken: sessionToken } })
+    .catch(() => undefined);
+}
+
+export type StateAction =
+  /** 正常往下走：换 code、建会话 */
+  | { kind: "proceed" }
+  /** 这个 state 之前已经成功过一次 → 直接复用那次的会话 */
+  | { kind: "replay"; sessionToken: string }
+  /** 拒绝：回登录页带 state_<reason> */
+  | { kind: "reject"; reason: string };
+
+/**
+ * 拿到 `consumeState` 的结果后该干什么 —— 纯函数，便于单测。
+ *
+ * 规则：
+ *   · 校验通过 → proceed
+ *   · 没带 state（平台不回传的已知兼容路径）→ proceed
+ *   · 已消费、但当时确实成功过、且在重放窗口内 → replay（幂等）
+ *   · 其余不匹配 / 过期 / 重放超窗 → reject
+ */
+export function decideStateAction(
+  check: StateCheck,
+  opts: { now?: number; replayMs?: number; sessionAlive?: boolean } = {},
+): StateAction {
+  if (check.ok) return { kind: "proceed" };
+  if (check.reason === "missing") return { kind: "proceed" };
+  if (check.reason !== "consumed") return { kind: "reject", reason: `state_${check.reason}` };
+
+  const replayMs = opts.replayMs ?? STATE_REPLAY_MS;
+  const fresh = check.consumedAgoMs !== null && check.consumedAgoMs <= replayMs;
+  if (check.resultSessionToken && fresh && opts.sessionAlive !== false) {
+    return { kind: "replay", sessionToken: check.resultSessionToken };
+  }
+  return { kind: "reject", reason: `state_${check.reason}` };
 }

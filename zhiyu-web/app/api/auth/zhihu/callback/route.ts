@@ -11,6 +11,9 @@ import {
 import {
   consumeState,
   createSession,
+  decideStateAction,
+  getSession,
+  saveStateResult,
   sessionCookieOptions,
   destroyUserSessions,
 } from "@/lib/auth/session";
@@ -49,12 +52,43 @@ export async function GET(req: NextRequest) {
   /* ② 校验并原子消费 state */
   const returnedState = params.get("state");
   const check = await consumeState(returnedState);
+
   if (!check.ok) {
+    /* 留下可诊断的痕迹：只记 state 前 8 位 + 原因 + 行是否存在，
+       绝不打完整 state / code / token */
+    console.warn(
+      "[zhihu-oauth] state 校验未通过",
+      JSON.stringify({
+        reason: check.reason,
+        statePrefix: returnedState ? `${returnedState.slice(0, 8)}…` : null,
+        exists: check.exists,
+        consumedAgoMs: check.consumedAgoMs,
+        hasResult: Boolean(check.resultSessionToken),
+      }),
+    );
+  }
+
+  if (!check.ok) {
+    /* 回调是 GET，手机端被请求第二次非常常见（下拉刷新、预取、前进后退）。
+       第一次已经把 state 消费掉、把一次性 code 换成会话了，第二次必然失败。
+       这时把第一次的会话原样再种一遍 —— 对用户就是"刷新了一下"而不是报错。 */
+    const replay = decideStateAction(check, {
+      sessionAlive: check.resultSessionToken
+        ? Boolean(await getSession(check.resultSessionToken))
+        : false,
+    });
+    if (replay.kind === "replay") {
+      console.warn("[zhihu-oauth] 检测到重复回调，复用上一次会话（幂等重放）");
+      const res = NextResponse.redirect(new URL(check.returnTo ?? "/home", origin));
+      res.cookies.set(sessionCookieOptions(replay.sessionToken));
+      return res;
+    }
+
     /* state 没回传是历史已知问题（通用 OAuth 文档记录 2077 实测不返 state）。
        黑客松文档则声明已支持透传。这里采取：
          · 回传了就严格校验（不匹配/过期/重放一律拒绝）
          · 完全没回传时不阻断，但记录 —— 否则在"确实不返 state"的环境下无法登录 */
-    if (check.reason !== "missing") return fail(`state_${check.reason}`);
+    if (replay.kind === "reject") return fail(replay.reason);
     console.warn("[zhihu-oauth] 回调未携带 state，已按兼容路径继续（建议向平台确认）");
   }
 
@@ -133,6 +167,10 @@ export async function GET(req: NextRequest) {
     zhihuToken: accessToken,
     tokenExpiresIn: expiresIn,
   });
+
+  /* ⑦ 把这把会话记回 state 行：重复回调（刷新/预取）时可以原样重放，
+        不会因为一次性 code 已被用掉而把用户挡在「授权状态校验失败」 */
+  if (check.ok && returnedState) await saveStateResult(returnedState, sessionToken);
 
   const dest = new URL(check.ok ? (check.returnTo ?? "/home") : "/home", origin);
   const res = NextResponse.redirect(dest);
