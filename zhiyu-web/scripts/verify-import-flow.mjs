@@ -707,6 +707,14 @@ await prisma.personaSource.updateMany({
 });
 await gotoSources();
 
+/* 等「同步数据」按钮渲染出来。
+   ⚠️ 这个按钮现在**永远渲染**（不再依赖状态接口返回），所以等不到就是真 bug ——
+   先前写成 `if (!status) return null`，接口一抖动按钮就整个消失，这里因此偶发失败。 */
+await waitFor(
+  () => Boolean(document.querySelector('[data-provider-link="dingtalk"] [data-provider-sync]')),
+  15000,
+);
+
 const platCard = await page.evaluate(() => {
   const card = document.querySelector('[data-open-import="dingtalk"]')?.closest("article");
   return {
@@ -791,6 +799,14 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(400);
 await gotoSources();
+
+/* 等「同步数据」按钮渲染出来。
+   ⚠️ 这个按钮现在**永远渲染**（不再依赖状态接口返回），所以等不到就是真 bug ——
+   先前写成 `if (!status) return null`，接口一抖动按钮就整个消失，这里因此偶发失败。 */
+await waitFor(
+  () => Boolean(document.querySelector('[data-provider-link="dingtalk"] [data-provider-sync]')),
+  15000,
+);
 
 /* 未配置凭证时点「同步数据」应弹出三步向导 */
 await clickSel('[data-provider-link="feishu"] [data-provider-sync]');

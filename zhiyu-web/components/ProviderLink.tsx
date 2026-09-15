@@ -57,9 +57,14 @@ export default function ProviderLink({
 
   /* 授权回来时带上结果（callback 会顺手同步），直接展示，省一次点击 */
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).toString();
-    if (!q.includes(`linked=${provider}`)) return;
-    const sp = new URLSearchParams(q);
+    const sp = new URLSearchParams(window.location.search);
+    /* 服务端说"还没配凭证"时**自动打开向导** —— 用户点完「同步数据」
+       不该看到一个需要自己解读的参数 */
+    if (sp.get("link") === `${provider}_unconfigured`) {
+      setWizard(true);
+      return;
+    }
+    if (sp.get("linked") !== provider) return;
     const pulled = sp.get("pulled");
     const failed = sp.get("syncFailed");
     if (pulled) setNote(`已同步 ${pulled} 条`);
@@ -105,7 +110,19 @@ export default function ProviderLink({
   }, [onSynced, provider]);
 
   const onClick = useCallback(() => {
-    if (!status) return;
+    /**
+     * 状态还没拿到（接口慢或失败）时**也让按钮可用**：
+     * 直接交给服务端判断 —— 它要么跳平台授权页，要么带
+     * `link=<provider>_unconfigured` 回来，页面会把向导自动弹出来。
+     *
+     * 为什么这么写：先前 `if (!status) return null` 会让按钮**整个消失**，
+     * 一次接口抖动就等于功能不见了（e2e 因此偶发失败，实测）。
+     * 按钮永远在，判断交给后端。
+     */
+    if (!status) {
+      window.location.href = `/api/oauth/${provider}`;
+      return;
+    }
     /* 没配凭证 → 向导；配了但没授权 → 直接跳授权页；都好了 → 同步 */
     if (!status.configured) {
       setWizard(true);
@@ -118,15 +135,15 @@ export default function ProviderLink({
     void sync();
   }, [status, sync, provider]);
 
-  if (!status) return null;
-
-  const state = !status.configured
-    ? "未配置"
-    : status.linked && !status.linked.expired
-      ? status.linked.displayName
-        ? `已连接 ${status.linked.displayName}`
-        : "已连接"
-      : "未授权";
+  const state = !status
+    ? "检查中…"
+    : !status.configured
+      ? "未配置"
+      : status.linked && !status.linked.expired
+        ? status.linked.displayName
+          ? `已连接 ${status.linked.displayName}`
+          : "已连接"
+        : "未授权";
 
   return (
     <span className={styles.row} data-provider-link={provider}>
