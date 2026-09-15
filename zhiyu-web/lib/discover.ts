@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import type { Persona } from "@prisma/client";
 import { scoreAll, type MatchablePersona, type QuickMatchResult } from "@/lib/matching/quick";
 import { PROVINCES } from "@/lib/regions";
-import { matchPersonaType } from "@/lib/persona/fusion";
+import { matchPersonaType, PERSONA_TYPES } from "@/lib/persona/fusion";
 import { clampPercent } from "@/lib/score";
 
 /** 发现页需要展示的候选视图 */
@@ -70,30 +70,32 @@ function stringArray(v: unknown): string[] {
 /**
  * 取一个人格的**倾向型**（发现页「人格倾向」筛选与卡片上显示的那个）。
  *
- * ⚠️ 优先用**综合画像**（多源融合判定的六型倾向），而不是 SBTI 自评结果。
- * 原因：
- *   · 产品上「人格倾向」是综合画像的一部分，答的是"这个人整体是什么样"
- *   · 真实知乎创作者根本没有 SBTI，若只看 sbti 则他们**永远没有倾向型**，
- *     发现页的「人格倾向」筛选对他们完全筛不出东西（实测就是这样）
- *   · 反过来，做过 SBTI 的人也不该让一份自评问卷盖过所有观察数据
- *
- * 兼容：老的演示数据把倾向型预置在 `personality.type` / `sbti.typeTitle` 里，
- * 所以融合判定不出来时回退到它 —— 这样演示人格的行为不变。
+ * 优先级（④c 调整）：
+ *   ① `personality.type` —— **蒸馏时由 LLM 读懂证据后判定的**，`typeEvidence`
+ *      里带着原话依据。这是现在唯一"有理由"的判型来源。
+ *      演示数据预置的型也在这个字段里，所以行为不变。
+ *   ② 六维欧氏距离（`matchPersonaType`）—— 仅作**历史数据兜底**：
+ *      实测第一名与第二名只差 0.016 个百分点（79.2109% vs 79.1949%），
+ *      把 career 从 0.5 挪到 0.6 就换型。那不是判定，是抛硬币，
+ *      所以不再作为主来源。
+ *   ③ 最后才退回 SBTI 自评的类型名。
  */
 function personaType(values: unknown, personality: unknown): string | null {
-  /* ① 综合画像：由六维（多源融合的产物）判定倾向型 */
+  const p = (personality ?? {}) as Record<string, unknown>;
+  const sbti = p.sbti as { type?: string; typeTitle?: string } | undefined;
+
+  /* ① LLM 判定（或演示数据预置）的倾向型 */
+  const preset = typeof p.type === "string" ? p.type.trim() : "";
+  if (preset && (PERSONA_TYPES as string[]).includes(preset)) return preset;
+
+  /* ② 六维兜底（历史数据） */
   const fusedMatch = matchPersonaType(
     values && typeof values === "object" ? (values as Record<string, unknown>) : null,
   );
   if (fusedMatch) return fusedMatch.type;
 
-  /* ② 回退：演示数据里预置的倾向型 / SBTI 结果 */
-  const p = (personality ?? {}) as Record<string, unknown>;
-  const sbti = p.sbti as { type?: string; typeTitle?: string } | undefined;
-  const preset = p.type;
-  return (
-    (typeof preset === "string" ? preset : null) ?? sbti?.typeTitle ?? sbti?.type ?? null
-  );
+  /* ③ SBTI 自评的类型名 */
+  return sbti?.typeTitle ?? sbti?.type ?? null;
 }
 
 /**

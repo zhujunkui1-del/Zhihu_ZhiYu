@@ -110,9 +110,17 @@ rec(
 /* 与人格页对比，两边应一致 */
 await page.goto(`${BASE}/persona`, { waitUntil: "load", timeout: 60000 });
 await page.waitForTimeout(2800);
-const personaType = await page.evaluate(
-  () => document.querySelector("[data-fused-type]")?.textContent?.trim() ?? "",
-);
+const personaType = await page.evaluate(() => {
+  /* ④c 之后人格页的主结论是「带依据的 LLM 判型」（[data-judged-type]）。
+     判型没出来时才退回旧的六维徽章 —— 两边取到的都应是同一个型名。 */
+  const judged = document.querySelector("[data-judged-type]");
+  if (judged) {
+    const six = ["深度思考型", "好奇探索型", "温和共情型", "理性辩手型", "体验派", "务实执行型"];
+    const t = judged.textContent ?? "";
+    return six.find((x) => t.includes(x)) ?? "";
+  }
+  return document.querySelector("[data-fused-type]")?.textContent?.trim() ?? "";
+});
 rec(
   "首页与人格页显示同一个倾向型",
   homeType !== "" && homeType === personaType,

@@ -133,6 +133,11 @@ export interface PersonaBoard {
     selfReportOnly: boolean;
   } | null;
   /**
+   * 蒸馏时由 LLM 判定的倾向型 + 原话依据（`fused` 为空时的展示来源）。
+   * `type` 一定是六型之一；`evidence` 为空表示模型没给依据 → 界面不要显示型名。
+   */
+  judgedType: { type: string; evidence: string; judgedAt: string | null } | null;
+  /**
    * **分源解析**：每个数据源各自解析出的特征与结论。**含 SBTI**。
    *
    * 产品要求："拿到某个源的数据后就该能解析出这个源里的人是什么样的"，
@@ -257,6 +262,22 @@ export async function buildPersonaBoard(
      所以这里不再排除 sbti —— 但 `selfReportSources` / `selfReportOnly`
      会如实回报自评占比，页面据此标注，不让自评冒充观察结论。 */
   const facets = await buildPersonaFacets(persona.id);
+
+  /**
+   * **LLM 判定的倾向型**（蒸馏时读懂证据后给的结论 + 原话依据）。
+   *
+   * 为什么单独拿出来：六维融合已经量不出价值观（③ 之后 fused 常为空），
+   * 而"人格倾向"这个产品概念还得有 —— 但不能没有理由地给一个。
+   * 所以判定与依据成对出现：有依据才显示型名，没依据就显示"暂不判定"。
+   */
+  const judgedType = (() => {
+    const p = personality as Record<string, unknown>;
+    const t = typeof p.type === "string" ? p.type.trim() : "";
+    const evidence = typeof p.typeEvidence === "string" ? p.typeEvidence.trim() : "";
+    if (!t) return null;
+    return { type: t, evidence, judgedAt: (p.typeJudgedAt as string) ?? null };
+  })();
+
   const fused = facets?.type
     ? {
         type: facets.type.type,
@@ -388,6 +409,11 @@ export async function buildPersonaBoard(
     axesSource,
     axesIncludesSelfReport,
     fused,
+    /**
+     * 蒸馏时判定的倾向型 + 依据。`fused` 为空时界面用它显示"人格倾向"，
+     * 并**必须**把 `evidence` 一起显示出来（没有依据的型名等于编）。
+     */
+    judgedType,
     /**
      * 数据体检结论（零区分度自评 / 跨源同值）。
      * 界面要如实说出来 —— "为什么这一维没有"比"编一个数"重要。

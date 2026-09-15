@@ -59,13 +59,21 @@ await page.waitForTimeout(3000);
 
 const SIX = ["深度思考型", "好奇探索型", "温和共情型", "理性辩手型", "体验派", "务实执行型"];
 const fusedInfo = await page.evaluate(() => {
+  /* ④c 之后，主结论是**带依据的 LLM 判型**（[data-judged-type]）；
+     旧的六维徽章降级成一行参考（[data-fused-legacy]）。
+     两个都读，断言按新政策写。 */
+  const judged = document.querySelector("[data-judged-type]");
+  const legacy = document.querySelector("[data-fused-legacy]");
   const el = document.querySelector("[data-fused-type]");
   const sbtiLine = document.querySelector("[data-sbti-self]");
   const head = [...document.querySelectorAll("h3")].find((h) =>
     h.textContent.includes("综合画像"),
   );
   return {
-    fusedType: el?.textContent?.trim() ?? "",
+    judgedText: (judged?.textContent ?? "").replace(/\s+/g, " ").trim(),
+    hasJudged: Boolean(judged),
+    legacyText: (legacy?.textContent ?? "").replace(/\s+/g, " ").trim(),
+    fusedType: (judged?.textContent ?? el?.textContent ?? "").trim(),
     headText: head?.textContent?.trim() ?? "",
     /* 综合画像块的标题旁应说明"由 X 融合"，而不是 SBTI 等级码 */
     headMeta:
@@ -75,9 +83,19 @@ const fusedInfo = await page.evaluate(() => {
 });
 
 rec(
-  "综合画像判定出了六型倾向之一",
-  SIX.includes(fusedInfo.fusedType),
+  "综合画像给出了六型倾向之一",
+  SIX.some((t) => fusedInfo.fusedType.includes(t)),
   `倾向型 = 「${fusedInfo.fusedType}」`,
+);
+rec(
+  "**判定带了依据**（④c：没有依据的型名等于编）",
+  fusedInfo.hasJudged && /判定依据[:：]/.test(fusedInfo.judgedText),
+  fusedInfo.judgedText.slice(0, 160),
+);
+rec(
+  "旧的六维相似度降级为一行参考，不再冒充结论",
+  /六维相似度（旧口径，仅供参考）/.test(fusedInfo.legacyText),
+  fusedInfo.legacyText.slice(0, 120),
 );
 rec(
   "综合画像标注了融合来源（不再是 SBTI 等级码）",

@@ -23,6 +23,7 @@ import { encryptionStatus } from "@/lib/crypto-box";
 import {
   facetFromContents,
   isObservedSource,
+  PERSONA_TYPES,
 } from "@/lib/persona/fusion";
 import { persistSourceFacet } from "@/lib/persona/source-facets";
 import { facetOptionsFor, isContentFacetSource } from "@/lib/persona/facet-opts";
@@ -50,7 +51,26 @@ export interface DistilledPersona {
   interests: string[];
   topics: string[];
   communicationStyle: string[];
+  /**
+   * 价值观六维。
+   *
+   * ⚠️ **不再作为"综合画像"的来源**（用户已确认的方针：六维只保留在
+   * SBTI 自评那一侧）。这里仍然解析，是为了兼容历史数据与规则兜底
+   * （`NEUTRAL_VALUES`），但**不再写进 `Persona.values`** —— 让 LLM
+   * 拍六个 0~1 的数字正是"数据太假"的来源之一（实测它给出 100%/50% 这种整档值）。
+   */
   values: Record<string, number>;
+  /**
+   * LLM 判定的**人格倾向型**（六型之一；判定不了就是 null = 暂不判定）。
+   *
+   * 为什么改由 LLM 判：原来用"归一化欧氏距离"算六型相似度，
+   * 实测第一名与第二名只差 **0.016 个百分点**（79.2109% vs 79.1949%），
+   * 把 career 从 0.5 挪到 0.6 就直接换型 —— 那不是判定，是抛硬币。
+   * 现在让模型读懂证据后给结论，并**必须带原话依据**（`typeEvidence`）。
+   */
+  type: (typeof PERSONA_TYPES)[number] | null;
+  /** 判定依据（1~2 句，须引用证据原话） */
+  typeEvidence: string;
   /** 一句话画像 */
   summary: string;
   /** 每个结论指向哪些证据（可解释性） */
@@ -113,6 +133,8 @@ export async function collectEvidence(personaId: string): Promise<{
     communicationStyle: string[];
     values: Record<string, number> | null;
     sbti: { type?: string; typeTitle?: string; codes?: string; dimensions?: Record<string, number> } | null;
+    /** personality JSON 列（判型结果与依据就写在里面） */
+    personality: Record<string, unknown> | null;
   } | null;
 }> {
   const persona = await prisma.persona.findUnique({
@@ -227,6 +249,7 @@ export async function collectEvidence(personaId: string): Promise<{
       communicationStyle: comm,
       values: asRec(persona.values),
       sbti: sbti ?? null,
+      personality: (persona.personality ?? null) as Record<string, unknown> | null,
     },
   };
 }
@@ -244,18 +267,22 @@ function buildMessages(evidence: EvidenceItem[], displayName: string): ChatMessa
         "你是人格蒸馏引擎。你的唯一任务：**根据给定的证据**归纳出这个人的结构化人格画像。\n" +
         "铁律：\n" +
         "1. 只能依据证据里出现过的信息，不得凭空补充、不得脑补经历。\n" +
-        "2. 证据不足以判断某维度时，给中性值 0.5，并在 summary 里说明哪一块信息不足。\n" +
+        "2. 证据不足以判断的字段，如实留空或写「证据不足」，**不要给一个凑出来的数字**。\n" +
         "3. 每个结论都要能指回证据编号。\n" +
+        "4. 不做诊断、不做道德评判。\n" +
         "输出**严格 JSON**（不要 markdown 代码块），字段：\n" +
         "{\n" +
         '  "bio": "一句话身份描述（20字内，基于证据）",\n' +
         '  "interests": ["兴趣领域", "…"],        // 3~8 个，须来自证据\n' +
         '  "topics": ["常聊话题", "…"],            // 2~6 个\n' +
         '  "communicationStyle": ["表达习惯", "…"], // 2~6 个\n' +
-        '  "values": {"career":0~1,"social":0~1,"autonomy":0~1,"creation":0~1,"learning":0~1,"stability":0~1},\n' +
+        '  "type": "深度思考型|好奇探索型|温和共情型|理性辩手型|体验派|务实执行型",\n' +
+        '  "typeEvidence": "为什么判成这一型：1~2 句，必须引用证据里的原话",\n' +
         '  "summary": "两三句总述，必须点明信息不足之处",\n' +
         '  "groundedIn": [{"claim":"某个结论","from":[证据编号]}, …]\n' +
-        "}",
+        "}\n" +
+        "⚠️ `type` 只能从上面六个里选一个。**证据不足以判断就填 null**，并在 typeEvidence 里说明缺什么 —— " +
+        "宁可说「暂不判定」，也不要猜一个。",
     },
     {
       role: "user",
@@ -281,6 +308,18 @@ function parseDistilled(raw: string): DistilledPersona {
   const o = JSON.parse(candidate) as Record<string, unknown>;
   const v = (o.values ?? {}) as Record<string, unknown>;
 
+  /**
+   * 倾向型：**只接受六型之一**，其余一律当作"暂不判定"。
+   *
+   * 为什么不让它自由发挥：这个字段会直接显示成"你的人格倾向是 X"，
+   * 还可能被发现页的筛选用到 —— 一个模型自创的型名会污染筛选。
+   * 判定不了就返回 null，界面显示"暂不判定"，不硬选。
+   */
+  const rawType = typeof o.type === "string" ? o.type.trim() : "";
+  const type = (PERSONA_TYPES as string[]).includes(rawType)
+    ? (rawType as (typeof PERSONA_TYPES)[number])
+    : null;
+
   return {
     bio: typeof o.bio === "string" ? o.bio.slice(0, 60) : "",
     interests: strArr(o.interests, 10),
@@ -295,6 +334,10 @@ function parseDistilled(raw: string): DistilledPersona {
       stability: clamp01(v.stability),
     },
     summary: typeof o.summary === "string" ? o.summary.slice(0, 400) : "",
+    /** 判定的倾向型（可为 null = 暂不判定） */
+    type,
+    /** 判定依据：必须带原话，界面上和型名一起显示 */
+    typeEvidence: typeof o.typeEvidence === "string" ? o.typeEvidence.slice(0, 300) : "",
     groundedIn: Array.isArray(o.groundedIn)
       ? o.groundedIn
           .map((x) => {
@@ -330,6 +373,10 @@ function distillByRules(evidence: EvidenceItem[], displayName: string): Distille
     topics: interests.slice(0, 4),
     communicationStyle: [],
     values: { ...NEUTRAL_VALUES },
+    /* 规则兜底**不判型**：它只做统计归并，没有读懂内容的能力，
+       硬选一个型等于编。界面会显示"暂不判定"。 */
+    type: null,
+    typeEvidence: "",
     summary:
       `本次未调用大模型，仅把已有标签做了归并（${evidence.length} 条证据）。` +
       (testItem ? `包含 ${testItem.text}。` : "") +
@@ -446,8 +493,38 @@ export async function distillPersona(
         interests: merged.interests,
         topics: merged.topics,
         communicationStyle: merged.communicationStyle,
-        /* 有 LLM 归纳时才用它的 values；规则兜底是中位值，写进去等于撒谎 */
-        values: method === "llm" ? distilled.values : undefined,
+        /**
+         * ⚠️ **不再写 `values`（LLM 拍的六维）**。
+         *
+         * 用户确认的方针：价值观六维只保留在 SBTI 自评那一侧，不参与综合结论。
+         * 让模型对着证据拍六个 0~1 的数字，实测出来的就是 100%/50% 这种整档值
+         * （"数据太假"）。判型改由 `type` / `typeEvidence` 承担 ——
+         * 那是**读懂内容后的结论 + 原话依据**，而不是六个凭空的小数。
+         * 历史数据里的旧 values 保留不动（界面仍可显示，但会被标注为旧口径）。
+         */
+        values: undefined,
+        /* 判型与依据：写进 personality（JSON 列），discover 页优先读它 */
+        ...(method === "llm"
+          ? {
+              personality: {
+                ...((persona.personality ?? {}) as Record<string, unknown>),
+                ...(distilled.type
+                  ? {
+                      type: distilled.type,
+                      typeEvidence: distilled.typeEvidence,
+                      typeJudgedAt: new Date().toISOString(),
+                      typeJudgeMethod: "llm-distill",
+                    }
+                  : {
+                      /* 模型说判不了 —— 清掉旧的判定，别让过期结论继续挂着 */
+                      type: undefined,
+                      typeEvidence: undefined,
+                      typeJudgedAt: new Date().toISOString(),
+                      typeJudgeMethod: "llm-undecided",
+                    }),
+              } as never,
+            }
+          : {}),
         confidence: {
           method: method === "llm" ? "llm-distill" : "rule-distill",
           distilledAt: new Date().toISOString(),
@@ -456,6 +533,7 @@ export async function distillPersona(
           summary: distilled.summary,
           groundedIn: distilled.groundedIn,
           llmError: llmError ?? null,
+          judgedType: distilled.type,
         } as never,
       },
     });

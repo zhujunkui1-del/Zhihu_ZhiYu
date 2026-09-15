@@ -553,19 +553,50 @@ export default function PersonaClient({
               <div className={styles.prCol}>
                 {/* ① 综合画像判定的**人格倾向**（六型之一）——
                     不是 SBTI 的沙雕人格，两者含义不同。 */}
-                {board.fused ? (
-                  <>
+                {/* ① 主结论：**蒸馏时由 Agent 读懂证据后判定的**倾向 + 原话依据。
+                    没有依据就不显示型名 —— 一个没有理由的型名和编一个没区别。 */}
+                {board.judgedType?.evidence ? (
+                  <div data-judged-type="1">
                     <div className={styles.typeBadge}>
-                      <span className={styles.typeName} data-fused-type="1">
-                        {board.fused.type}
-                      </span>
-                      <span className="meta">
-                        匹配度 {toDisplayPercentText(board.fused.similarity / 100)}
-                      </span>
+                      <span className={styles.typeName}>{board.judgedType.type}</span>
+                      <span className="meta">Agent 读完你的数据后判定</span>
                     </div>
                     <p className={styles.hint} style={{ marginTop: 8 }}>
-                      {board.fused.blurb}
+                      判定依据：{board.judgedType.evidence}
                     </p>
+                  </div>
+                ) : null}
+
+                {/* ② 旧口径（六维相似度）降级为参考：不再当作"你的人格倾向"。
+                    原因：实测它的第一名与第二名只差 0.016 个百分点，
+                    把 career 从 0.5 挪到 0.6 就换型 —— 那不是判定。 */}
+                {board.fused ? (
+                  <>
+                    {board.judgedType?.evidence ? (
+                      <p className="meta" style={{ marginTop: 10 }} data-fused-legacy="1">
+                        六维相似度（旧口径，仅供参考）：{board.fused.type}{" "}
+                        {toDisplayPercentText(board.fused.similarity / 100)}
+                        {board.fused.runnerUp.length
+                          ? `；次接近 ${board.fused.runnerUp
+                              .map((r) => `${r.type} ${toDisplayPercentText(r.similarity / 100)}`)
+                              .join("、")}`
+                          : ""}
+                      </p>
+                    ) : (
+                      <>
+                        <div className={styles.typeBadge}>
+                          <span className={styles.typeName} data-fused-type="1">
+                            {board.fused.type}
+                          </span>
+                          <span className="meta">
+                            匹配度 {toDisplayPercentText(board.fused.similarity / 100)}
+                          </span>
+                        </div>
+                        <p className={styles.hint} style={{ marginTop: 8 }}>
+                          {board.fused.blurb}
+                        </p>
+                      </>
+                    )}
                     {/* 只有自评时，必须说清这份"综合画像"目前等于把自评折算了一遍 */}
                     {board.fused.selfReportOnly ? (
                       <p className={styles.selfOnlyNote} data-fused-self-only="1">
@@ -578,7 +609,7 @@ export default function PersonaClient({
                         这份结论含 <b>SBTI 自评</b>成分，其余来自观察到的数据。
                       </p>
                     ) : null}
-                    {board.fused.runnerUp.length ? (
+                    {!board.judgedType?.evidence && board.fused.runnerUp.length ? (
                       <p className="meta" style={{ marginTop: 6 }}>
                         次接近：
                         {board.fused.runnerUp
@@ -599,13 +630,15 @@ export default function PersonaClient({
                       </div>
                     ) : null}
                   </>
-                ) : (
+                ) : !board.judgedType?.evidence ? (
+                  /* 既没有六维结论、也没有带依据的判型 → 如实说还没有，并告诉用户怎么办 */
                   <p className={styles.hint}>
                     {board.behavior?.radarIsBehavior ? (
                       <>
-                        价值观维度在**观察数据上量不出来**（内容形态反推不出"你多看重成长"），
-                        所以这里不再给一个凑出来的倾向。下面这张图是**数出来的行为特征** ——
-                        谁先开口、多久回、什么时候聊、聊得散不散，每一项都能指着原始数据说清。
+                        还没有判定人格倾向（价值观维度在观察数据上量不出来）。
+                        点一次「重新蒸馏」，Agent 会读完你的数据给出结论与依据；
+                        下面这张图是**数出来的行为特征** —— 谁先开口、多久回、
+                        什么时候聊、聊得散不散，每一项都能指着原始数据说清。
                       </>
                     ) : (
                       <>
@@ -614,7 +647,7 @@ export default function PersonaClient({
                       </>
                     )}
                   </p>
-                )}
+                ) : null}
 
                 {/* ② SBTI 自评单独一行 —— 与上面的综合画像并列，不混为一谈 */}
                 {sbti?.type ? (
