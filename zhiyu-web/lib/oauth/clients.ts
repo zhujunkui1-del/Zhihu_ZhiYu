@@ -53,6 +53,39 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
+/**
+ * ⚠️ 必须检查业务错误码 —— 飞书/钉钉的业务错误是 **HTTP 200 + `{code, msg}`**。
+ *
+ * 这条是踩过坑才加的：之前只看 `data.items`，接口因为**权限不足**返回
+ * `{code: 99991672, msg: "..."}` 时，`data` 是 undefined → 被当成"没有数据"，
+ * 于是给用户的结论是"可能是你还没发过话，或应用缺少权限"这种**推测**，
+ * 真正的错误码和原因全被吞掉了（用户根本无从下手）。
+ *
+ * @param what 人话描述这一步在做什么，出错时拼进提示
+ * @param scopeHint 这一步需要哪个权限，出错时一并告诉用户去开
+ */
+function assertOk(
+  json: Record<string, unknown>,
+  provider: "feishu" | "dingtalk",
+  what: string,
+  scopeHint: string,
+): void {
+  const rawCode = json.code;
+  /* 飞书：code 是数字，0 为成功；钉钉：成功时通常没有 code，出错才有 */
+  const failed =
+    provider === "feishu"
+      ? typeof rawCode === "number" && rawCode !== 0
+      : typeof rawCode === "number" && rawCode !== 0;
+  if (!failed) return;
+
+  const msg = pickStr(json, "msg", "message", "error_description") || JSON.stringify(json).slice(0, 160);
+  throw new OAuthApiError(
+    `${provider}_api_${rawCode}`,
+    `${provider === "feishu" ? "飞书" : "钉钉"}接口在「${what}」这一步报错：${rawCode} ${msg}` +
+      `（该步需要权限：${scopeHint}）`,
+  );
+}
+
 function pickStr(o: Record<string, unknown>, ...keys: string[]): string {
   for (const k of keys) {
     const v = o[k];
@@ -193,6 +226,7 @@ export async function feishuPullMessages(
 
   const chatsRes = await fetch(`${FEISHU_BASE}/im/v1/chats?page_size=50`, { headers });
   const chatsJson = await readJson(chatsRes);
+  assertOk(chatsJson, "feishu", "读取你的群列表", "im:chat");
   const chatList = ((chatsJson.data ?? {}) as Record<string, unknown>).items;
   const chats = Array.isArray(chatList) ? (chatList as Record<string, unknown>[]) : [];
 
@@ -224,6 +258,12 @@ export async function feishuPullMessages(
         `${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ""}`;
       const msgRes = await fetch(url, { headers });
       const msgJson = await readJson(msgRes);
+      assertOk(
+        msgJson,
+        "feishu",
+        `拉取会话 ${t.id} 的消息`,
+        t.isP2p ? "im:message.p2p_msg:get_as_user" : "im:message.group_msg:get_as_user",
+      );
       const data = (msgJson.data ?? {}) as Record<string, unknown>;
       const list = data.items;
       if (!Array.isArray(list) || list.length === 0) break;
@@ -300,6 +340,7 @@ async function feishuDocContent(
       { headers },
     );
     const j = await readJson(r);
+    assertOk(j, "feishu", "解析 Wiki 节点", "wiki:wiki:readonly");
     const node = (((j.data ?? {}) as Record<string, unknown>).node ?? {}) as Record<string, unknown>;
     const objToken = pickStr(node, "obj_token") || token;
     const objType = pickStr(node, "obj_type") || "docx";
@@ -311,6 +352,7 @@ async function feishuDocContent(
       headers,
     });
     const j = await readJson(r);
+    assertOk(j, "feishu", "读取文档正文", "docx:document:readonly");
     return pickStr((j.data ?? {}) as Record<string, unknown>, "content");
   }
 
@@ -326,6 +368,7 @@ async function feishuBitableText(
     headers,
   });
   const j = await readJson(r);
+  assertOk(j, "feishu", "读取多维表格", "bitable:app:readonly");
   const data = (j.data ?? {}) as Record<string, unknown>;
   const tables = Array.isArray(data.items) ? (data.items as Record<string, unknown>[]) : [];
 
@@ -365,7 +408,14 @@ export async function feishuPullDocs(
     "Content-Type": "application/json; charset=utf-8",
   };
 
-  /** 先按"创建人是我"搜；平台不支持该过滤时退回关键词搜索（distilly 的同款兜底） */
+  /**
+   * 先按"创建人是我"搜；平台不支持该过滤时退回关键词搜索（distilly 的同款兜底）。
+   *
+   * ⚠️ 第一次因为**权限不足**（缺 search:message）失败时，不能把它当成
+   * "没搜到文档"就去重试关键词 —— 那样错误会被彻底吞掉。
+   * 所以这里区分：`code!==0` 且是权限类错误 → 直接抛出，让用户看到真实原因；
+   * 其它情况（比如不支持 creator 过滤）才回落。
+   */
   const search = async (body: Record<string, unknown>) => {
     const r = await fetch(`${FEISHU_BASE}/search/v2/message`, {
       method: "POST",
@@ -383,7 +433,10 @@ export async function feishuPullDocs(
   });
   let raw = ((j.data ?? {}) as Record<string, unknown>).items;
   if (!Array.isArray(raw) || raw.length === 0) {
+    /* 权限不足 / 未开通该接口 → 抛出真实错误，而不是静默"没搜到" */
+    assertOk(j, "feishu", "搜索你的云文档", "search:message");
     j = await search({ query: myName || "", search_type: "docs", page_size: maxDocs });
+    assertOk(j, "feishu", "搜索你的云文档", "search:message");
     raw = ((j.data ?? {}) as Record<string, unknown>).items;
   }
   const list = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
@@ -455,47 +508,63 @@ export async function dingtalkExchangeCode(env: ProviderEnv, code: string): Prom
 export async function dingtalkPullDocs(
   accessToken: string,
   opts: { maxDocs?: number; keyword?: string } = {},
-): Promise<{ items: PulledItem[]; workspaces: number; docs: number; bitables: number }> {
+): Promise<{
+  items: PulledItem[];
+  workspaces: number;
+  docs: number;
+  bitables: number;
+  warnings: string[];
+}> {
   const maxDocs = opts.maxDocs ?? 20;
   const headers = { "x-acs-dingtalk-access-token": accessToken };
   const items: PulledItem[] = [];
+  const warnings: string[] = [];
 
-  const wsRes = await fetch(`${DINGTALK_BASE}/v1.0/doc/workspaces?maxResults=50`, { headers });
-  const wsJson = await readJson(wsRes);
-  const wsList = wsJson.workspaces;
-  const workspaces = Array.isArray(wsList) ? (wsList as Record<string, unknown>[]) : [];
-
+  /* 文档与多维表格是两套权限，分别 try/catch：一个没开不该连带丢掉另一个 */
+  let workspaces = 0;
   let docs = 0;
-  for (const ws of workspaces.slice(0, 5)) {
-    const wsId = pickStr(ws, "workspaceId", "id");
-    if (!wsId) continue;
-    const filesRes = await fetch(
-      `${DINGTALK_BASE}/v1.0/doc/workspaces/${encodeURIComponent(wsId)}/files?maxResults=50`,
-      { headers },
-    );
-    const filesJson = await readJson(filesRes);
-    const files = filesJson.workspaces;
-    const list = Array.isArray(files) ? (files as Record<string, unknown>[]) : [];
-    for (const f of list.slice(0, maxDocs)) {
-      const docId = pickStr(f, "dentries", "id", "docId");
-      const name = pickStr(f, "name", "title") || "文档";
-      if (!docId) continue;
-      const spaceId = pickStr(f, "spaceId") || wsId;
-      const contentRes = await fetch(
-        `${DINGTALK_BASE}/v1.0/doc/workspaces/${encodeURIComponent(spaceId)}/files/${encodeURIComponent(
-          docId,
-        )}/content`,
+  try {
+    const wsRes = await fetch(`${DINGTALK_BASE}/v1.0/doc/workspaces?maxResults=50`, { headers });
+    const wsJson = await readJson(wsRes);
+    assertOk(wsJson, "dingtalk", "列出知识库", "文档读权限");
+    const wsList = wsJson.workspaces;
+    const list0 = Array.isArray(wsList) ? (wsList as Record<string, unknown>[]) : [];
+    workspaces = list0.length;
+
+    for (const ws of list0.slice(0, 5)) {
+      const wsId = pickStr(ws, "workspaceId", "id");
+      if (!wsId) continue;
+      const filesRes = await fetch(
+        `${DINGTALK_BASE}/v1.0/doc/workspaces/${encodeURIComponent(wsId)}/files?maxResults=50`,
         { headers },
       );
-      const contentJson = await readJson(contentRes);
-      const text = pickStr(contentJson, "content", "text", "markdown").trim();
-      if (text.length < 10) continue;
-      /* 文档可能很长：切成段落，每段一条证据（与手动导入 docs.txt 的口径一致） */
-      const chunks = splitParagraphs(text, `钉钉 · 文档《${name}》`);
-      if (chunks.length === 0) continue;
-      docs += 1;
-      items.push(...chunks);
+      const filesJson = await readJson(filesRes);
+      assertOk(filesJson, "dingtalk", "列出知识库文件", "文档读权限");
+      const files = filesJson.workspaces;
+      const list = Array.isArray(files) ? (files as Record<string, unknown>[]) : [];
+      for (const f of list.slice(0, maxDocs)) {
+        const docId = pickStr(f, "dentries", "id", "docId");
+        const name = pickStr(f, "name", "title") || "文档";
+        if (!docId) continue;
+        const spaceId = pickStr(f, "spaceId") || wsId;
+        const contentRes = await fetch(
+          `${DINGTALK_BASE}/v1.0/doc/workspaces/${encodeURIComponent(spaceId)}/files/${encodeURIComponent(
+            docId,
+          )}/content`,
+          { headers },
+        );
+        const contentJson = await readJson(contentRes);
+        assertOk(contentJson, "dingtalk", "读取文档正文", "文档读权限");
+        const text = pickStr(contentJson, "content", "text", "markdown").trim();
+        if (text.length < 10) continue;
+        const chunks = splitParagraphs(text, `钉钉 · 文档《${name}》`);
+        if (chunks.length === 0) continue;
+        docs += 1;
+        items.push(...chunks);
+      }
     }
+  } catch (e) {
+    warnings.push(`文档没拉到：${(e as Error).message}`);
   }
 
   /* ── 多维表格 ──
@@ -518,6 +587,7 @@ export async function dingtalkPullDocs(
       }),
     });
     const searchJson = await readJson(searchRes);
+    assertOk(searchJson, "dingtalk", "搜索多维表格", "多维表格读权限");
     const docList = searchJson.docList;
     const found = Array.isArray(docList) ? (docList as Record<string, unknown>[]) : [];
 
@@ -531,6 +601,7 @@ export async function dingtalkPullDocs(
         { headers },
       );
       const sheetsJson = await readJson(sheetsRes);
+      assertOk(sheetsJson, "dingtalk", "读取多维表格工作表", "多维表格读权限");
       const sheets = Array.isArray(sheetsJson.sheets)
         ? (sheetsJson.sheets as Record<string, unknown>[])
         : [];
@@ -549,6 +620,7 @@ export async function dingtalkPullDocs(
           { headers },
         );
         const fieldsJson = await readJson(fieldsRes);
+        assertOk(fieldsJson, "dingtalk", "读取多维表格字段", "多维表格读权限");
         const fields = (Array.isArray(fieldsJson.fields) ? fieldsJson.fields : [])
           .map((f) => pickStr(f as Record<string, unknown>, "name"))
           .filter(Boolean);
@@ -560,6 +632,7 @@ export async function dingtalkPullDocs(
           { headers },
         );
         const recJson = await readJson(recRes);
+        assertOk(recJson, "dingtalk", "读取多维表格记录", "多维表格读权限");
         const records = Array.isArray(recJson.records)
           ? (recJson.records as Record<string, unknown>[])
           : [];
@@ -584,15 +657,17 @@ export async function dingtalkPullDocs(
         }
       }
     }
-  } catch {
-    /* 多维表格失败不影响文档（权限可能只开了一部分） */
+  } catch (e) {
+    /* 多维表格失败不影响文档（权限可能只开了一部分），但**要说出来** */
+    warnings.push(`多维表格没拉到：${(e as Error).message}`);
   }
 
   return {
     items: [...items, ...bitables],
-    workspaces: workspaces.length,
+    workspaces,
     docs,
     bitables: bitableCount,
+    warnings,
   };
 }
 

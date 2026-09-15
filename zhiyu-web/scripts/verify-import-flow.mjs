@@ -699,6 +699,18 @@ rec(
 /* ───────── ⑩ 按钮形态 ───────── */
 console.log("\n== ⑩ 按钮形态（首次一个 / 已注入两个 / 平台源多一个同步）==");
 
+/* ⚠️ 后端在授权/同步完成后会跳回 /persona?tab=sources —— 页面必须真的切到那一栏。
+   之前 PersonaClient 无视 ?tab=，永远停在「人格卡」，用户刚注入完数据却看不到变化。 */
+await page.goto(`${BASE}/persona?tab=sources`, { waitUntil: "load", timeout: 60000 });
+const tabHonored = await waitFor(
+  () => Boolean(document.querySelector('[data-open-import="wechat"]')),
+  15000,
+);
+rec(
+  "⚠️ 带 ?tab=sources 打开时**直接停在「注入数据」栏**（用户注入完回来能看到状态）",
+  tabHonored,
+);
+
 /* 先把钉钉清成"未注入"，才能验证平台源的按钮形态 */
 await prisma.personaEvidence.deleteMany({ where: { personaId, source: "dingtalk" } });
 await prisma.personaSource.updateMany({

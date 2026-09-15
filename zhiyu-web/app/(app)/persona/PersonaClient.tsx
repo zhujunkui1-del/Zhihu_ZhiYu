@@ -128,6 +128,22 @@ export default function PersonaClient({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("card");
 
+  /**
+   * 从 URL 读初始页签（`?tab=sources`）。
+   *
+   * ⚠️ 这个之前缺了，后果是：授权/同步完成后后端跳回
+   * `/persona?tab=sources&linked=feishu&pulled=N`，而页面**无视这个参数**、
+   * 永远停在「人格卡」—— 用户刚注入完数据，却被丢回另一页，看不到任何变化
+   * （用户报的"注入后 UI 没更新"里就含这一条）。
+   * 另外从 OAuth 回跳时 `linked` / `pulled` 只用于提示，读一次就该清掉，
+   * 否则刷新会重复弹。
+   */
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const t = sp.get("tab");
+    if (t === "sources" || t === "distill") setTab(t);
+  }, []);
+
   /* SBTI 测试：弹窗内的答题状态 */
   const [quizOpen, setQuizOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});

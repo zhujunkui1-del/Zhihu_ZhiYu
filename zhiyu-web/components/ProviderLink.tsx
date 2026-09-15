@@ -25,7 +25,6 @@ interface ProviderStatus {
   configured: boolean;
   linked: { displayName: string | null; expired: boolean } | null;
 }
-
 export default function ProviderLink({
   provider,
   onSynced,
@@ -156,7 +155,9 @@ export default function ProviderLink({
         ok: boolean;
         error?: string;
         code?: string;
+        warnings?: string[];
         counts?: { pulled: number; written: number; total: number };
+        detail?: Record<string, unknown>;
       };
 
       if (!r.ok) {
@@ -165,22 +166,44 @@ export default function ProviderLink({
           window.location.href = `/api/oauth/${provider}`;
           return;
         }
+        /**
+         * 同步失败要说**大声**：之前只写一行灰色小字，用户以为"点了没反应"。
+         * 现在同时弹提示条（带真实错误码与缺哪个权限）。
+         */
         setNote(r.error ?? "同步失败");
-        reportError(new Error(r.error ?? "同步失败"), { title: "同步失败" });
+        reportError(new Error(r.error ?? "同步失败"), {
+          title: `${status?.label ?? ""}同步失败`,
+          detail: `${r.code ?? ""}`,
+        });
         return;
       }
+
+      /* 成功的提示要带上**分步计数**，用户才知道究竟拿到了什么 */
+      const d = r.detail ?? {};
+      const bits: string[] = [];
+      if (typeof d.messages === "number") bits.push(`消息 ${d.messages}`);
+      if (typeof d.docs === "number") bits.push(`文档 ${d.docs}`);
+      if (typeof d.bitables === "number") bits.push(`表格 ${d.bitables}`);
       setNote(
-        `新增 ${r.counts?.written ?? 0} 条（读到 ${r.counts?.pulled ?? 0} 条，共 ${
-          r.counts?.total ?? 0
-        } 条）`,
+        `新增 ${r.counts?.written ?? 0} 条（共 ${r.counts?.total ?? 0} 条）` +
+          (bits.length ? ` · ${bits.join(" / ")}` : ""),
       );
       onSynced();
+
+      /* 部分成功：有的步骤没拉到（通常是权限没开），如实弹出来并说明缺什么 */
+      if (r.warnings?.length) {
+        reportError(new Error(r.warnings.join("；")), {
+          title: "部分数据没拉到",
+          detail: "按提示补开权限后重新同步",
+        });
+      }
     } catch (e) {
       setNote(`同步失败：${(e as Error).message}`);
+      reportError(e, { title: "同步失败" });
     } finally {
       setBusy(false);
     }
-  }, [onSynced, provider]);
+  }, [onSynced, provider, status?.label]);
 
   const onClick = useCallback(() => {
     /**

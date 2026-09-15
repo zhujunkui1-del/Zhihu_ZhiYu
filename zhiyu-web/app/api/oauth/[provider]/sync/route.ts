@@ -41,6 +41,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       counts: { pulled: r.pulled, written: r.written, total: r.total },
       skipped: r.skipped,
       detail: r.detail,
+      /* 有哪一步没拉到（权限未开通等）—— 前端会显示并弹提示，不因"部分成功"而闭嘴 */
+      warnings: r.warnings,
     });
   } catch (e) {
     const err = e as SyncError;

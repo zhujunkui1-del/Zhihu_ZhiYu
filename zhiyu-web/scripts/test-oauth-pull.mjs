@@ -343,6 +343,65 @@ rec(
   `${withoutId.items.length} 条`,
 );
 
+/* ── ④b 错误必须被暴露，而不是当成"没有数据" ───────────────────────── */
+console.log("\n== ④b 平台报错必须暴露（HTTP 200 + 业务错误码）==");
+routes.length = 0;
+calls.length = 0;
+
+/* 飞书的权限错误就是 HTTP 200 + {code: 99991672, msg: "..."} —— 
+   之前只看 data.items，会把它当成"没有数据"，给用户一句没用的推测。 */
+on("/im/v1/chats", { code: 99991672, msg: "no permission: im:chat" });
+let permErr = null;
+try {
+  await feishuPullMessages("tok", "ou_me");
+} catch (e) {
+  permErr = e;
+}
+rec(
+  "⚠️ 群列表权限不足 → 抛出带错误码的真实原因",
+  Boolean(permErr) && String(permErr.message).includes("99991672"),
+  permErr?.message,
+);
+rec(
+  "错误里写清了这一步需要哪个权限（用户照着去开）",
+  String(permErr?.message ?? "").includes("im:chat"),
+  permErr?.message,
+);
+
+/* 消息权限不足：也要抛，且区分群聊/私聊需要的不同权限 */
+routes.length = 0;
+calls.length = 0;
+on("/im/v1/chats", { data: { items: [{ chat_id: "oc_g1", name: "群" }] } });
+on("/im/v1/messages", { code: 99991672, msg: "no permission: im:message.group_msg:get_as_user" });
+let msgErr = null;
+try {
+  await feishuPullMessages("tok", "ou_me");
+} catch (e) {
+  msgErr = e;
+}
+rec(
+  "⚠️ 消息权限不足 → 抛出，并指出需要 im:message.group_msg:get_as_user",
+  Boolean(msgErr) && String(msgErr.message).includes("group_msg:get_as_user"),
+  msgErr?.message,
+);
+
+/* 私聊那一步要提示 p2p 权限 */
+routes.length = 0;
+calls.length = 0;
+on("/im/v1/chats", { data: { items: [] } });
+on("/im/v1/messages", { code: 99991672, msg: "no permission" });
+let p2pErr = null;
+try {
+  await feishuPullMessages("tok", "ou_me", { extraChatIds: ["oc_p2pAAA111"] });
+} catch (e) {
+  p2pErr = e;
+}
+rec(
+  "私聊那一步提示的是 im:message.p2p_msg:get_as_user",
+  String(p2pErr?.message ?? "").includes("p2p_msg:get_as_user"),
+  p2pErr?.message,
+);
+
 /* ── ⑤ 能力声明必须与实现一致（不许再写假话）──────────────────────── */
 console.log("\n== ⑤ 能力声明 vs 实现 ==");
 rec(
