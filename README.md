@@ -13,6 +13,10 @@
   线上：<b>https://www.zhiyuapp.site</b>
 </p>
 
+<p align="center">
+  <img src="产品方案/assets/visit.png" alt="访问量" width="220">
+</p>
+
 ---
 
 ## 这是什么
