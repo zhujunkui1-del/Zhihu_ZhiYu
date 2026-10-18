@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build": "next build",
     "dev": "next dev",
     "postinstall": "prisma generate",
-    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -15,28 +15,37 @@
     "db:studio": "prisma studio",
     "seed": "node --env-file=.env scripts/seed-demo.mjs && node --env-file=.env scripts/seed-agent-match.mjs",
     "seed:reset": "npm run seed",
-    "check:deploy": "node scripts/check-deploy-readiness.mjs"
+    "check:deploy": "node scripts/check-deploy-readiness.mjs",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-neon": "^7.10.0",
     "@prisma/client": "^7.10.0",
-    "next": "16.3.4",
+    "next": "^16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "^16.4.2",
     "prisma": "^7.10.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.151.1"
   },
   "allowScripts": {
     "prisma@7.10.0": true,
-    "@prisma/engines@7.10.0": true
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.25.4": true,
+    "esbuild@0.28.2": true,
+    "workerd@1.20261012.1": true
   }
 }
